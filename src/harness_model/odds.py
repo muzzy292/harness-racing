@@ -202,6 +202,7 @@ def _score_components(row: dict[str, str]) -> dict[str, float]:
     bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
     days_since_last_run = _to_float(row.get("days_since_last_run"))
     nr_headroom = _to_float(row.get("nr_headroom"))
+    avg_stake = _to_float(row.get("last_5_avg_stake"))
 
     # When horse-page run data is available use it exclusively for the ability
     # bucket.  Form-page recent lines are a fallback for horses with no history
@@ -230,6 +231,10 @@ def _score_components(row: dict[str, str]) -> dict[str, float]:
         # Large headroom can indicate declining form (NR has dropped) → small penalty.
         # Weight is intentionally small to avoid double-counting with nr component.
         "class_pos": _neg_scale(nr_headroom, divisor=8.0, floor=-2.0, missing=0.0) * 0.15,
+        # Stake class — average earnings from recent runs (outlier-capped).
+        # Centred at $4500; horses earning above that have been racing at a higher level.
+        # Only populated when horse-page data has been ingested.
+        "stake_class": _pos_scale(avg_stake, center=4500.0, divisor=2500.0, missing=0.0) * 0.2,
         "barrier": _barrier_score(barrier),
         # BMR at race distance range — faster (lower seconds) = better.
         # Centre around 117s (1:57.0), 1s difference ≈ 0.5 point swing.

@@ -132,6 +132,9 @@ def _build_feature_row(
     race_nr_ceiling = _parse_race_nr_ceiling(runner.get("class_name"))
     nr_rating = runner["nr_rating"]
     nr_headroom = round(race_nr_ceiling - float(nr_rating), 1) if (race_nr_ceiling is not None and nr_rating is not None) else None
+    raw_stakes = [run["stake"] for run in last_runs if run.get("stake") is not None]
+    capped_stakes = _cap_outlier_stakes([float(s) for s in raw_stakes])
+    last_5_avg_stake = _avg(capped_stakes[:5])
 
     return {
         "meeting_code": runner["meeting_code"],
@@ -202,6 +205,7 @@ def _build_feature_row(
         "days_since_last_run": days_since_last_run,
         "race_nr_ceiling": race_nr_ceiling,
         "nr_headroom": nr_headroom,
+        "last_5_avg_stake": last_5_avg_stake,
     }
 
 
@@ -432,6 +436,33 @@ def _days_since_last_run(recent_lines: list[dict[str, object]], meeting_date: ob
     if latest is None:
         return None
     return (race_date - latest).days
+
+
+def _cap_outlier_stakes(stakes: list[float]) -> list[float]:
+    """Cap a single outlier stake at 30% of the second-highest value.
+
+    If the highest stake is more than 1.5x the second-highest (e.g. a horse
+    won one big feature race but normally races at a much lower level), that
+    result is replaced with second_highest * 0.30 so it does not inflate the
+    horse's apparent class level.
+    """
+    if len(stakes) < 2:
+        return stakes
+    sorted_desc = sorted(stakes, reverse=True)
+    highest = sorted_desc[0]
+    second = sorted_desc[1]
+    if second <= 0 or highest <= 1.5 * second:
+        return stakes
+    cap = second * 0.30
+    replaced = False
+    result = []
+    for s in stakes:
+        if not replaced and s == highest:
+            result.append(cap)
+            replaced = True
+        else:
+            result.append(s)
+    return result
 
 
 def _parse_race_nr_ceiling(class_name: object) -> float | None:
