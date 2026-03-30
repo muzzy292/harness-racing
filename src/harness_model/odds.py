@@ -58,7 +58,10 @@ def score_race_rows(
 
     enriched = []
     for row in race_rows:
-        components = _score_components(row)
+        s1 = _stage1_components(row)
+        s2 = _stage2_components(row)
+        stage1_score = round(sum(s1.values()), 4)
+        stage2_score = round(sum(s2.values()), 4)
         enriched.append(
             {
                 "horse_name": row.get("horse_name"),
@@ -66,8 +69,10 @@ def score_race_rows(
                 "barrier": row.get("barrier"),
                 "nominated_driver": row.get("nominated_driver"),
                 "nominated_trainer": row.get("nominated_trainer"),
-                "score": round(sum(components.values()), 4),
-                "components": components,
+                "stage1_score": stage1_score,
+                "stage2_score": stage2_score,
+                "score": round(stage1_score + stage2_score, 4),
+                "components": {**s1, **s2},
             }
         )
 
@@ -137,12 +142,14 @@ def render_race_odds_table(scored_rows: list[dict[str, object]]) -> str:
     lines = []
     has_market = any(row.get("fair_market_probability") is not None for row in display_rows)
     if has_market:
-        lines.append("No.  Horse                 Barrier  ModelP  AdjP    Fair Odds  Adj Odds  Score")
-        lines.append("---  --------------------  -------  ------  ------  ---------  --------  ------")
+        lines.append("No.  Horse                 Barrier  ModelP  AdjP    Fair Odds  Adj Odds  S1      S2      Score")
+        lines.append("---  --------------------  -------  ------  ------  ---------  --------  ------  ------  ------")
     else:
-        lines.append("No.  Horse                 Barrier  Prob    Fair Odds  Score")
-        lines.append("---  --------------------  -------  ------  ---------  ------")
+        lines.append("No.  Horse                 Barrier  Prob    Fair Odds  S1      S2      Score")
+        lines.append("---  --------------------  -------  ------  ---------  ------  ------  ------")
     for row in display_rows:
+        s1 = f"{row.get('stage1_score', 0.0):>6.3f}"
+        s2 = f"{row.get('stage2_score', 0.0):>6.3f}"
         if has_market:
             lines.append(
                 f"{str(row['runner_number'] or ''):<3}  "
@@ -152,6 +159,7 @@ def render_race_odds_table(scored_rows: list[dict[str, object]]) -> str:
                 f"{float(row['adjusted_probability']):.4f}  "
                 f"{row['fair_odds']:<9}  "
                 f"{row['adjusted_fair_odds']:<8}  "
+                f"{s1}  {s2}  "
                 f"{row['score']:.4f}"
             )
         else:
@@ -161,6 +169,7 @@ def render_race_odds_table(scored_rows: list[dict[str, object]]) -> str:
                 f"{str(row['barrier'] or ''):<7}  "
                 f"{row['win_probability']:.4f}  "
                 f"{row['fair_odds']:<9}  "
+                f"{s1}  {s2}  "
                 f"{row['score']:.4f}"
             )
     return "\n".join(lines)
@@ -179,76 +188,81 @@ def render_meeting_odds(meeting_scores: dict[int, list[dict[str, object]]], meet
     return "\n".join(sections)
 
 
-def _score_components(row: dict[str, str]) -> dict[str, float]:
+def _stage1_components(row: dict[str, str]) -> dict[str, float]:
+    """Stage 1 — Horse performance rating.
+
+    Built from historical form: adjusted margins, sectionals, consistency,
+    ceiling run, win rate, NR, and class-normalised form signals.
+    These components are independent of today's specific race conditions.
+    """
     last5_adj = _to_float(row.get("last_5_avg_adj_margin"))
-    last10_adj = _to_float(row.get("last_10_avg_adj_margin"))
     best_adj = _to_float(row.get("last_5_best_adj_margin"))
     recent_line_adj = _to_float(row.get("recent_line_avg_adj_margin"))
     recent_line_best = _to_float(row.get("recent_line_best_adj_margin"))
     avg_sp = _to_float(row.get("last_5_avg_sp"))
     win_rate = _to_float(row.get("last_5_win_rate"))
     sec3 = _to_float(row.get("last_3_avg_sectional_delta"))
-    sec5 = _to_float(row.get("last_5_avg_sectional_delta"))
     comment_adj = _to_float(row.get("recent_line_avg_comment_adj"))
     tempo_adj = _to_float(row.get("recent_line_avg_tempo_adj"))
     tempo_flags = _to_float(row.get("recent_line_tempo_flags"))
     null_flags = _to_float(row.get("recent_line_null_flags"))
-    map_lead = _to_float(row.get("map_lead_score"))
-    map_soft = _to_float(row.get("map_soft_trip_score"))
-    map_wide = _to_float(row.get("map_wide_risk_score"))
-    map_death = _to_float(row.get("map_death_score"))
     nr = _to_float(row.get("nr_rating"))
-    barrier = row.get("barrier") or ""
-    bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
-    days_since_last_run = _to_float(row.get("days_since_last_run"))
     nr_headroom = _to_float(row.get("nr_headroom"))
     avg_stake = _to_float(row.get("last_5_avg_stake"))
     class_delta = _to_float(row.get("class_delta"))
 
-    # When horse-page run data is available use it exclusively for the ability
-    # bucket.  Form-page recent lines are a fallback for horses with no history
-    # in the DB — they should not stack on top of horse-page data.
+    # Horse-page run data takes priority over form-page recent lines —
+    # they should not stack.
     has_horse_data = last5_adj is not None
     consistency_adj = last5_adj if has_horse_data else recent_line_adj
     ceiling_adj     = best_adj  if has_horse_data else recent_line_best
 
-    components = {
-        # ── Ability bucket (one metric per concept) ──────────────────────────
+    return {
         "consistency": _neg_scale(consistency_adj, divisor=12.0, floor=-4.0, missing=0.0) * 1.8,
         "ceiling":     _neg_scale(ceiling_adj,     divisor=10.0, floor=-3.5, missing=0.0) * 1.2,
         "late_speed":  _neg_scale(sec3,            divisor=1.2,  floor=-2.5, missing=0.0) * 1.4,
         "comment_adj": _pos_scale(comment_adj, center=0.0, divisor=6.0, missing=0.0) * 0.5,
-        "tempo_adj": _pos_scale(tempo_adj, center=0.0, divisor=1.2, missing=0.0) * 0.45,
+        "tempo_adj":   _pos_scale(tempo_adj, center=0.0, divisor=1.2, missing=0.0) * 0.45,
         "tempo_flags": -(tempo_flags or 0.0) * 0.08,
-        "null_flags": -(null_flags or 0.0) * 0.25,
-        "map_lead": (map_lead or 0.0) * 0.7,
-        "map_soft": (map_soft or 0.0) * 0.45,
-        "map_wide": -(map_wide or 0.0) * 0.5,
-        "map_death": -(map_death or 0.0) * 0.35,
-        "market": _neg_log_scale(avg_sp, missing=0.0) * 0.6,
-        "win_rate": (win_rate or 0.0) * 1.2,
-        "nr": _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * 0.25,
-        # Class position — lower headroom (NR near ceiling) = horse is near top of grade.
-        # Large headroom can indicate declining form (NR has dropped) → small penalty.
-        # Weight is intentionally small to avoid double-counting with nr component.
-        "class_pos": _neg_scale(nr_headroom, divisor=8.0, floor=-2.0, missing=0.0) * 0.15,
-        # Stake class — average earnings from recent runs (outlier-capped).
-        # Centred at $4500; horses earning above that have been racing at a higher level.
-        # Only populated when horse-page data has been ingested.
+        "null_flags":  -(null_flags or 0.0) * 0.25,
+        "market":      _neg_log_scale(avg_sp, missing=0.0) * 0.6,
+        "win_rate":    (win_rate or 0.0) * 1.2,
+        "nr":          _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * 0.25,
+        # Class signals — lower NR headroom = near top of grade; stake class and
+        # class delta capture recent competition level vs today's race.
+        "class_pos":   _neg_scale(nr_headroom, divisor=8.0, floor=-2.0, missing=0.0) * 0.15,
         "stake_class": _pos_scale(avg_stake, center=4500.0, divisor=2500.0, missing=0.0) * 0.2,
-        # Class delta — today's race purse minus average recent run purse (outlier-capped).
-        # Positive = stepping up in class; negative = dropping back.
-        # A horse dropping back gets a bonus; one stepping up gets a penalty.
-        # Centred at 0; $2000 difference ≈ ±0.3 swing.
         "class_delta": _pos_scale(class_delta, center=0.0, divisor=-2000.0, missing=0.0) * 0.3,
-        "barrier": _barrier_score(barrier),
-        # BMR at race distance range — faster (lower seconds) = better.
-        # Centre around 117s (1:57.0), 1s difference ≈ 0.5 point swing.
-        "bmr_dist_rge": _pos_scale(bmr_dist_rge, center=117.0, divisor=-2.0, missing=0.0) * 0.6,
-        # Fitness penalty — last run > 14 days ago scores negatively.
-        "fitness": _fitness_score(days_since_last_run),
     }
-    return components
+
+
+def _stage2_components(row: dict[str, str]) -> dict[str, float]:
+    """Stage 2 — Today's race adjustment.
+
+    Built from race-day factors: barrier draw, projected map position,
+    distance suitability (BMR), and fitness (days since last run).
+    These are independent of the horse's historical ability rating.
+    """
+    map_lead = _to_float(row.get("map_lead_score"))
+    map_soft = _to_float(row.get("map_soft_trip_score"))
+    map_wide = _to_float(row.get("map_wide_risk_score"))
+    map_death = _to_float(row.get("map_death_score"))
+    barrier = row.get("barrier") or ""
+    bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
+    days_since_last_run = _to_float(row.get("days_since_last_run"))
+
+    return {
+        "barrier":      _barrier_score(barrier),
+        "map_lead":     (map_lead or 0.0) * 0.7,
+        "map_soft":     (map_soft or 0.0) * 0.45,
+        "map_wide":    -(map_wide or 0.0) * 0.5,
+        "map_death":   -(map_death or 0.0) * 0.35,
+        # BMR at race distance — faster (lower seconds) = better.
+        # Centred at 117s (1:57.0), 1s difference ≈ 0.5 point swing.
+        "bmr_dist_rge": _pos_scale(bmr_dist_rge, center=117.0, divisor=-2.0, missing=0.0) * 0.6,
+        # Fitness — last run > 14 days ago scores negatively.
+        "fitness":      _fitness_score(days_since_last_run),
+    }
 
 
 def _softmax(scores: list[float], temperature: float = 1.0) -> list[float]:
