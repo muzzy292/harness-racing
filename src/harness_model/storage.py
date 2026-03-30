@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS race_runners (
     form_last_season_summary TEXT,
     form_bmr TEXT,
     form_bmr_dist_rge TEXT,
+    race_purse REAL,
     PRIMARY KEY (meeting_code, race_number, horse_id)
 );
 
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS runner_recent_lines (
     raw_comment TEXT,
     finish_position INTEGER,
     raw_margin REAL,
+    run_purse REAL,
     comment_adjustment REAL,
     tempo_adjustment REAL,
     null_run INTEGER NOT NULL DEFAULT 0,
@@ -132,6 +134,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             "form_last_season_summary": "TEXT",
             "form_bmr": "TEXT",
             "form_bmr_dist_rge": "TEXT",
+            "race_purse": "REAL",
         },
     )
     _ensure_columns(
@@ -150,6 +153,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             "tempo_adjustment": "REAL",
             "null_run": "INTEGER NOT NULL DEFAULT 0",
             "adjusted_margin": "REAL",
+            "run_purse": "REAL",
         },
     )
     _ensure_columns(
@@ -188,9 +192,9 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             barrier, driver_name, trainer_name, scratched, race_name,
             race_distance, race_type, class_name, raw_price,
             form_career_summary, form_this_season_summary, form_last_season_summary,
-            form_bmr, form_bmr_dist_rge
+            form_bmr, form_bmr_dist_rge, race_purse
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(meeting_code, race_number, horse_id) DO UPDATE SET
             runner_number = excluded.runner_number,
             horse_name = excluded.horse_name,
@@ -207,7 +211,8 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             form_this_season_summary = excluded.form_this_season_summary,
             form_last_season_summary = excluded.form_last_season_summary,
             form_bmr = excluded.form_bmr,
-            form_bmr_dist_rge = excluded.form_bmr_dist_rge
+            form_bmr_dist_rge = excluded.form_bmr_dist_rge,
+            race_purse = excluded.race_purse
         """,
         [
             (
@@ -230,6 +235,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
                 _summary_to_text(runner.form_last_season_summary),
                 runner.form_bmr,
                 runner.form_bmr_dist_rge,
+                runner.race_purse,
             )
             for runner in runners
         ],
@@ -240,9 +246,9 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             meeting_code, race_number, horse_id, line_index, run_date,
             track_name, track_code, distance, condition, last_half, mile_rate,
             first_half, q1, q2, q3, q4, raw_comment, finish_position,
-            raw_margin, comment_adjustment, tempo_adjustment, null_run, adjusted_margin
+            raw_margin, run_purse, comment_adjustment, tempo_adjustment, null_run, adjusted_margin
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(meeting_code, race_number, horse_id, line_index) DO UPDATE SET
             run_date = excluded.run_date,
             track_name = excluded.track_name,
@@ -259,6 +265,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             raw_comment = excluded.raw_comment,
             finish_position = excluded.finish_position,
             raw_margin = excluded.raw_margin,
+            run_purse = excluded.run_purse,
             comment_adjustment = excluded.comment_adjustment,
             tempo_adjustment = excluded.tempo_adjustment,
             null_run = excluded.null_run,
@@ -285,6 +292,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
                 line.raw_comment,
                 line.finish_position,
                 line.raw_margin,
+                line.run_purse,
                 line.comment_adjustment,
                 line.tempo_adjustment,
                 int(line.null_run),

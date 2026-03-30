@@ -34,7 +34,8 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
             COALESCE(rr.form_this_season_summary, hp.this_season_summary) AS this_season_summary,
             COALESCE(rr.form_last_season_summary, hp.last_season_summary) AS last_season_summary,
             rr.form_bmr,
-            rr.form_bmr_dist_rge
+            rr.form_bmr_dist_rge,
+            rr.race_purse
         FROM race_runners rr
         LEFT JOIN meetings m ON m.meeting_code = rr.meeting_code
         LEFT JOIN horse_profiles hp ON hp.horse_id = rr.horse_id
@@ -135,6 +136,11 @@ def _build_feature_row(
     raw_stakes = [run["stake"] for run in last_runs if run.get("stake") is not None]
     capped_stakes = _cap_outlier_stakes([float(s) for s in raw_stakes])
     last_5_avg_stake = _avg(capped_stakes[:5])
+    raw_run_purses = [line["run_purse"] for line in recent_lines if line.get("run_purse") is not None]
+    capped_run_purses = _cap_outlier_stakes([float(p) for p in raw_run_purses])
+    avg_recent_run_purse = _avg(capped_run_purses[:5])
+    race_purse = runner.get("race_purse")
+    class_delta = round(float(race_purse) - avg_recent_run_purse, 0) if (race_purse is not None and avg_recent_run_purse is not None) else None
 
     return {
         "meeting_code": runner["meeting_code"],
@@ -206,6 +212,9 @@ def _build_feature_row(
         "race_nr_ceiling": race_nr_ceiling,
         "nr_headroom": nr_headroom,
         "last_5_avg_stake": last_5_avg_stake,
+        "race_purse": race_purse,
+        "avg_recent_run_purse": avg_recent_run_purse,
+        "class_delta": class_delta,
     }
 
 

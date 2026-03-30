@@ -203,6 +203,7 @@ def _score_components(row: dict[str, str]) -> dict[str, float]:
     days_since_last_run = _to_float(row.get("days_since_last_run"))
     nr_headroom = _to_float(row.get("nr_headroom"))
     avg_stake = _to_float(row.get("last_5_avg_stake"))
+    class_delta = _to_float(row.get("class_delta"))
 
     # When horse-page run data is available use it exclusively for the ability
     # bucket.  Form-page recent lines are a fallback for horses with no history
@@ -235,6 +236,11 @@ def _score_components(row: dict[str, str]) -> dict[str, float]:
         # Centred at $4500; horses earning above that have been racing at a higher level.
         # Only populated when horse-page data has been ingested.
         "stake_class": _pos_scale(avg_stake, center=4500.0, divisor=2500.0, missing=0.0) * 0.2,
+        # Class delta — today's race purse minus average recent run purse (outlier-capped).
+        # Positive = stepping up in class; negative = dropping back.
+        # A horse dropping back gets a bonus; one stepping up gets a penalty.
+        # Centred at 0; $2000 difference ≈ ±0.3 swing.
+        "class_delta": _pos_scale(class_delta, center=0.0, divisor=-2000.0, missing=0.0) * 0.3,
         "barrier": _barrier_score(barrier),
         # BMR at race distance range — faster (lower seconds) = better.
         # Centre around 117s (1:57.0), 1s difference ≈ 0.5 point swing.

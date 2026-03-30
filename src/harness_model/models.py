@@ -33,6 +33,7 @@ class RunnerInfo:
     form_last_season_summary: tuple[int, int, int, int] | None = None
     form_bmr: str | None = None
     form_bmr_dist_rge: str | None = None
+    race_purse: float | None = None
     recent_lines: list["RunnerRecentLine"] = field(default_factory=list)
 
 
@@ -57,6 +58,7 @@ class RunnerRecentLine:
     raw_comment: str | None = None
     finish_position: int | None = None
     raw_margin: float | None = None
+    run_purse: float | None = None
     comment_adjustment: float = 0.0
     tempo_adjustment: float = 0.0
     null_run: bool = False

@@ -184,6 +184,7 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
         race_distance = _extract_form_distance(info)
         race_conditions = _extract_form_conditions(info)
         race_type = _extract_form_start_type(info)
+        race_purse = _extract_form_race_purse(info)
 
         horse_pattern = re.compile(
             r'<td class="horse_name_td"><span class="horse_number">(?P<number>\d+)</span><span class="horse_name">\s*'
@@ -241,6 +242,7 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
                     form_last_season_summary=last_season_summary,
                     form_bmr=form_bmr,
                     form_bmr_dist_rge=form_bmr_dist_rge,
+                    race_purse=race_purse,
                     recent_lines=recent_lines,
                 )
             )
@@ -631,6 +633,7 @@ def _extract_recent_lines_from_horse_block(
                 raw_comment=raw_comment or None,
                 finish_position=finish_position,
                 raw_margin=raw_margin,
+                run_purse=parsed.get("purse"),
                 comment_adjustment=comment_adjustment,
                 tempo_adjustment=tempo_adjustment,
                 null_run=null_run,
@@ -644,7 +647,8 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
     form_place_match = re.search(r'<td[^>]*class="form_place">\s*(?P<form_place>.*?)\s*</td>', line_html, re.IGNORECASE | re.DOTALL)
     results_match = re.search(
         r'<a class="results_link"[^>]*>\s*(?P<track>[A-Z]+)\s+(?P<date>\d{2}[A-Za-z]{3}\d{2})\s*</a>'
-        r'\s*(?P<distance>\d{4})(?:MS|SS)\s+\((?P<condition>[^)]+)\)',
+        r'\s*(?P<distance>\d{4})(?:MS|SS)\s+\((?P<condition>[^)]+)\)'
+        r'(?:,\s*\$(?P<purse>[\d,]+))?',
         line_html,
         re.IGNORECASE | re.DOTALL,
     )
@@ -662,6 +666,8 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
     if quarter_text in comment:
         comment = comment.split(quarter_text, 1)[-1].strip()
 
+    raw_purse = results_match.group("purse")
+    purse = float(raw_purse.replace(",", "")) if raw_purse else None
     return {
         "form_place": form_place_match.group("form_place"),
         "track_code": results_match.group("track"),
@@ -673,6 +679,7 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
         "quarters": sectional_match.group("quarters"),
         "comment": comment,
         "line_text": plain,
+        "purse": purse,
     }
 
 
@@ -692,6 +699,20 @@ def _normalize_track_condition(value: str) -> str:
     if upper in {"SLOW", "HEAVY", "WET", "RAIN AFFECTED", "SOFT"}:
         return "Slow"
     return value.title().strip()
+
+
+def _extract_form_race_purse(info_html: str) -> float | None:
+    """Extract the total race purse from the raceMoreInfo section.
+
+    The HTML looks like:
+      <span class="race_prizemoney">$9,792 - 1st $5,184, ...</span>
+
+    Returns the leading dollar amount as a float, e.g. 9792.0, or None.
+    """
+    match = re.search(r'<span class="race_prizemoney">\s*\$([\d,]+)', info_html, re.IGNORECASE)
+    if not match:
+        return None
+    return float(match.group(1).replace(",", ""))
 
 
 def _extract_form_bmr(horse_block: str) -> str | None:
