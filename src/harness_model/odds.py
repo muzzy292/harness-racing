@@ -202,14 +202,18 @@ def _score_components(row: dict[str, str]) -> dict[str, float]:
     bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
     days_since_last_run = _to_float(row.get("days_since_last_run"))
 
+    # When horse-page run data is available use it exclusively for the ability
+    # bucket.  Form-page recent lines are a fallback for horses with no history
+    # in the DB — they should not stack on top of horse-page data.
+    has_horse_data = last5_adj is not None
+    consistency_adj = last5_adj if has_horse_data else recent_line_adj
+    ceiling_adj     = best_adj  if has_horse_data else recent_line_best
+
     components = {
-        "last5_adj": _neg_scale(last5_adj, divisor=12.0, floor=-4.0, missing=0.0) * 1.8,
-        "last10_adj": _neg_scale(last10_adj, divisor=18.0, floor=-3.0, missing=0.0) * 1.0,
-        "best_adj": _neg_scale(best_adj, divisor=10.0, floor=-3.5, missing=0.0) * 0.9,
-        "recent_line_adj": _neg_scale(recent_line_adj, divisor=10.0, floor=-4.0, missing=0.0) * 1.25,
-        "recent_line_best": _neg_scale(recent_line_best, divisor=8.0, floor=-3.5, missing=0.0) * 0.85,
-        "sectional3": _neg_scale(sec3, divisor=1.2, floor=-2.5, missing=0.0) * 1.2,
-        "sectional5": _neg_scale(sec5, divisor=1.5, floor=-2.0, missing=0.0) * 0.8,
+        # ── Ability bucket (one metric per concept) ──────────────────────────
+        "consistency": _neg_scale(consistency_adj, divisor=12.0, floor=-4.0, missing=0.0) * 1.8,
+        "ceiling":     _neg_scale(ceiling_adj,     divisor=10.0, floor=-3.5, missing=0.0) * 1.2,
+        "late_speed":  _neg_scale(sec3,            divisor=1.2,  floor=-2.5, missing=0.0) * 1.4,
         "comment_adj": _pos_scale(comment_adj, center=0.0, divisor=6.0, missing=0.0) * 0.5,
         "tempo_adj": _pos_scale(tempo_adj, center=0.0, divisor=1.2, missing=0.0) * 0.45,
         "tempo_flags": -(tempo_flags or 0.0) * 0.08,

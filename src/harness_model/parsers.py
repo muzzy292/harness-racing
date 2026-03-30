@@ -210,9 +210,15 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
             last_season_summary = _extract_form_stats_summary(horse_block, "LS")
             form_bmr = _extract_form_bmr(horse_block)
             form_bmr_dist_rge = _extract_form_bmr_dist_rge(horse_block)
+            # Only check for scratching markers in the horse's own header area,
+            # not in the full block — the horseScratched div for horse N+1 can
+            # appear before that horse's horse_name_td and bleed into horse N's block.
+            # Limit the search to content before the first form_line row.
+            form_line_pos = horse_block.find('class="form_line"')
+            header_section = horse_block[:form_line_pos] if form_line_pos != -1 else horse_block[:2000]
             scratched = bool(
-                re.search(r'class="horseScratched"', horse_block, re.IGNORECASE)
-                or re.search(r'<span class="scratched">', horse_block, re.IGNORECASE)
+                re.search(r'class="horseScratched"', header_section, re.IGNORECASE)
+                or re.search(r'<span class="scratched">', header_section, re.IGNORECASE)
             )
             runners.append(
                 RunnerInfo(
