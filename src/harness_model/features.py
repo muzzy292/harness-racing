@@ -126,6 +126,15 @@ def _build_feature_row(
     primary_adj_margins = adjusted if adjusted else adj_recent_margins
     primary_prices = prices
     primary_win_rate_source = wins if last_runs else [line for line in valid_recent_lines if line.get("finish_position") == 1]
+    primary_source = last_runs if last_runs else valid_recent_lines
+    primary_source_5 = primary_source[:5]
+    top3_in_5 = [run for run in primary_source_5 if run.get("finish_position") in (1, 2, 3)]
+    competitive_in_5 = [
+        run for run in primary_source_5
+        if run.get("adjusted_margin") is not None and float(run["adjusted_margin"]) <= 3.0
+    ]
+    last_5_top3_rate = round(len(top3_in_5) / len(primary_source_5), 4) if primary_source_5 else None
+    last_5_competitive_rate = round(len(competitive_in_5) / len(primary_source_5), 4) if primary_source_5 else None
     map_signals = _map_signals(valid_recent_lines, runner.get("barrier"))
     bmr_secs = _parse_bmr_secs(runner.get("form_bmr"))
     bmr_dist_rge_secs = _parse_bmr_secs(runner.get("form_bmr_dist_rge"))
@@ -190,6 +199,8 @@ def _build_feature_row(
         "last_5_best_adj_margin": min(primary_adj_margins[:5]) if primary_adj_margins[:5] else None,
         "last_5_avg_sp": _avg(primary_prices[:5]),
         "last_5_win_rate": round(len(primary_win_rate_source[:5]) / min(len((last_runs or valid_recent_lines)[:5]), 5), 4) if (last_runs or valid_recent_lines)[:5] else None,
+        "last_5_top3_rate": last_5_top3_rate,
+        "last_5_competitive_rate": last_5_competitive_rate,
         "same_driver_avg_adj_margin": _avg([run["adjusted_margin"] for run in same_driver_runs if run["adjusted_margin"] is not None]),
         "same_driver_starts": len(same_driver_runs),
         "driver_last_30_starts": driver_stats["starts_30"],

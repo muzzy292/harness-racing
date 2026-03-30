@@ -201,6 +201,9 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
     recent_line_best = _to_float(row.get("recent_line_best_adj_margin"))
     avg_sp = _to_float(row.get("last_5_avg_sp"))
     win_rate = _to_float(row.get("last_5_win_rate"))
+    top3_rate = _to_float(row.get("last_5_top3_rate"))
+    competitive_rate = _to_float(row.get("last_5_competitive_rate"))
+    career_starts = _to_int(row.get("career_starts"))
     sec3 = _to_float(row.get("last_3_avg_sectional_delta"))
     comment_adj = _to_float(row.get("recent_line_avg_comment_adj"))
     tempo_adj = _to_float(row.get("recent_line_avg_tempo_adj"))
@@ -217,16 +220,33 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
     consistency_adj = last5_adj if has_horse_data else recent_line_adj
     ceiling_adj     = best_adj  if has_horse_data else recent_line_best
 
+    # Market weight weakens as the horse accumulates starts — for exposed horses
+    # the model's own data is more reliable than market history (which risks
+    # just learning public opinion). For lightly raced horses, trust market more.
+    if career_starts is None or career_starts < 5:
+        market_wt = 0.6
+    elif career_starts >= 15:
+        market_wt = 0.3
+    else:
+        market_wt = round(0.6 - 0.03 * (career_starts - 5), 2)
+
     return {
         "consistency": _neg_scale(consistency_adj, divisor=12.0, floor=-4.0, missing=0.0) * 1.8,
         "ceiling":     _neg_scale(ceiling_adj,     divisor=10.0, floor=-3.5, missing=0.0) * 1.2,
         "late_speed":  _neg_scale(sec3,            divisor=1.2,  floor=-2.5, missing=0.0) * 1.4,
-        "comment_adj": _pos_scale(comment_adj, center=0.0, divisor=6.0, missing=0.0) * 0.5,
+        # comment_adj is a support signal only — comments are noisy and inconsistently
+        # written, so weight is kept small to avoid over-fitting to race day commentary.
+        "comment_adj": _pos_scale(comment_adj, center=0.0, divisor=6.0, missing=0.0) * 0.25,
         "tempo_adj":   _pos_scale(tempo_adj, center=0.0, divisor=1.2, missing=0.0) * 0.45,
         "tempo_flags": -(tempo_flags or 0.0) * 0.08,
         "null_flags":  -(null_flags or 0.0) * 0.25,
-        "market":      _neg_log_scale(avg_sp, missing=0.0) * 0.6,
-        "win_rate":    (win_rate or 0.0) * 1.2,
+        # Market weakens for exposed horses; stronger prior for lightly raced.
+        "market":      _neg_log_scale(avg_sp, missing=0.0) * market_wt,
+        # win_rate reduced; supplemented by top3_rate and competitive_rate which
+        # are less distorted by field quality and bad luck runs.
+        "win_rate":      (win_rate or 0.0) * 0.7,
+        "top3_rate":     (top3_rate or 0.0) * 0.6,
+        "competitive_rate": (competitive_rate or 0.0) * 0.5,
         "nr":          _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * 0.25,
         # Class signals — lower NR headroom = near top of grade; stake class and
         # class delta capture recent competition level vs today's race.
