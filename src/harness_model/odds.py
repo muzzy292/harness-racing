@@ -258,9 +258,9 @@ def _stage2_components(row: dict[str, str]) -> dict[str, float]:
         "map_wide":    -(map_wide or 0.0) * 0.5,
         "map_death":   -(map_death or 0.0) * 0.35,
         # BMR at race distance — faster (lower seconds) = better.
-        # Centred at 117s (1:57.0), 1s difference ≈ 0.5 point swing.
-        "bmr_dist_rge": _pos_scale(bmr_dist_rge, center=117.0, divisor=-2.0, missing=0.0) * 0.6,
-        # Fitness — last run > 14 days ago scores negatively.
+        # Centred at 117s (1:57.0), capped at ±1.2 to prevent one component dominating.
+        "bmr_dist_rge": max(-1.2, min(1.2, _pos_scale(bmr_dist_rge, center=117.0, divisor=-2.0, missing=0.0))) * 0.6,
+        # Fitness — graduated penalty by days since last run.
         "fitness":      _fitness_score(days_since_last_run),
     }
 
@@ -386,17 +386,23 @@ def _fair_market_probs(
 
 
 def _fitness_score(days: float | None) -> float:
-    """Return a score penalty when a horse has been off the track for more than 14 days.
+    """Graduated penalty by days since last run.
 
-    Mirrors Claude's model: last race > 14 days = meaningful penalty.
-    > 14 days  → -0.35  (roughly equivalent to ×1.25 fair-odds lengthening)
-    > 28 days  → -0.55  (extended break, steeper penalty)
-    None / ≤ 14 days → 0.0
+    ≤ 14 days  →  0.00  (fit, no penalty)
+    15–28 days → -0.35  (short freshening)
+    29–42 days → -0.60  (spell, fitness uncertain)
+    43–84 days → -0.85  (extended spell, likely returning from injury/prep)
+    85+ days   → -1.10  (long absence, significant fitness risk)
+    None       →  0.00  (no data, treat as fit)
     """
     if days is None:
         return 0.0
+    if days > 84:
+        return -1.10
+    if days > 42:
+        return -0.85
     if days > 28:
-        return -0.55
+        return -0.60
     if days > 14:
         return -0.35
     return 0.0
