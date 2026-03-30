@@ -201,6 +201,7 @@ def _score_components(row: dict[str, str]) -> dict[str, float]:
     barrier = row.get("barrier") or ""
     bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
     days_since_last_run = _to_float(row.get("days_since_last_run"))
+    nr_headroom = _to_float(row.get("nr_headroom"))
 
     # When horse-page run data is available use it exclusively for the ability
     # bucket.  Form-page recent lines are a fallback for horses with no history
@@ -225,6 +226,10 @@ def _score_components(row: dict[str, str]) -> dict[str, float]:
         "market": _neg_log_scale(avg_sp, missing=0.0) * 0.6,
         "win_rate": (win_rate or 0.0) * 1.2,
         "nr": _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * 0.25,
+        # Class position — lower headroom (NR near ceiling) = horse is near top of grade.
+        # Large headroom can indicate declining form (NR has dropped) → small penalty.
+        # Weight is intentionally small to avoid double-counting with nr component.
+        "class_pos": _neg_scale(nr_headroom, divisor=8.0, floor=-2.0, missing=0.0) * 0.15,
         "barrier": _barrier_score(barrier),
         # BMR at race distance range — faster (lower seconds) = better.
         # Centre around 117s (1:57.0), 1s difference ≈ 0.5 point swing.

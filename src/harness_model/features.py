@@ -129,6 +129,9 @@ def _build_feature_row(
     bmr_secs = _parse_bmr_secs(runner.get("form_bmr"))
     bmr_dist_rge_secs = _parse_bmr_secs(runner.get("form_bmr_dist_rge"))
     days_since_last_run = _days_since_last_run(recent_lines, runner.get("meeting_date"))
+    race_nr_ceiling = _parse_race_nr_ceiling(runner.get("class_name"))
+    nr_rating = runner["nr_rating"]
+    nr_headroom = round(race_nr_ceiling - float(nr_rating), 1) if (race_nr_ceiling is not None and nr_rating is not None) else None
 
     return {
         "meeting_code": runner["meeting_code"],
@@ -197,6 +200,8 @@ def _build_feature_row(
         "form_bmr_secs": bmr_secs,
         "form_bmr_dist_rge_secs": bmr_dist_rge_secs,
         "days_since_last_run": days_since_last_run,
+        "race_nr_ceiling": race_nr_ceiling,
+        "nr_headroom": nr_headroom,
     }
 
 
@@ -427,6 +432,20 @@ def _days_since_last_run(recent_lines: list[dict[str, object]], meeting_date: ob
     if latest is None:
         return None
     return (race_date - latest).days
+
+
+def _parse_race_nr_ceiling(class_name: object) -> float | None:
+    """Extract the NR ceiling from a class_name string like 'NR up to 52. ...'
+
+    Returns the ceiling as a float, or None for MAIDEN races and unrecognised formats.
+    """
+    if not class_name:
+        return None
+    text = str(class_name)
+    match = re.search(r"NR\s+up\s+to\s+(\d+)", text, re.IGNORECASE)
+    if match:
+        return float(match.group(1))
+    return None
 
 
 def _sort_run_date(date_text: object) -> int:
