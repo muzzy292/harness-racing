@@ -234,9 +234,7 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
         "consistency": _neg_scale(consistency_adj, divisor=12.0, floor=-4.0, missing=0.0) * 1.8,
         "ceiling":     _neg_scale(ceiling_adj,     divisor=10.0, floor=-3.5, missing=0.0) * 1.2,
         "late_speed":  _neg_scale(sec3,            divisor=1.2,  floor=-2.5, missing=0.0) * 1.4,
-        # comment_adj is a support signal only — comments are noisy and inconsistently
-        # written, so weight is kept small to avoid over-fitting to race day commentary.
-        "comment_adj": _pos_scale(comment_adj, center=0.0, divisor=6.0, missing=0.0) * 0.25,
+        "comment_adj": _pos_scale(comment_adj, center=0.0, divisor=6.0, missing=0.0) * 0.5,
         "tempo_adj":   _pos_scale(tempo_adj, center=0.0, divisor=1.2, missing=0.0) * 0.45,
         "tempo_flags": -(tempo_flags or 0.0) * 0.08,
         "null_flags":  -(null_flags or 0.0) * 0.25,
