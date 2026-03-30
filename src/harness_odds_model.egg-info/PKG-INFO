@@ -1,0 +1,46 @@
+Metadata-Version: 2.4
+Name: harness-odds-model
+Version: 0.1.0
+Summary: Structured data pipeline for a harness racing odds model
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+
+# Harness Racing Odds Model
+
+This project builds a structured data pipeline for a harness racing odds model
+targeted at NSW pacing races.
+
+Current scope:
+
+- Tracks: Menangle, Penrith, Goulburn, Bathurst
+- Race types: pacing races only
+- Exclusions: trotters, 2YO races
+- Timing: night-before pricing, rerun after scratchings
+- Inputs: race fields/results pages and horse profile pages from `harness.org.au`
+
+Track par logic is intentionally excluded from this first build.
+
+## What this project does
+
+1. Fetches rendered meeting and horse pages from `harness.org.au`
+2. Parses them into structured race, runner, and horse-history records
+3. Stores the data in SQLite
+4. Builds runner-level features for later probability modeling
+
+## Setup
+
+```bash
+pip install playwright
+python -m playwright install chromium
+pip install -e .
+```
+
+## Example usage
+
+```bash
+harness-model fetch-meeting --meeting-code PC290326 --out data/raw
+harness-model ingest-meeting --html data/raw/meeting_PC290326.html --db data/harness.db
+harness-model fetch-horses --meeting-html data/raw/meeting_PC290326.html --out data/raw/horses
+harness-model ingest-horses --horse-dir data/raw/horses --db data/harness.db
+harness-model build-features --db data/harness.db --csv data/features/runner_features.csv
+```

@@ -1,0 +1,2 @@
+[console_scripts]
+harness-model = harness_model.cli:main
