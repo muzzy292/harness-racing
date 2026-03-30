@@ -1,0 +1,82 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Harness: Open Streamlit App",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "streamlit_app.py"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Harness: Refresh Meeting",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": [
+        "refresh-meeting",
+        "--meeting-code",
+        "${input:meetingCode}",
+        "--raw-dir",
+        "data/raw",
+        "--db",
+        "data/harness.db",
+        "--csv",
+        "data/features/runner_features.csv",
+        "--track-pars",
+        "${input:trackParsPath}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Harness: Score Meeting",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": [
+        "score-meeting",
+        "--csv",
+        "data/features/runner_features.csv",
+        "--meeting-code",
+        "${input:meetingCode}",
+        "--out-csv",
+        "data/odds/${input:meetingCode}_odds.csv"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Harness: Refresh And Score Meeting",
+      "configurations": [
+        "Harness: Refresh Meeting",
+        "Harness: Score Meeting"
+      ],
+      "stopAll": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "meetingCode",
+      "type": "promptString",
+      "description": "Meeting code to refresh or score",
+      "default": "LM300326"
+    },
+    {
+      "id": "trackParsPath",
+      "type": "promptString",
+      "description": "Full path to track pars JSON",
+      "default": "C:\\Users\\Paul Mustica\\Desktop\\track_pars.json"
+    }
+  ]
+}

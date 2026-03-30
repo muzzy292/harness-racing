@@ -1,4 +1,4 @@
-from .scoring.score_model import (
+from .score_model import (
     flatten_meeting_scores,
     load_feature_rows,
     load_market_rows,

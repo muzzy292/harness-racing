@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS race_results (
     finish_position INTEGER,
     margin REAL,
     starting_price REAL,
+    steward_comment TEXT,
     PRIMARY KEY (meeting_code, race_number, horse_name)
 );
 """
@@ -163,6 +164,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             "horse_id": "TEXT",
             "margin": "REAL",
             "starting_price": "REAL",
+            "steward_comment": "TEXT",
         },
     )
     conn.commit()
@@ -414,20 +416,22 @@ def upsert_results(conn: sqlite3.Connection, results: list) -> None:
                 result.finish_position,
                 result.margin,
                 result.starting_price,
+                result.steward_comment,
             )
         )
 
     conn.executemany(
         """
         INSERT INTO race_results(
-            meeting_code, race_number, horse_id, horse_name, finish_position, margin, starting_price
+          meeting_code, race_number, horse_id, horse_name, finish_position, margin, starting_price, steward_comment
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(meeting_code, race_number, horse_name) DO UPDATE SET
             horse_id = excluded.horse_id,
             finish_position = excluded.finish_position,
             margin = excluded.margin,
-            starting_price = excluded.starting_price
+            starting_price = excluded.starting_price,
+            steward_comment = excluded.steward_comment
         """,
         rows,
     )

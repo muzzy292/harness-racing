@@ -35,6 +35,23 @@ def fetch_results(meeting_code: str, output_dir: str | Path) -> Path:
     return save_html(html, Path(output_dir) / f"results_{meeting_code}.html")
 
 
+def refresh_meeting(
+    meeting_code: str,
+    raw_dir: str | Path,
+    db_path: str | Path,
+    csv_path: str | Path,
+    track_pars_path: str | Path | None = None,
+) -> dict[str, Path | int]:
+    meeting_path = fetch_meeting(meeting_code, raw_dir)
+    _, runner_count = ingest_meeting_html(db_path, meeting_path)
+    feature_path = build_feature_dataset(db_path, csv_path, track_pars_path=track_pars_path)
+    return {
+        "meeting_path": meeting_path,
+        "feature_path": feature_path,
+        "runner_count": runner_count,
+    }
+
+
 def fetch_horse_pages_from_meeting_html(
     meeting_html_path: str | Path,
     output_dir: str | Path,
