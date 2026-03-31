@@ -116,32 +116,51 @@ def parse_meeting_html(html: str, meeting_code: str) -> tuple[MeetingInfo, list[
 
 
 def parse_results_html(html: str, meeting_code: str) -> list[ResultRunner]:
-    text = extract_text(html)
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
     results: list[ResultRunner] = []
 
-    current_race_number: int | None = None
-    for idx, line in enumerate(lines):
-        race_match = re.fullmatch(r"Race\s+(\d+)", line, re.IGNORECASE)
-        if race_match:
-            current_race_number = int(race_match.group(1))
-            continue
-        if current_race_number is None:
-            continue
+    header_pattern = re.compile(
+        r'<tr class="raceHeader">.*?'
+        r'<td class="raceNumber[^"]*"[^>]*>\s*(?P<race_number>\d+)\s*</td>.*?'
+        r'<td class="raceTitle">(?P<race_title>.*?)</td>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    table_pattern = re.compile(
+        r'<table class="raceFieldTable resultTable">(?P<table>.*?)</table>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    row_pattern = re.compile(
+        r"<tr>\s*"
+        r'<td class="horse_number">\s*(?P<place>\d+)?\s*</td>.*?'
+        r'<a href="[^"]*horseId=(?P<horse_id>\d+)" class="horse_name_link">(?P<horse_name>[^<]+)</a>.*?'
+        r'<td class="margin">\s*(?P<margin>[^<]*)</td>.*?'
+        r'<td class="starting_price[^"]*">\s*(?P<starting_price>.*?)</td>',
+        re.IGNORECASE | re.DOTALL,
+    )
 
-        # Best-effort parser for result tables in extracted text.
-        # This is intentionally conservative until we have a saved real results page.
-        if re.fullmatch(r"\d+", line) and idx + 1 < len(lines):
-            next_line = lines[idx + 1]
-            if re.fullmatch(r"[A-Z0-9\s'\-\.\(\)]+", next_line) and len(next_line) > 2:
-                results.append(
-                    ResultRunner(
-                        meeting_code=meeting_code,
-                        race_number=current_race_number,
-                        horse_name=_clean_spaces(next_line).title(),
-                        finish_position=int(line),
-                    )
+    headers = list(header_pattern.finditer(html))
+    tables = list(table_pattern.finditer(html))
+
+    for header_match, table_match in zip(headers, tables):
+        race_number = int(header_match.group("race_number"))
+        race_title = _clean_spaces(re.sub(r"<[^>]+>", " ", header_match.group("race_title")))
+        if _is_excluded_race(race_title):
+            continue
+        table_html = table_match.group("table")
+        for row_match in row_pattern.finditer(table_html):
+            place_text = (row_match.group("place") or "").strip()
+            margin_text = _clean_spaces(row_match.group("margin") or "")
+            odds_text = _clean_spaces(re.sub(r"<[^>]+>", " ", row_match.group("starting_price") or ""))
+            results.append(
+                ResultRunner(
+                    meeting_code=meeting_code,
+                    race_number=race_number,
+                    horse_name=_clean_spaces(row_match.group("horse_name")).title(),
+                    finish_position=int(place_text) if place_text.isdigit() else None,
+                    margin=0.0 if place_text == "1" else (_parse_results_margin(margin_text) if margin_text else None),
+                    starting_price=_parse_results_price(odds_text),
+                    horse_id=row_match.group("horse_id"),
                 )
+            )
 
     return _dedupe_results(results)
 
@@ -961,6 +980,23 @@ def _parse_stake(value: str) -> float | None:
 
 def _parse_price(value: str) -> float | None:
     match = re.match(r"^\$([\d]+\.[\d]{2})$", value)
+    return float(match.group(1)) if match else None
+
+
+def _parse_results_price(value: str) -> float | None:
+    match = re.search(r"\$\s*([\d]+\.[\d]{2})", value)
+    return float(match.group(1)) if match else None
+
+
+def _parse_results_margin(value: str) -> float | None:
+    plain = value.strip().upper()
+    if not plain:
+        return None
+    if plain in {"HD", "HFHD", "SH"}:
+        return 0.1
+    if plain == "SHFHD":
+        return 0.05
+    match = re.search(r"([\d]+(?:\.\d+)?)", plain)
     return float(match.group(1)) if match else None
 
 
