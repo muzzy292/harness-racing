@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from .models import HorseProfile, HorseRun, MeetingInfo, ResultRunner, RunnerInfo, RunnerRecentLine
 
@@ -145,6 +146,41 @@ def parse_results_html(html: str, meeting_code: str) -> list[ResultRunner]:
     return _dedupe_results(results)
 
 
+def parse_hrnsw_results_index(html: str) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    meetings_section = html
+    trials_marker = re.search(r'<div[^>]+id="[^"]*pnlTrials"[^>]*>', html, re.IGNORECASE)
+    if trials_marker:
+        meetings_section = html[:trials_marker.start()]
+
+    row_pattern = re.compile(
+        r"<tr\b[^>]*>\s*"
+        r'<td\b[^>]*class="[^"]*\btrackname\b[^"]*"[^>]*>(?P<track>.*?)</td>\s*'
+        r'<td\b[^>]*class="[^"]*\btimeofday\b[^"]*"[^>]*>(?P<session>.*?)</td>\s*'
+        r'<td\b[^>]*class="[^"]*\bdate\b[^"]*"[^>]*>(?P<date>.*?)</td>\s*'
+        r"<td>.*?"
+        r'<a[^>]+href="(?P<link>[^"]*meeting-results\.cfm\?mc=(?P<code>[A-Z0-9]+)[^"]*)"[^>]*>'
+        r"(?P<label>.*?)</a>",
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    for match in row_pattern.finditer(meetings_section):
+        label = _clean_spaces(re.sub(r"<[^>]+>", " ", match.group("label")))
+        if "RESULTS" not in label.upper():
+            continue
+        absolute_link = urljoin("https://www.hrnsw.com.au", match.group("link"))
+        entries.append(
+            {
+                "track_name": _clean_spaces(re.sub(r"<[^>]+>", " ", match.group("track"))).title(),
+                "session": _clean_spaces(re.sub(r"<[^>]+>", " ", match.group("session"))).title(),
+                "meeting_date": _clean_spaces(re.sub(r"<[^>]+>", " ", match.group("date"))),
+                "meeting_code": match.group("code").upper(),
+                "results_url": absolute_link,
+            }
+        )
+    return _dedupe_hrnsw_entries(entries)
+
+
 def _parse_runners_from_html(html: str, meeting_code: str) -> list[RunnerInfo]:
     runners = _parse_form_guide_races(html, meeting_code)
     if runners:
@@ -191,8 +227,8 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
             r'<a href="[^"]*horseId=(?P<horse_id>\d+)">(?P<horse_name>[^<]+)</a>.*?'
             r'<div class="horse_handicap">(?P<barrier>[^<]+)</div>.*?'
             r'<div class="horse_class">(?P<horse_class>[^<]+)</div>.*?'
-            r'<div class="driver">Driver:\s*<span class="driver_name">.*?>(?P<driver>[^<]*)</a>.*?'
-            r'<div class="trainer">Trainer:\s*<span class="trainer_name">(?:<span class="bolded">)?(?P<trainer>[^<(]+)',
+            r'<div class="driver">Driver:\s*<span class="driver_name">.*?<a href="(?P<driver_link>[^"]+)">(?P<driver>[^<]*)</a>.*?'
+            r'<div class="trainer">Trainer:\s*<span class="trainer_name">(?:<span class="bolded">)?(?:<a href="(?P<trainer_link>[^"]+)">)?(?P<trainer>[^<(]+)',
             flags=re.IGNORECASE | re.DOTALL,
         )
 
@@ -230,7 +266,9 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
                     horse_name=_clean_spaces(horse_match.group("horse_name")),
                     barrier=_clean_spaces(horse_match.group("barrier")),
                     driver_name=_clean_driver_name(_clean_spaces(horse_match.group("driver"))),
+                    driver_link=horse_match.group("driver_link"),
                     trainer_name=_clean_spaces(horse_match.group("trainer")).rstrip(","),
+                    trainer_link=horse_match.group("trainer_link"),
                     scratched=scratched,
                     race_name=race_name,
                     race_distance=race_distance,
@@ -292,7 +330,9 @@ def _parse_structured_race_tables(html: str, meeting_code: str) -> list[RunnerIn
                     horse_name=horse_name,
                     barrier=_extract_cell_text(row, "hcp"),
                     driver_name=_clean_driver_name(_extract_cell_anchor_text(row, "driver")),
+                    driver_link=_extract_cell_anchor_href(row, "driver"),
                     trainer_name=_extract_cell_anchor_text(row, "trainer"),
+                    trainer_link=_extract_cell_anchor_href(row, "trainer"),
                     scratched=False,
                     race_name=race_name,
                     race_distance=race_distance,
@@ -339,7 +379,9 @@ def _parse_fallback_race_blocks(html: str, meeting_code: str) -> list[RunnerInfo
                     horse_name=_clean_spaces(horse_match.group("horse_name")),
                     barrier=_extract_barrier(snippet),
                     driver_name=_extract_driver(snippet),
+                    driver_link=_extract_driver_link(snippet),
                     trainer_name=_extract_trainer(snippet),
+                    trainer_link=_extract_trainer_link(snippet),
                     scratched=_extract_scratched(snippet),
                     race_name=race_name,
                     race_distance=race_distance,
@@ -486,6 +528,39 @@ def _extract_form_race_name(header_html: str) -> str | None:
     return plain or None
 
 
+def _parse_hrnsw_meeting_text(text: str) -> dict[str, str] | None:
+    match = re.fullmatch(r"(.+?)\s+(Day|Night|Twilight)\s+(\d{2}/\d{2}/\d{4})", text.strip(), re.IGNORECASE)
+    if not match:
+        return None
+    track_name, session, meeting_date = match.groups()
+    return {
+        "track_name": _clean_spaces(track_name).title(),
+        "session": session.title(),
+        "meeting_date": meeting_date,
+    }
+
+
+def _extract_meeting_code_from_url(url: str) -> str | None:
+    parsed = urlparse(url)
+    query_mc = parse_qs(parsed.query).get("mc")
+    if query_mc:
+        return query_mc[0].upper()
+    match = re.search(r"\b([A-Z]{2}\d{6})\b", url, re.IGNORECASE)
+    return match.group(1).upper() if match else None
+
+
+def _dedupe_hrnsw_entries(entries: list[dict[str, str]]) -> list[dict[str, str]]:
+    seen: set[str] = set()
+    deduped: list[dict[str, str]] = []
+    for entry in entries:
+        code = entry["meeting_code"]
+        if code in seen:
+            continue
+        seen.add(code)
+        deduped.append(entry)
+    return deduped
+
+
 def _extract_form_distance(info_html: str) -> int | None:
     match = re.search(r'<td class="distance">(\d{4})\s+METRES</td>', info_html, re.IGNORECASE)
     return int(match.group(1)) if match else None
@@ -538,6 +613,16 @@ def _extract_driver(snippet: str) -> str | None:
     return match.group(1).strip() if match else None
 
 
+def _extract_driver_link(snippet: str) -> str | None:
+    match = re.search(r'<div class="driver">.*?<a href="([^"]+/racing/driverlink/[^"]+|/racing/driverlink/[^"]+)"', snippet, re.IGNORECASE | re.DOTALL)
+    return match.group(1) if match else None
+
+
+def _extract_trainer_link(snippet: str) -> str | None:
+    match = re.search(r'<div class="trainer">.*?<a href="([^"]+/racing/trainerlink/[^"]+|/racing/trainerlink/[^"]+|[^"]+/racing/trainers/[^"]+|/racing/trainers/[^"]+)"', snippet, re.IGNORECASE | re.DOTALL)
+    return match.group(1) if match else None
+
+
 def _extract_trainer(snippet: str) -> str | None:
     plain = _clean_spaces(re.sub(r"<[^>]+>", " ", snippet))
     match = re.search(r"\bTrainer\s*:?\s*([A-Z][A-Za-z\.\'\-\s]{3,40})", plain)
@@ -569,6 +654,15 @@ def _extract_cell_anchor_text(row_html: str, class_name: str) -> str | None:
     if not match:
         return _extract_cell_text(row_html, class_name)
     return _clean_spaces(re.sub(r"<[^>]+>", " ", match.group(1))) or None
+
+
+def _extract_cell_anchor_href(row_html: str, class_name: str) -> str | None:
+    match = re.search(
+        rf'<td class="{re.escape(class_name)}[^"]*"[^>]*>.*?<a [^>]*href="([^"]+)"',
+        row_html,
+        re.IGNORECASE | re.DOTALL,
+    )
+    return match.group(1) if match else None
 
 
 def _extract_cell_int(row_html: str, class_name: str) -> int | None:
@@ -934,14 +1028,48 @@ def parse_driver_page_html(html: str, driver_name: str) -> dict[str, object] | N
     }
 
 
-def _extract_driver_stat_pct(html: str, label: str) -> float | None:
+def parse_trainer_page_html(html: str, trainer_name: str) -> dict[str, object] | None:
+    season_win_rate = _extract_profile_stat_pct(html, "Season Win %")
+    career_win_rate = _extract_profile_stat_pct(html, "Career Win %")
+    if season_win_rate is None and career_win_rate is None:
+        return None
+
+    season_starts, season_wins = _extract_profile_season_stats(html)
+    return {
+        "trainer_name": trainer_name,
+        "season_starts": season_starts,
+        "season_wins": season_wins,
+        "season_win_rate": season_win_rate,
+        "career_win_rate": career_win_rate,
+    }
+
+
+def parse_trainer_links_from_fields_html(html: str) -> dict[str, str]:
+    links: dict[str, str] = {}
+    for match in re.finditer(
+        r'<div class="trainer">.*?<a href="(?P<link>[^"]+/racing/trainerlink/[^"]+|/racing/trainerlink/[^"]+|[^"]+/racing/trainers/[^"]+|/racing/trainers/[^"]+)">(?P<name>[^<]+)</a>',
+        html,
+        re.IGNORECASE | re.DOTALL,
+    ):
+        name = _clean_spaces(match.group("name"))
+        if not name:
+            continue
+        links[_normalize_person_key(name)] = match.group("link")
+    return links
+
+
+def _extract_profile_stat_pct(html: str, label: str) -> float | None:
     # Rendered HTML has whitespace inside the value div, so match loosely after the label
     pattern = re.escape(label) + r".*?(\d+)%"
     m = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
     return int(m.group(1)) / 100.0 if m else None
 
 
-def _extract_driver_season_stats(html: str) -> tuple[int | None, int | None]:
+def _extract_driver_stat_pct(html: str, label: str) -> float | None:
+    return _extract_profile_stat_pct(html, label)
+
+
+def _extract_profile_season_stats(html: str) -> tuple[int | None, int | None]:
     # Find the season table (Season / Starts / Wins / Places / Stakes)
     m = re.search(r"<th[^>]*>Season</th>.*?<tbody>(.*?)</tbody>", html, re.DOTALL | re.IGNORECASE)
     if not m:
@@ -958,3 +1086,11 @@ def _extract_driver_season_stats(html: str) -> tuple[int | None, int | None]:
     starts = int(starts_m.group(1).replace(",", "")) if starts_m else None
     wins = int(wins_m.group(1).replace(",", "")) if wins_m else None
     return starts, wins
+
+
+def _extract_driver_season_stats(html: str) -> tuple[int | None, int | None]:
+    return _extract_profile_season_stats(html)
+
+
+def _normalize_person_key(name: str) -> str:
+    return " ".join(name.upper().split())
