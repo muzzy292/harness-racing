@@ -35,31 +35,21 @@ Horse-page fetching now includes:
 ## Setup
 
 ```bash
-pip install streamlit
 pip install playwright
 python -m playwright install chromium
 pip install -e .
-```
-
-To run the local app:
-
-```bash
-streamlit run streamlit_app.py
 ```
 
 ## Example usage
 
 ```bash
 harness-model fetch-meeting --meeting-code PC290326 --out data/raw
-harness-model refresh-meeting --meeting-code PC290326 --raw-dir data/raw --db data/harness.db --csv data/features/runner_features.csv
 harness-model ingest-meeting --html data/raw/meeting_PC290326.html --db data/harness.db
 harness-model fetch-horses --meeting-html data/raw/meeting_PC290326.html --out data/raw/horses
 harness-model ingest-horses --horse-dir data/raw/horses --db data/harness.db
 harness-model build-features --db data/harness.db --csv data/features/runner_features.csv
 harness-model score-meeting --csv data/features/runner_features.csv --meeting-code PC290326
 harness-model score-meeting --csv data/features/runner_features.csv --meeting-code PC290326 --out-csv data/odds/PC290326_odds.csv
-harness-model compare-results --csv data/features/runner_features.csv --meeting-code PC290326 --db data/harness.db --out-csv data/odds/PC290326_results_comparison.csv
-harness-model compare-map --csv data/features/runner_features.csv --meeting-code PC290326 --db data/harness.db --out-csv data/odds/PC290326_map_comparison.csv
 ```
 
 To blend model probabilities with fair market probabilities, provide a market CSV with columns:
@@ -84,12 +74,6 @@ harness-model fetch-horses --meeting-html data/raw/meeting_LM300326.html --out d
 
 Race filtering still excludes trotters and 2YO races automatically.
 
-To refresh a meeting end to end after the form page changes:
-
-```bash
-harness-model refresh-meeting --meeting-code LM300326 --raw-dir data/raw --db data/harness.db --csv data/features/runner_features.csv --track-pars "C:\Users\Paul Mustica\Desktop\track_pars.json"
-```
-
 To create a reusable pre-race snapshot and NSW horse library:
 
 ```bash
@@ -112,29 +96,3 @@ harness-model ingest-results --html data/raw/results_LM300326.html --db data/har
 
 Results ingestion is a first-pass scaffold and may need one saved real results page
 to fine-tune the parser against the exact completed-meeting layout.
-
-## VS Code tasks
-
-This workspace now includes [tasks.json](C:\Users\Paul Mustica\Documents\Harness Racing Scripting\.vscode\tasks.json) with:
-
-- `Harness: Refresh Meeting`
-- `Harness: Score Meeting`
-- `Harness: Refresh And Score Meeting`
-
-Open the Command Palette in VS Code and run `Tasks: Run Task`, then choose the task you want.
-
-This workspace also includes [launch.json](C:\Users\Paul Mustica\Documents\Harness Racing Scripting\.vscode\launch.json) so you can use the green Run button in the `Run and Debug` panel for:
-
-- `Harness: Refresh Meeting`
-- `Harness: Score Meeting`
-- `Harness: Refresh And Score Meeting`
-
-The Streamlit app gives you a local browser UI for the same workflow:
-
-- refresh the latest meeting form page
-- rebuild features
-- score the full meeting
-- compare scored races against stored results
-- compare predicted map against actual results-page stewards comments
-- inspect race-level odds and features
-- download odds and feature CSVs

@@ -2,12 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(python -c \":*)",
-      "WebFetch(domain:www.harness.org.au)",
-      "Bash(python -m harness_model.cli ingest-meeting --html data/raw/meeting_LM300326.html --db data/harness.db)",
-      "Bash(python -m harness_model.cli build-features --db data/harness.db --csv data/features/runner_features.csv --track-pars \"C:/Users/Paul Mustica/Desktop/track_pars.json\")",
-      "Bash(python -m harness_model.cli score-race --csv data/features/runner_features.csv --meeting-code LM300326 --race-number 4)",
-      "Bash(python -m harness_model.cli score-meeting --csv data/features/runner_features.csv --meeting-code LM300326)",
-      "Bash(python -m harness_model.cli score-race --csv data/features/runner_features.csv --meeting-code LM300326 --race-number 9)"
+      "WebFetch(domain:www.harness.org.au)"
     ]
   }
 }

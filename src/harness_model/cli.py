@@ -3,14 +3,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .compare import (
-    compare_meeting_map_to_results,
-    compare_meeting_scores_to_results,
-    load_results_for_meeting,
-    render_comparison_report,
-    render_map_comparison_report,
-    write_comparison_csv,
-)
 from .storage import connect, scratch_horse as db_scratch_horse
 from .pipeline import (
     build_feature_dataset,
@@ -21,7 +13,6 @@ from .pipeline import (
     ingest_horse_html,
     ingest_meeting_html,
     ingest_results_html,
-    refresh_meeting,
     snapshot_meeting,
 )
 from .odds import (
@@ -43,13 +34,6 @@ def main() -> None:
     fetch_meeting_parser = subparsers.add_parser("fetch-meeting", help="Fetch a meeting page")
     fetch_meeting_parser.add_argument("--meeting-code", required=True)
     fetch_meeting_parser.add_argument("--out", default="data/raw")
-
-    refresh_meeting_parser = subparsers.add_parser("refresh-meeting", help="Fetch a meeting, ingest it, and rebuild the feature CSV in one sequence")
-    refresh_meeting_parser.add_argument("--meeting-code", required=True)
-    refresh_meeting_parser.add_argument("--raw-dir", default="data/raw")
-    refresh_meeting_parser.add_argument("--db", default="data/harness.db")
-    refresh_meeting_parser.add_argument("--csv", default="data/features/runner_features.csv")
-    refresh_meeting_parser.add_argument("--track-pars")
 
     ingest_meeting_parser = subparsers.add_parser("ingest-meeting", help="Parse and store a meeting HTML file")
     ingest_meeting_parser.add_argument("--html", required=True)
@@ -103,20 +87,6 @@ def main() -> None:
     score_meeting_parser.add_argument("--market-weight", type=float, default=0.55)
     score_meeting_parser.add_argument("--out-csv")
 
-    compare_parser = subparsers.add_parser("compare-results", help="Compare meeting odds against stored race results")
-    compare_parser.add_argument("--csv", default="data/features/runner_features.csv")
-    compare_parser.add_argument("--meeting-code", required=True)
-    compare_parser.add_argument("--db", default="data/harness.db")
-    compare_parser.add_argument("--min-prob", type=float, default=0.0)
-    compare_parser.add_argument("--max-prob", type=float, default=1.0)
-    compare_parser.add_argument("--out-csv")
-
-    compare_map_parser = subparsers.add_parser("compare-map", help="Compare predicted map tags against results-page stewards comments")
-    compare_map_parser.add_argument("--csv", default="data/features/runner_features.csv")
-    compare_map_parser.add_argument("--meeting-code", required=True)
-    compare_map_parser.add_argument("--db", default="data/harness.db")
-    compare_map_parser.add_argument("--out-csv")
-
     scratch_parser = subparsers.add_parser("scratch-horse", help="Mark a horse as scratched in the DB (for late scratchings not yet on the form page)")
     scratch_parser.add_argument("--meeting-code", required=True)
     scratch_parser.add_argument("--horse-name", required=True, help="Horse name (case-insensitive partial match)")
@@ -133,17 +103,6 @@ def main() -> None:
 
     if args.command == "fetch-meeting":
         print(f"Saved meeting HTML to {fetch_meeting(args.meeting_code, args.out)}")
-    elif args.command == "refresh-meeting":
-        result = refresh_meeting(
-            args.meeting_code,
-            args.raw_dir,
-            args.db,
-            args.csv,
-            track_pars_path=args.track_pars,
-        )
-        print(f"Saved meeting HTML to {result['meeting_path']}")
-        print(f"Stored 1 meeting and {result['runner_count']} runners in {Path(args.db)}")
-        print(f"Wrote feature dataset to {result['feature_path']}")
     elif args.command == "ingest-meeting":
         meetings, runners = ingest_meeting_html(args.db, args.html)
         print(f"Stored {meetings} meeting and {runners} runners in {Path(args.db)}")
@@ -210,32 +169,6 @@ def main() -> None:
             )
             print(f"Saved meeting odds CSV to {out_path}")
         print(render_meeting_odds(scored, args.meeting_code))
-    elif args.command == "compare-results":
-        feature_rows = load_feature_rows(args.csv)
-        meeting_scores = score_meeting_rows(
-            feature_rows,
-            args.meeting_code,
-            min_probability=args.min_prob,
-            max_probability=args.max_prob,
-        )
-        conn = connect(args.db)
-        result_rows = load_results_for_meeting(conn, args.meeting_code)
-        conn.close()
-        comparison_rows, summary = compare_meeting_scores_to_results(args.meeting_code, meeting_scores, result_rows)
-        if args.out_csv:
-            out_path = write_comparison_csv(comparison_rows, args.out_csv)
-            print(f"Saved results comparison CSV to {out_path}")
-        print(render_comparison_report(args.meeting_code, comparison_rows, summary))
-    elif args.command == "compare-map":
-        feature_rows = load_feature_rows(args.csv)
-        conn = connect(args.db)
-        result_rows = load_results_for_meeting(conn, args.meeting_code)
-        conn.close()
-        comparison_rows, summary = compare_meeting_map_to_results(args.meeting_code, feature_rows, result_rows)
-        if args.out_csv:
-            out_path = write_comparison_csv(comparison_rows, args.out_csv)
-            print(f"Saved map comparison CSV to {out_path}")
-        print(render_map_comparison_report(args.meeting_code, comparison_rows, summary))
     elif args.command == "scratch-horse":
         conn = connect(args.db)
         scratched = db_scratch_horse(conn, args.meeting_code, args.horse_name, race_number=args.race_number)
