@@ -1,0 +1,69 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Ingest Meeting",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "harness_model.cli",
+        "ingest-meeting",
+        "--html", "data/raw/meeting_${input:meetingCode}.html",
+        "--db", "data/harness.db"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Features",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "harness_model.cli",
+        "build-features",
+        "--db", "data/harness.db",
+        "--csv", "data/features/runner_features.csv",
+        "--track-pars", "${input:trackParsPath}"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Score Meeting",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "harness_model.cli",
+        "score-meeting",
+        "--csv", "data/features/runner_features.csv",
+        "--meeting-code", "${input:meetingCode}"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Full Pipeline (Ingest + Features + Score)",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Ingest Meeting",
+        "Build Features",
+        "Score Meeting"
+      ],
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "meetingCode",
+      "type": "promptString",
+      "description": "Meeting code (e.g. LM300326)",
+      "default": "LM300326"
+    },
+    {
+      "id": "trackParsPath",
+      "type": "promptString",
+      "description": "Full path to track pars JSON",
+      "default": "C:\\Users\\Paul Mustica\\Desktop\\track_pars.json"
+    }
+  ]
+}

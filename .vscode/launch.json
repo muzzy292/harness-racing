@@ -1,0 +1,93 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Ingest Meeting",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": [
+        "ingest-meeting",
+        "--html",
+        "data/raw/meeting_${input:meetingCode}.html",
+        "--db",
+        "data/harness.db"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Build Features",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": [
+        "build-features",
+        "--db",
+        "data/harness.db",
+        "--csv",
+        "data/features/runner_features.csv",
+        "--track-pars",
+        "${input:trackParsPath}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Score Meeting",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": [
+        "score-meeting",
+        "--csv",
+        "data/features/runner_features.csv",
+        "--meeting-code",
+        "${input:meetingCode}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Score Race",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": [
+        "score-race",
+        "--csv",
+        "data/features/runner_features.csv",
+        "--meeting-code",
+        "${input:meetingCode}",
+        "--race-number",
+        "${input:raceNumber}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "meetingCode",
+      "type": "promptString",
+      "description": "Meeting code (e.g. LM300326)",
+      "default": "LM300326"
+    },
+    {
+      "id": "raceNumber",
+      "type": "promptString",
+      "description": "Race number",
+      "default": "4"
+    },
+    {
+      "id": "trackParsPath",
+      "type": "promptString",
+      "description": "Full path to track pars JSON",
+      "default": "C:\\Users\\Paul Mustica\\Desktop\\track_pars.json"
+    }
+  ]
+}
