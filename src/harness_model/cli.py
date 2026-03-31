@@ -6,6 +6,7 @@ from pathlib import Path
 from .storage import connect, scratch_horse as db_scratch_horse
 from .pipeline import (
     build_feature_dataset,
+    fetch_driver_stats_for_meeting,
     fetch_horse_pages_from_meeting_html,
     fetch_meeting,
     fetch_results,
@@ -93,6 +94,10 @@ def main() -> None:
     scratch_parser.add_argument("--race-number", type=int, help="Limit to a specific race number (optional)")
     scratch_parser.add_argument("--db", default="data/harness.db")
 
+    fetch_driver_stats_parser = subparsers.add_parser("fetch-driver-stats", help="Fetch driver profile pages and store season win rates")
+    fetch_driver_stats_parser.add_argument("--meeting-code", required=True)
+    fetch_driver_stats_parser.add_argument("--db", default="data/harness.db")
+
     snapshot_parser = subparsers.add_parser("snapshot-meeting", help="Archive a pre-race meeting or one race into a timestamped snapshot folder")
     snapshot_parser.add_argument("--meeting-code", required=True)
     snapshot_parser.add_argument("--snapshots-root", default="data/snapshots")
@@ -178,6 +183,9 @@ def main() -> None:
                 print(f"Scratched: {name}  (Race {race})")
         else:
             print(f"No matching horse found for '{args.horse_name}' in meeting {args.meeting_code}")
+    elif args.command == "fetch-driver-stats":
+        count = fetch_driver_stats_for_meeting(args.db, args.meeting_code)
+        print(f"Stored driver stats for {count} drivers in {Path(args.db)}")
     elif args.command == "snapshot-meeting":
         result = snapshot_meeting(
             args.meeting_code,

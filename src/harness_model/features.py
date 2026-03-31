@@ -217,6 +217,7 @@ def _build_feature_row(
         "trainer_last_90_win_rate": trainer_stats["win_rate_90"],
         "trainer_change_flag": _trainer_change_flag(last_runs, runner["nominated_trainer"]),
         "driver_change_flag": _driver_change_flag(last_runs, runner["nominated_driver"]),
+        "driver_page_season_win_rate": _driver_page_win_rate(conn, runner["nominated_driver"]),
         "form_bmr_secs": bmr_secs,
         "form_bmr_dist_rge_secs": bmr_dist_rge_secs,
         "days_since_last_run": days_since_last_run,
@@ -270,6 +271,17 @@ def _driver_change_flag(last_runs: list[dict[str, object]], nominated_driver: ob
     if not nominated_driver or not last_runs or not last_runs[0]["driver_name"]:
         return None
     return int(_normalize_name(last_runs[0]["driver_name"]) != _normalize_name(str(nominated_driver)))
+
+
+def _driver_page_win_rate(conn: sqlite3.Connection, driver_name: object) -> float | None:
+    if not driver_name:
+        return None
+    slug = str(driver_name).lower().strip().replace(" ", "-")
+    row = conn.execute(
+        "SELECT season_win_rate FROM driver_stats WHERE driver_slug = ?",
+        (slug,),
+    ).fetchone()
+    return float(row["season_win_rate"]) if row and row["season_win_rate"] is not None else None
 
 
 def _summary_part(summary_text: object, idx: int) -> int | None:

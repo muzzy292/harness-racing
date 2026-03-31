@@ -907,3 +907,54 @@ def _dedupe_results(results: list[ResultRunner]) -> list[ResultRunner]:
         seen.add(key)
         deduped.append(result)
     return deduped
+
+
+def parse_driver_page_html(html: str, driver_name: str) -> dict[str, object] | None:
+    """Parse a driver profile page and return season/career win rate stats.
+
+    Extracts from the statrow header divs:
+      <div class="text-small">Season Win %</div><div>26%</div>
+      <div class="text-small">Career Win %</div><div>18%</div>
+
+    Also extracts current-season starts/wins from the season stats table.
+    Returns None if neither rate can be found.
+    """
+    season_win_rate = _extract_driver_stat_pct(html, "Season Win %")
+    career_win_rate = _extract_driver_stat_pct(html, "Career Win %")
+    if season_win_rate is None and career_win_rate is None:
+        return None
+
+    season_starts, season_wins = _extract_driver_season_stats(html)
+    return {
+        "driver_name": driver_name,
+        "season_starts": season_starts,
+        "season_wins": season_wins,
+        "season_win_rate": season_win_rate,
+        "career_win_rate": career_win_rate,
+    }
+
+
+def _extract_driver_stat_pct(html: str, label: str) -> float | None:
+    # Rendered HTML has whitespace inside the value div, so match loosely after the label
+    pattern = re.escape(label) + r".*?(\d+)%"
+    m = re.search(pattern, html, re.DOTALL | re.IGNORECASE)
+    return int(m.group(1)) / 100.0 if m else None
+
+
+def _extract_driver_season_stats(html: str) -> tuple[int | None, int | None]:
+    # Find the season table (Season / Starts / Wins / Places / Stakes)
+    m = re.search(r"<th[^>]*>Season</th>.*?<tbody>(.*?)</tbody>", html, re.DOTALL | re.IGNORECASE)
+    if not m:
+        return None, None
+    tbody = m.group(1)
+    row_m = re.search(r"<tr>(.*?)</tr>", tbody, re.DOTALL | re.IGNORECASE)
+    if not row_m:
+        return None, None
+    cells = re.findall(r"<td[^>]*>([^<]+)</td>", row_m.group(1))
+    if len(cells) < 3:
+        return None, None
+    starts_m = re.search(r"(\d[\d,]*)", cells[1])
+    wins_m = re.search(r"(\d[\d,]*)", cells[2])
+    starts = int(starts_m.group(1).replace(",", "")) if starts_m else None
+    wins = int(wins_m.group(1).replace(",", "")) if wins_m else None
+    return starts, wins

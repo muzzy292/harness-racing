@@ -268,6 +268,7 @@ def _stage2_components(row: dict[str, str]) -> dict[str, float]:
     barrier = row.get("barrier") or ""
     bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
     days_since_last_run = _to_float(row.get("days_since_last_run"))
+    driver_win_rate = _to_float(row.get("driver_page_season_win_rate"))
 
     return {
         "barrier":      _barrier_score(barrier),
@@ -280,6 +281,9 @@ def _stage2_components(row: dict[str, str]) -> dict[str, float]:
         "bmr_dist_rge": max(-1.2, min(1.2, _pos_scale(bmr_dist_rge, center=117.0, divisor=-2.0, missing=0.0))) * 0.6,
         # Fitness — graduated penalty by days since last run.
         "fitness":      _fitness_score(days_since_last_run),
+        # Driver form — current season win rate from official profile page.
+        # Centred at 15% (average NSW win rate). Missing = 0 (no effect).
+        "driver_form":  _pos_scale(driver_win_rate, center=0.15, divisor=0.10, missing=0.0) * 0.3,
     }
 
 

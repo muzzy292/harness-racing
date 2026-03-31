@@ -49,6 +49,15 @@ def build_results_url(meeting_code: str) -> str:
     return f"https://www.harness.org.au/racing/fields/race-fields/?mc={meeting_code}"
 
 
+def build_driver_url(driver_name: str) -> str:
+    slug = driver_name.lower().strip().replace(" ", "-")
+    return f"https://www.harness.org.au/racing/drivers/{slug}/"
+
+
+def driver_name_to_slug(driver_name: str) -> str:
+    return driver_name.lower().strip().replace(" ", "-")
+
+
 def is_rate_limited_html(html: str) -> bool:
     lowered = html.lower()
     return "rate limit exceeded" in lowered or "access denied" in lowered
@@ -70,3 +79,10 @@ def is_valid_horse_html(html: str) -> bool:
     if "an error has occurred" in lowered:
         return False
     return "performance records" in lowered or "best winning mile rate" in lowered
+
+
+def is_valid_driver_html(html: str) -> bool:
+    lowered = html.lower()
+    if is_rate_limited_html(html):
+        return False
+    return "season win %" in lowered or "career win %" in lowered

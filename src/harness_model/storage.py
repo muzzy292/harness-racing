@@ -112,6 +112,16 @@ CREATE TABLE IF NOT EXISTS race_results (
     starting_price REAL,
     PRIMARY KEY (meeting_code, race_number, horse_name)
 );
+
+CREATE TABLE IF NOT EXISTS driver_stats (
+    driver_slug TEXT PRIMARY KEY,
+    driver_name TEXT NOT NULL,
+    season_starts INTEGER,
+    season_wins INTEGER,
+    season_win_rate REAL,
+    career_win_rate REAL,
+    fetched_date TEXT
+);
 """
 
 
@@ -480,6 +490,33 @@ def _summary_to_text(summary: tuple[int, int, int, int] | None) -> str | None:
     if summary is None:
         return None
     return "-".join(str(value) for value in summary)
+
+
+def upsert_driver_stats(conn: sqlite3.Connection, driver_slug: str, stats: dict[str, object]) -> None:
+    from datetime import date
+    conn.execute(
+        """
+        INSERT INTO driver_stats(driver_slug, driver_name, season_starts, season_wins, season_win_rate, career_win_rate, fetched_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(driver_slug) DO UPDATE SET
+            driver_name = excluded.driver_name,
+            season_starts = excluded.season_starts,
+            season_wins = excluded.season_wins,
+            season_win_rate = excluded.season_win_rate,
+            career_win_rate = excluded.career_win_rate,
+            fetched_date = excluded.fetched_date
+        """,
+        (
+            driver_slug,
+            stats["driver_name"],
+            stats.get("season_starts"),
+            stats.get("season_wins"),
+            stats.get("season_win_rate"),
+            stats.get("career_win_rate"),
+            date.today().isoformat(),
+        ),
+    )
+    conn.commit()
 
 
 def _ensure_columns(conn: sqlite3.Connection, table_name: str, columns: dict[str, str]) -> None:

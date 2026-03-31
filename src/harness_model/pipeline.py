@@ -5,18 +5,21 @@ import time
 from datetime import datetime
 
 from .features import build_runner_feature_rows, install_sqlite_helpers, write_feature_csv
-from .parsers import parse_horse_profile_html, parse_meeting_html, parse_results_html
+from .parsers import parse_driver_page_html, parse_horse_profile_html, parse_meeting_html, parse_results_html
 from .scraper import (
+    build_driver_url,
     build_horse_url,
     build_meeting_url,
     build_results_url,
+    driver_name_to_slug,
     fetch_rendered_html,
     is_rate_limited_html,
+    is_valid_driver_html,
     is_valid_horse_html,
     is_valid_meeting_html,
     save_html,
 )
-from .storage import connect, init_db, upsert_horse_profile, upsert_meeting, upsert_results, upsert_runners
+from .storage import connect, init_db, upsert_driver_stats, upsert_horse_profile, upsert_meeting, upsert_results, upsert_runners
 from .track_pars import load_track_pars
 
 
@@ -166,6 +169,51 @@ def ingest_horse_dir(db_path: str | Path, horse_dir: str | Path) -> int:
     for path in sorted(Path(horse_dir).glob("*.html")):
         ingest_horse_html(db_path, path)
         count += 1
+    return count
+
+
+def fetch_driver_stats_for_meeting(db_path: str | Path, meeting_code: str) -> int:
+    conn = connect(db_path)
+    init_db(conn)
+    drivers = conn.execute(
+        """
+        SELECT DISTINCT driver_name
+        FROM race_runners
+        WHERE meeting_code = ? AND driver_name IS NOT NULL AND COALESCE(scratched, 0) = 0
+        """,
+        (meeting_code,),
+    ).fetchall()
+    conn.close()
+
+    count = 0
+    for row in drivers:
+        driver_name = row["driver_name"]
+        slug = driver_name_to_slug(driver_name)
+        url = build_driver_url(driver_name)
+        print(f"Fetching driver stats: {driver_name} ({url})", flush=True)
+        try:
+            html = fetch_rendered_html(url, wait_ms=3000)
+        except Exception as exc:
+            print(f"  Failed to fetch {driver_name}: {exc}", flush=True)
+            continue
+        if not is_valid_driver_html(html):
+            print(f"  No valid stats page for {driver_name}", flush=True)
+            continue
+        stats = parse_driver_page_html(html, driver_name)
+        if stats is None:
+            print(f"  Could not parse stats for {driver_name}", flush=True)
+            continue
+        conn = connect(db_path)
+        upsert_driver_stats(conn, slug, stats)
+        conn.close()
+        print(
+            f"  Stored: season {stats.get('season_wins')}/{stats.get('season_starts')} "
+            f"({int((stats.get('season_win_rate') or 0) * 100)}%)",
+            flush=True,
+        )
+        count += 1
+        time.sleep(2.0)
+
     return count
 
 

@@ -42,10 +42,53 @@
       "problemMatcher": []
     },
     {
-      "label": "Full Pipeline (Ingest + Features + Score)",
+      "label": "Fetch Horses",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "harness_model.cli",
+        "fetch-horses",
+        "--meeting-html", "data/raw/meeting_${input:meetingCode}.html",
+        "--out", "data/raw/horses",
+        "--horse-library", "data/horse_library/nsw"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Ingest Horses",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "harness_model.cli",
+        "ingest-horses",
+        "--horse-dir", "data/raw/horses",
+        "--db", "data/harness.db"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Fetch Driver Stats",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "harness_model.cli",
+        "fetch-driver-stats",
+        "--meeting-code", "${input:meetingCode}",
+        "--db", "data/harness.db"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Full Pipeline (Ingest + Horses + Drivers + Features + Score)",
       "dependsOrder": "sequence",
       "dependsOn": [
         "Ingest Meeting",
+        "Fetch Horses",
+        "Ingest Horses",
+        "Fetch Driver Stats",
         "Build Features",
         "Score Meeting"
       ],
