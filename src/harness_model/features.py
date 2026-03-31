@@ -46,7 +46,7 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
 
     rows: list[dict[str, object]] = []
     for runner in runners:
-        last_runs = conn.execute(
+        all_last_runs = conn.execute(
             """
             SELECT *
             FROM horse_runs
@@ -54,10 +54,14 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
               AND COALESCE(race_type, 'RACE') <> 'TRIAL'
               AND COALESCE(null_run, 0) = 0
             ORDER BY _sort_run_date(run_date) DESC
-            LIMIT 10
+            LIMIT 20
             """,
             (runner["horse_id"],),
         ).fetchall()
+        last_runs = _runs_before_meeting(
+            [dict(row) for row in all_last_runs],
+            runner["meeting_date"],
+        )[:10]
         recent_lines = conn.execute(
             """
             SELECT *
@@ -74,7 +78,7 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
             _build_feature_row(
                 conn,
                 dict(runner),
-                [dict(row) for row in last_runs],
+                last_runs,
                 [dict(row) for row in recent_lines],
                 track_pars,
             )
@@ -216,6 +220,7 @@ def _build_feature_row(
         "trainer_last_90_wins": trainer_stats["wins_90"],
         "trainer_last_90_win_rate": trainer_stats["win_rate_90"],
         "trainer_change_flag": _trainer_change_flag(last_runs, runner["nominated_trainer"]),
+        "trainer_change_recent_flag": _trainer_change_recent_flag(last_runs, runner["nominated_trainer"]),
         "driver_change_flag": _driver_change_flag(last_runs, runner["nominated_driver"]),
         "driver_page_season_win_rate": _driver_page_win_rate(conn, runner["nominated_driver"]),
         "form_bmr_secs": bmr_secs,
@@ -262,15 +267,45 @@ def _rolling_person_stats(conn: sqlite3.Connection, field_name: str, person_name
 
 
 def _trainer_change_flag(last_runs: list[dict[str, object]], nominated_trainer: object) -> int | None:
-    if not nominated_trainer or not last_runs or not last_runs[0]["trainer_name"]:
+    prior_trainer = _latest_known_person(last_runs, "trainer_name")
+    if not nominated_trainer or not prior_trainer:
         return None
-    return int(_normalize_name(last_runs[0]["trainer_name"]) != _normalize_name(str(nominated_trainer)))
+    return int(not _person_names_match(prior_trainer, str(nominated_trainer)))
+
+
+def _trainer_change_recent_flag(last_runs: list[dict[str, object]], nominated_trainer: object) -> int | None:
+    if not nominated_trainer:
+        return None
+
+    nominated = str(nominated_trainer)
+    known_trainers = [
+        str(run["trainer_name"])
+        for run in last_runs
+        if run.get("trainer_name")
+    ]
+    if not known_trainers:
+        return None
+
+    if not _person_names_match(known_trainers[0], nominated):
+        return 1
+
+    streak = 0
+    for trainer in known_trainers:
+        if _person_names_match(trainer, nominated):
+            streak += 1
+        else:
+            break
+
+    if streak <= 2 and len(known_trainers) > streak:
+        return 1
+    return 0
 
 
 def _driver_change_flag(last_runs: list[dict[str, object]], nominated_driver: object) -> int | None:
-    if not nominated_driver or not last_runs or not last_runs[0]["driver_name"]:
+    prior_driver = _latest_known_person(last_runs, "driver_name")
+    if not nominated_driver or not prior_driver:
         return None
-    return int(_normalize_name(last_runs[0]["driver_name"]) != _normalize_name(str(nominated_driver)))
+    return int(not _person_names_match(prior_driver, str(nominated_driver)))
 
 
 def _driver_page_win_rate(conn: sqlite3.Connection, driver_name: object) -> float | None:
@@ -303,6 +338,43 @@ def _avg(values: list[float]) -> float | None:
 
 def _normalize_name(name: str) -> str:
     return " ".join(name.upper().split())
+
+
+def _latest_known_person(last_runs: list[dict[str, object]], field_name: str) -> str | None:
+    for run in last_runs:
+        value = run.get(field_name)
+        if value:
+            return str(value)
+    return None
+
+
+def _person_names_match(left: str, right: str) -> bool:
+    left_tokens = _name_tokens(left)
+    right_tokens = _name_tokens(right)
+    if not left_tokens or not right_tokens:
+        return False
+    if left_tokens[-1] != right_tokens[-1]:
+        return False
+
+    left_initials = "".join(token[0] for token in left_tokens[:-1] if token)
+    right_initials = "".join(token[0] for token in right_tokens[:-1] if token)
+    if not left_initials or not right_initials:
+        return False
+    shorter = left_initials if len(left_initials) <= len(right_initials) else right_initials
+    longer = right_initials if len(right_initials) > len(left_initials) else left_initials
+    return longer.startswith(shorter)
+
+
+def _name_tokens(name: str) -> list[str]:
+    cleaned = re.sub(r"[^A-Z ]+", " ", _normalize_name(name))
+    return [token for token in cleaned.split() if token]
+
+
+def _runs_before_meeting(last_runs: list[dict[str, object]], meeting_date: object) -> list[dict[str, object]]:
+    meeting_key = _sort_run_date(meeting_date)
+    if meeting_key <= 0:
+        return last_runs
+    return [run for run in last_runs if _sort_run_date(run.get("run_date")) < meeting_key]
 
 
 def _sectional_deltas_vs_par(recent_lines: list[dict[str, object]], track_pars: dict | None) -> list[float]:

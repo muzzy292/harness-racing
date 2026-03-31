@@ -269,6 +269,12 @@ def _stage2_components(row: dict[str, str]) -> dict[str, float]:
     bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
     days_since_last_run = _to_float(row.get("days_since_last_run"))
     driver_win_rate = _to_float(row.get("driver_page_season_win_rate"))
+    trainer_change_flag = _to_float(row.get("trainer_change_flag"))
+    trainer_change_recent_flag = _to_float(row.get("trainer_change_recent_flag"))
+    trainer_win_rate_30 = _to_float(row.get("trainer_last_30_win_rate"))
+    trainer_win_rate_90 = _to_float(row.get("trainer_last_90_win_rate"))
+    class_delta = _to_float(row.get("class_delta"))
+    nr_headroom = _to_float(row.get("nr_headroom"))
 
     return {
         "barrier":      _barrier_score(barrier),
@@ -284,6 +290,17 @@ def _stage2_components(row: dict[str, str]) -> dict[str, float]:
         # Driver form — current season win rate from official profile page.
         # Centred at 15% (average NSW win rate). Missing = 0 (no effect).
         "driver_form":  _pos_scale(driver_win_rate, center=0.15, divisor=0.10, missing=0.0) * 0.3,
+        # Trainer form and stable-change overlay.
+        # We keep this measured: genuine trainer changes matter, but they should
+        # not drown out the horse's core profile.
+        "trainer_form": _trainer_form_score(trainer_win_rate_30, trainer_win_rate_90),
+        "stable_change": _stable_change_score(
+            trainer_change_flag,
+            trainer_change_recent_flag,
+            days_since_last_run,
+            class_delta,
+            nr_headroom,
+        ),
     }
 
 
@@ -428,6 +445,41 @@ def _fitness_score(days: float | None) -> float:
     if days > 14:
         return -0.35
     return 0.0
+
+
+def _trainer_form_score(win_rate_30: float | None, win_rate_90: float | None) -> float:
+    score_30 = _pos_scale(win_rate_30, center=0.12, divisor=0.08, missing=0.0) * 0.18
+    score_90 = _pos_scale(win_rate_90, center=0.12, divisor=0.08, missing=0.0) * 0.12
+    return score_30 + score_90
+
+
+def _stable_change_score(
+    trainer_change_flag: float | None,
+    trainer_change_recent_flag: float | None,
+    days_since_last_run: float | None,
+    class_delta: float | None,
+    nr_headroom: float | None,
+) -> float:
+    if trainer_change_flag != 1 and trainer_change_recent_flag != 1:
+        return 0.0
+
+    score = 0.25 if trainer_change_flag == 1 else 0.18
+    if days_since_last_run is not None and days_since_last_run >= 45:
+        score += 0.20
+    elif days_since_last_run is not None and days_since_last_run >= 21:
+        score += 0.10
+
+    if class_delta is not None and class_delta >= 500:
+        score += 0.15
+    elif class_delta is not None and class_delta <= -2000:
+        score -= 0.10
+
+    if nr_headroom is not None and nr_headroom < 0:
+        score += 0.10
+    elif nr_headroom is not None and nr_headroom > 4:
+        score -= 0.10
+
+    return score
 
 
 def _market_key(horse_name: object, runner_number: object) -> tuple[str, int | None]:
