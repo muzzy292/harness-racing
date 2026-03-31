@@ -10,10 +10,12 @@ from .pipeline import (
     fetch_horse_pages_from_meeting_html,
     fetch_meeting,
     fetch_results,
+    fetch_trainer_stats_for_meeting,
     ingest_horse_dir,
     ingest_horse_html,
     ingest_meeting_html,
     ingest_results_html,
+    ingest_results_dir,
     snapshot_meeting,
 )
 from .odds import (
@@ -48,11 +50,17 @@ def main() -> None:
     ingest_results_parser.add_argument("--html", required=True)
     ingest_results_parser.add_argument("--db", default="data/harness.db")
 
+    ingest_results_dir_parser = subparsers.add_parser("ingest-results-dir", help="Parse and store all results HTML files in a folder")
+    ingest_results_dir_parser.add_argument("--results-dir", required=True)
+    ingest_results_dir_parser.add_argument("--db", default="data/harness.db")
+
     fetch_horses_parser = subparsers.add_parser("fetch-horses", help="Fetch horse pages referenced by a meeting HTML file")
     fetch_horses_parser.add_argument("--meeting-html", required=True)
     fetch_horses_parser.add_argument("--out", default="data/raw/horses")
     fetch_horses_parser.add_argument("--race-number", type=int)
     fetch_horses_parser.add_argument("--horse-library")
+    fetch_horses_parser.add_argument("--db", default="data/harness.db")
+    fetch_horses_parser.add_argument("--force-refresh", action="store_true")
 
     ingest_horse_parser = subparsers.add_parser("ingest-horse", help="Parse and store one horse HTML file")
     ingest_horse_parser.add_argument("--html", required=True)
@@ -97,6 +105,16 @@ def main() -> None:
     fetch_driver_stats_parser = subparsers.add_parser("fetch-driver-stats", help="Fetch driver profile pages and store season win rates")
     fetch_driver_stats_parser.add_argument("--meeting-code", required=True)
     fetch_driver_stats_parser.add_argument("--db", default="data/harness.db")
+    fetch_driver_stats_parser.add_argument("--force-refresh", action="store_true")
+    fetch_driver_stats_parser.add_argument("--max-age-days", type=int, default=7)
+    fetch_driver_stats_parser.add_argument("--driver-library", default="data/driver_library")
+
+    fetch_trainer_stats_parser = subparsers.add_parser("fetch-trainer-stats", help="Fetch trainer profile pages and store season win rates")
+    fetch_trainer_stats_parser.add_argument("--meeting-code", required=True)
+    fetch_trainer_stats_parser.add_argument("--db", default="data/harness.db")
+    fetch_trainer_stats_parser.add_argument("--force-refresh", action="store_true")
+    fetch_trainer_stats_parser.add_argument("--max-age-days", type=int, default=7)
+    fetch_trainer_stats_parser.add_argument("--trainer-library", default="data/trainer_library")
 
     snapshot_parser = subparsers.add_parser("snapshot-meeting", help="Archive a pre-race meeting or one race into a timestamped snapshot folder")
     snapshot_parser.add_argument("--meeting-code", required=True)
@@ -116,12 +134,17 @@ def main() -> None:
     elif args.command == "ingest-results":
         count = ingest_results_html(args.db, args.html)
         print(f"Stored {count} result rows in {Path(args.db)}")
+    elif args.command == "ingest-results-dir":
+        count = ingest_results_dir(args.db, args.results_dir)
+        print(f"Stored {count} result rows from {Path(args.results_dir)} in {Path(args.db)}")
     elif args.command == "fetch-horses":
         paths = fetch_horse_pages_from_meeting_html(
             args.meeting_html,
             args.out,
             race_number=args.race_number,
             horse_library_dir=args.horse_library,
+            db_path=args.db,
+            force_refresh=args.force_refresh,
         )
         print(f"Fetched {len(paths)} horse pages into {Path(args.out)}")
     elif args.command == "ingest-horse":
@@ -184,8 +207,23 @@ def main() -> None:
         else:
             print(f"No matching horse found for '{args.horse_name}' in meeting {args.meeting_code}")
     elif args.command == "fetch-driver-stats":
-        count = fetch_driver_stats_for_meeting(args.db, args.meeting_code)
+        count = fetch_driver_stats_for_meeting(
+            args.db,
+            args.meeting_code,
+            force_refresh=args.force_refresh,
+            max_age_days=args.max_age_days,
+            driver_library_dir=args.driver_library,
+        )
         print(f"Stored driver stats for {count} drivers in {Path(args.db)}")
+    elif args.command == "fetch-trainer-stats":
+        count = fetch_trainer_stats_for_meeting(
+            args.db,
+            args.meeting_code,
+            force_refresh=args.force_refresh,
+            max_age_days=args.max_age_days,
+            trainer_library_dir=args.trainer_library,
+        )
+        print(f"Stored trainer stats for {count} trainers in {Path(args.db)}")
     elif args.command == "snapshot-meeting":
         result = snapshot_meeting(
             args.meeting_code,

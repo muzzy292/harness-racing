@@ -5,21 +5,45 @@ import time
 from datetime import datetime
 
 from .features import build_runner_feature_rows, install_sqlite_helpers, write_feature_csv
-from .parsers import parse_driver_page_html, parse_horse_profile_html, parse_meeting_html, parse_results_html
+from .parsers import (
+    parse_driver_page_html,
+    parse_horse_profile_html,
+    parse_meeting_html,
+    parse_results_html,
+    parse_trainer_links_from_fields_html,
+    parse_trainer_page_html,
+)
 from .scraper import (
+    build_fields_url,
     build_driver_url,
     build_horse_url,
     build_meeting_url,
     build_results_url,
+    build_trainer_url,
     driver_name_to_slug,
     fetch_rendered_html,
     is_rate_limited_html,
     is_valid_driver_html,
     is_valid_horse_html,
     is_valid_meeting_html,
+    is_valid_trainer_html,
     save_html,
+    trainer_name_to_slug,
 )
-from .storage import connect, init_db, upsert_driver_stats, upsert_horse_profile, upsert_meeting, upsert_results, upsert_runners
+from .storage import (
+    connect,
+    driver_stats_are_fresh,
+    horse_has_runs,
+    init_db,
+    sync_runner_recent_lines_to_horse_runs,
+    upsert_driver_stats,
+    upsert_horse_profile,
+    upsert_meeting,
+    upsert_results,
+    upsert_runners,
+    upsert_trainer_stats,
+    trainer_stats_are_fresh,
+)
 from .track_pars import load_track_pars
 
 
@@ -43,6 +67,8 @@ def fetch_horse_pages_from_meeting_html(
     output_dir: str | Path,
     race_number: int | None = None,
     horse_library_dir: str | Path | None = None,
+    db_path: str | Path | None = None,
+    force_refresh: bool = False,
 ) -> list[Path]:
     html_path = Path(meeting_html_path)
     output_path = Path(output_dir)
@@ -53,6 +79,10 @@ def fetch_horse_pages_from_meeting_html(
     html = html_path.read_text(encoding="utf-8", errors="replace")
     meeting_code = _infer_meeting_code(html_path)
     _, runners = parse_meeting_html(html, meeting_code)
+    conn = None
+    if db_path:
+        conn = connect(db_path)
+        init_db(conn)
     if race_number is not None:
         runners = [runner for runner in runners if runner.race_number == race_number]
 
@@ -72,7 +102,16 @@ def fetch_horse_pages_from_meeting_html(
     reused_count = 0
     fetched_count = 0
     skipped_existing_count = 0
+    skipped_known_count = 0
     for index, runner in enumerate(unique_runners, start=1):
+        if conn is not None and not force_refresh and horse_has_runs(conn, runner.horse_id):
+            skipped_known_count += 1
+            print(
+                f"[{index}/{len(unique_runners)}] Skipping known horse with DB history for "
+                f"{runner.horse_name} ({runner.horse_id})",
+                flush=True,
+            )
+            continue
         target_path = output_path / f"{_safe_name(runner.horse_name)}_{runner.horse_id}.html"
         library_target = _library_target_path(library_path, runner.horse_id, runner.horse_name) if library_path else None
         library_existing = _find_existing_library_file(library_path, runner.horse_id, preferred=library_target)
@@ -81,7 +120,11 @@ def fetch_horse_pages_from_meeting_html(
             existing_html = target_path.read_text(encoding="utf-8", errors="replace")
             if is_valid_horse_html(existing_html):
                 skipped_existing_count += 1
-                print(f"[{index}/{len(unique_runners)}] Skipping existing valid file for {runner.horse_name} ({runner.horse_id})", flush=True)
+                print(
+                    f"[{index}/{len(unique_runners)}] Reusing local cached profile for "
+                    f"{runner.horse_name} ({runner.horse_id})",
+                    flush=True,
+                )
                 if library_target and not library_target.exists():
                     save_html(existing_html, library_target)
                 saved_paths.append(target_path)
@@ -91,14 +134,22 @@ def fetch_horse_pages_from_meeting_html(
             existing_html = library_existing.read_text(encoding="utf-8", errors="replace")
             if is_valid_horse_html(existing_html):
                 reused_count += 1
-                print(f"[{index}/{len(unique_runners)}] Reusing library file for {runner.horse_name} ({runner.horse_id})", flush=True)
+                print(
+                    f"[{index}/{len(unique_runners)}] Reusing library cached profile for "
+                    f"{runner.horse_name} ({runner.horse_id})",
+                    flush=True,
+                )
                 save_html(existing_html, target_path)
                 if library_target and library_existing != library_target:
                     save_html(existing_html, library_target)
                 saved_paths.append(target_path)
                 continue
 
-        print(f"[{index}/{len(unique_runners)}] Fetching {runner.horse_name} ({runner.horse_id})...", flush=True)
+        print(
+            f"[{index}/{len(unique_runners)}] Fetching new horse profile for "
+            f"{runner.horse_name} ({runner.horse_id})...",
+            flush=True,
+        )
         horse_html = _fetch_horse_with_retry(runner.horse_id, runner.horse_name)
         if horse_html is None:
             failures.append(f"{runner.horse_name} ({runner.horse_id})")
@@ -115,12 +166,15 @@ def fetch_horse_pages_from_meeting_html(
     print(
         "\nHorse fetch summary:\n"
         f"  Total in scope:      {len(unique_runners)}\n"
+        f"  Skipped known:       {skipped_known_count}\n"
         f"  Reused from library: {reused_count}\n"
         f"  Skipped existing:    {skipped_existing_count}\n"
         f"  Freshly fetched:     {fetched_count}\n"
         f"  Failed:              {len(failures)}",
         flush=True,
     )
+    if conn is not None:
+        conn.close()
     if failures:
         print(f"Completed with {len(failures)} failures due to repeated blocking or invalid pages.", flush=True)
         for failed in failures:
@@ -137,6 +191,7 @@ def ingest_meeting_html(db_path: str | Path, html_path: str | Path) -> tuple[int
     init_db(conn)
     upsert_meeting(conn, meeting)
     upsert_runners(conn, runners)
+    sync_runner_recent_lines_to_horse_runs(conn, runners)
     conn.close()
     return 1, len(runners)
 
@@ -151,6 +206,13 @@ def ingest_results_html(db_path: str | Path, html_path: str | Path) -> int:
     upsert_results(conn, results)
     conn.close()
     return len(results)
+
+
+def ingest_results_dir(db_path: str | Path, results_dir: str | Path) -> int:
+    count = 0
+    for path in sorted(Path(results_dir).glob("results_*.html")):
+        count += ingest_results_html(db_path, path)
+    return count
 
 
 def ingest_horse_html(db_path: str | Path, html_path: str | Path) -> str:
@@ -172,12 +234,20 @@ def ingest_horse_dir(db_path: str | Path, horse_dir: str | Path) -> int:
     return count
 
 
-def fetch_driver_stats_for_meeting(db_path: str | Path, meeting_code: str) -> int:
+def fetch_driver_stats_for_meeting(
+    db_path: str | Path,
+    meeting_code: str,
+    force_refresh: bool = False,
+    max_age_days: int = 7,
+    driver_library_dir: str | Path = "data/driver_library",
+) -> int:
+    library_dir = Path(driver_library_dir)
+    library_dir.mkdir(parents=True, exist_ok=True)
     conn = connect(db_path)
     init_db(conn)
     drivers = conn.execute(
         """
-        SELECT DISTINCT driver_name
+        SELECT DISTINCT driver_name, driver_link
         FROM race_runners
         WHERE meeting_code = ? AND driver_name IS NOT NULL AND COALESCE(scratched, 0) = 0
         """,
@@ -186,19 +256,64 @@ def fetch_driver_stats_for_meeting(db_path: str | Path, meeting_code: str) -> in
     conn.close()
 
     count = 0
+    skipped_fresh_count = 0
     for row in drivers:
         driver_name = row["driver_name"]
         slug = driver_name_to_slug(driver_name)
-        url = build_driver_url(driver_name)
-        print(f"Fetching driver stats: {driver_name} ({url})", flush=True)
-        try:
-            html = fetch_rendered_html(url, wait_ms=3000)
-        except Exception as exc:
-            print(f"  Failed to fetch {driver_name}: {exc}", flush=True)
+        driver_link = row["driver_link"]
+        cache_path = library_dir / f"{slug}.html"
+        conn = connect(db_path)
+        init_db(conn)
+        is_fresh = driver_stats_are_fresh(conn, slug, max_age_days=max_age_days)
+        conn.close()
+        if is_fresh and not force_refresh:
+            skipped_fresh_count += 1
+            print(f"Skipping driver with fresh DB stats: {driver_name}", flush=True)
             continue
+        primary_url = _absolute_driver_url(driver_link)
+        fallback_url = build_driver_url(driver_name)
+        url = primary_url or fallback_url
+        html = None
+        if not force_refresh and _cache_is_fresh(cache_path, max_age_days=max_age_days):
+            html = cache_path.read_text(encoding="utf-8", errors="replace")
+            if is_valid_driver_html(html):
+                print(f"Using cached driver HTML: {driver_name}", flush=True)
+            else:
+                html = None
+        if force_refresh:
+            print(f"Force refreshing driver stats: {driver_name} ({url})", flush=True)
+        elif html is None:
+            print(f"Fetching driver stats: {driver_name} ({url})", flush=True)
+        if html is None:
+            try:
+                html = fetch_rendered_html(url, wait_ms=3000)
+            except Exception as exc:
+                if primary_url and primary_url != fallback_url:
+                    print(f"  Primary driver link failed for {driver_name}: {exc}", flush=True)
+                    print(f"  Retrying with fallback slug URL: {fallback_url}", flush=True)
+                    try:
+                        html = fetch_rendered_html(fallback_url, wait_ms=3000)
+                    except Exception as fallback_exc:
+                        print(f"  Failed to fetch {driver_name}: {fallback_exc}", flush=True)
+                        continue
+                else:
+                    print(f"  Failed to fetch {driver_name}: {exc}", flush=True)
+                    continue
         if not is_valid_driver_html(html):
-            print(f"  No valid stats page for {driver_name}", flush=True)
-            continue
+            if primary_url and primary_url != fallback_url and url != fallback_url:
+                print(f"  Primary driver page invalid for {driver_name}, retrying fallback slug URL", flush=True)
+                try:
+                    html = fetch_rendered_html(fallback_url, wait_ms=3000)
+                except Exception as fallback_exc:
+                    print(f"  Failed to fetch {driver_name}: {fallback_exc}", flush=True)
+                    continue
+                if not is_valid_driver_html(html):
+                    print(f"  No valid stats page for {driver_name}", flush=True)
+                    continue
+            else:
+                print(f"  No valid stats page for {driver_name}", flush=True)
+                continue
+        save_html(html, cache_path)
         stats = parse_driver_page_html(html, driver_name)
         if stats is None:
             print(f"  Could not parse stats for {driver_name}", flush=True)
@@ -214,6 +329,123 @@ def fetch_driver_stats_for_meeting(db_path: str | Path, meeting_code: str) -> in
         count += 1
         time.sleep(2.0)
 
+    print(
+        "\nDriver stats summary:\n"
+        f"  Drivers in scope:     {len(drivers)}\n"
+        f"  Skipped fresh:        {skipped_fresh_count}\n"
+        f"  Freshly fetched:      {count}",
+        flush=True,
+    )
+    return count
+
+
+def fetch_trainer_stats_for_meeting(
+    db_path: str | Path,
+    meeting_code: str,
+    force_refresh: bool = False,
+    max_age_days: int = 7,
+    trainer_library_dir: str | Path = "data/trainer_library",
+) -> int:
+    library_dir = Path(trainer_library_dir)
+    library_dir.mkdir(parents=True, exist_ok=True)
+    fields_links = _fetch_trainer_links_for_meeting(meeting_code)
+    conn = connect(db_path)
+    init_db(conn)
+    trainers = conn.execute(
+        """
+        SELECT DISTINCT trainer_name, trainer_link
+        FROM race_runners
+        WHERE meeting_code = ? AND trainer_name IS NOT NULL AND COALESCE(scratched, 0) = 0
+        """,
+        (meeting_code,),
+    ).fetchall()
+    conn.close()
+
+    count = 0
+    skipped_fresh_count = 0
+    for row in trainers:
+        trainer_name = row["trainer_name"]
+        slug = trainer_name_to_slug(trainer_name)
+        trainer_link = row["trainer_link"] or fields_links.get(_normalize_person_key(trainer_name))
+        cache_path = library_dir / f"{slug}.html"
+        conn = connect(db_path)
+        init_db(conn)
+        is_fresh = trainer_stats_are_fresh(conn, slug, max_age_days=max_age_days)
+        conn.close()
+        if is_fresh and not force_refresh:
+            skipped_fresh_count += 1
+            print(f"Skipping trainer with fresh DB stats: {trainer_name}", flush=True)
+            continue
+
+        primary_url = _absolute_trainer_url(trainer_link)
+        fallback_url = build_trainer_url(trainer_name)
+        url = primary_url or fallback_url
+        html = None
+        if not force_refresh and _cache_is_fresh(cache_path, max_age_days=max_age_days):
+            html = cache_path.read_text(encoding="utf-8", errors="replace")
+            if is_valid_trainer_html(html):
+                print(f"Using cached trainer HTML: {trainer_name}", flush=True)
+            else:
+                html = None
+        if force_refresh:
+            print(f"Force refreshing trainer stats: {trainer_name} ({url})", flush=True)
+        elif html is None:
+            print(f"Fetching trainer stats: {trainer_name} ({url})", flush=True)
+        if html is None:
+            try:
+                html = fetch_rendered_html(url, wait_ms=3000)
+            except Exception as exc:
+                if primary_url and primary_url != fallback_url:
+                    print(f"  Primary trainer link failed for {trainer_name}: {exc}", flush=True)
+                    print(f"  Retrying with fallback slug URL: {fallback_url}", flush=True)
+                    try:
+                        html = fetch_rendered_html(fallback_url, wait_ms=3000)
+                    except Exception as fallback_exc:
+                        print(f"  Failed to fetch {trainer_name}: {fallback_exc}", flush=True)
+                        continue
+                else:
+                    print(f"  Failed to fetch {trainer_name}: {exc}", flush=True)
+                    continue
+
+        if not is_valid_trainer_html(html):
+            if primary_url and primary_url != fallback_url and url != fallback_url:
+                print(f"  Primary trainer page invalid for {trainer_name}, retrying fallback slug URL", flush=True)
+                try:
+                    html = fetch_rendered_html(fallback_url, wait_ms=3000)
+                except Exception as fallback_exc:
+                    print(f"  Failed to fetch {trainer_name}: {fallback_exc}", flush=True)
+                    continue
+                if not is_valid_trainer_html(html):
+                    print(f"  No valid stats page for {trainer_name}", flush=True)
+                    continue
+            else:
+                print(f"  No valid stats page for {trainer_name}", flush=True)
+                continue
+
+        save_html(html, cache_path)
+        stats = parse_trainer_page_html(html, trainer_name)
+        if stats is None:
+            print(f"  Could not parse stats for {trainer_name}", flush=True)
+            continue
+        conn = connect(db_path)
+        init_db(conn)
+        upsert_trainer_stats(conn, slug, stats)
+        conn.close()
+        print(
+            f"  Stored: season {stats.get('season_wins')}/{stats.get('season_starts')} "
+            f"({int((stats.get('season_win_rate') or 0) * 100)}%)",
+            flush=True,
+        )
+        count += 1
+        time.sleep(2.0)
+
+    print(
+        "\nTrainer stats summary:\n"
+        f"  Trainers in scope:    {len(trainers)}\n"
+        f"  Skipped fresh:        {skipped_fresh_count}\n"
+        f"  Freshly fetched:      {count}",
+        flush=True,
+    )
     return count
 
 
@@ -336,3 +568,50 @@ def _fetch_horse_with_retry(horse_id: str, horse_name: str, max_attempts: int = 
         time.sleep(5)
 
     return None
+
+
+def _absolute_driver_url(driver_link: str | None) -> str | None:
+    if not driver_link:
+        return None
+    text = str(driver_link).strip()
+    if not text:
+        return None
+    if text.startswith("http://") or text.startswith("https://"):
+        return text
+    if text.startswith("/"):
+        return f"https://www.harness.org.au{text}"
+    return f"https://www.harness.org.au/{text.lstrip('/')}"
+
+
+def _absolute_trainer_url(trainer_link: str | None) -> str | None:
+    if not trainer_link:
+        return None
+    text = str(trainer_link).strip()
+    if not text:
+        return None
+    if text.startswith("http://") or text.startswith("https://"):
+        return text
+    if text.startswith("/"):
+        return f"https://www.harness.org.au{text}"
+    return f"https://www.harness.org.au/{text.lstrip('/')}"
+
+
+def _fetch_trainer_links_for_meeting(meeting_code: str) -> dict[str, str]:
+    try:
+        html = fetch_rendered_html(build_fields_url(meeting_code), wait_ms=3000)
+    except Exception as exc:
+        print(f"Could not fetch fields page for trainer links: {exc}", flush=True)
+        return {}
+    return parse_trainer_links_from_fields_html(html)
+
+
+def _normalize_person_key(name: str) -> str:
+    return " ".join(str(name).upper().split())
+
+
+def _cache_is_fresh(path: Path, max_age_days: int) -> bool:
+    if not path.exists():
+        return False
+    modified = datetime.fromtimestamp(path.stat().st_mtime)
+    age_days = (datetime.now() - modified).days
+    return age_days <= max_age_days
