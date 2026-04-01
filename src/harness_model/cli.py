@@ -9,6 +9,7 @@ from .pipeline import (
     fetch_driver_stats_for_meeting,
     fetch_horse_pages_from_meeting_html,
     fetch_meeting,
+    fetch_results_history,
     fetch_results,
     fetch_trainer_stats_for_meeting,
     ingest_horse_dir,
@@ -45,6 +46,12 @@ def main() -> None:
     fetch_results_parser = subparsers.add_parser("fetch-results", help="Fetch a post-race results page for a meeting")
     fetch_results_parser.add_argument("--meeting-code", required=True)
     fetch_results_parser.add_argument("--out", default="data/raw")
+
+    fetch_results_history_parser = subparsers.add_parser("fetch-results-history", help="Fetch recent NSW results pages from the HRNSW results index")
+    fetch_results_history_parser.add_argument("--out", default="data/raw")
+    fetch_results_history_parser.add_argument("--tracks", help="Comma-separated track names to include")
+    fetch_results_history_parser.add_argument("--limit", type=int)
+    fetch_results_history_parser.add_argument("--force-refresh", action="store_true")
 
     ingest_results_parser = subparsers.add_parser("ingest-results", help="Parse and store a results HTML file")
     ingest_results_parser.add_argument("--html", required=True)
@@ -131,6 +138,15 @@ def main() -> None:
         print(f"Stored {meetings} meeting and {runners} runners in {Path(args.db)}")
     elif args.command == "fetch-results":
         print(f"Saved results HTML to {fetch_results(args.meeting_code, args.out)}")
+    elif args.command == "fetch-results-history":
+        tracks = [part.strip() for part in (args.tracks or "").split(",") if part.strip()]
+        paths = fetch_results_history(
+            args.out,
+            tracks=tracks or None,
+            limit=args.limit,
+            force_refresh=args.force_refresh,
+        )
+        print(f"Prepared {len(paths)} results history files in {Path(args.out)}")
     elif args.command == "ingest-results":
         count = ingest_results_html(args.db, args.html)
         print(f"Stored {count} result rows in {Path(args.db)}")

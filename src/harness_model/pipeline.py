@@ -8,6 +8,8 @@ from .features import build_runner_feature_rows, install_sqlite_helpers, write_f
 from .parsers import (
     parse_driver_page_html,
     parse_horse_profile_html,
+    parse_hrnsw_results_index,
+    parse_hrnsw_track_options,
     parse_meeting_html,
     parse_results_html,
     parse_trainer_links_from_fields_html,
@@ -17,10 +19,12 @@ from .scraper import (
     build_fields_url,
     build_driver_url,
     build_horse_url,
+    build_hrnsw_results_index_url,
     build_meeting_url,
     build_results_url,
     build_trainer_url,
     driver_name_to_slug,
+    fetch_hrnsw_results_search_html,
     fetch_rendered_html,
     is_rate_limited_html,
     is_valid_driver_html,
@@ -60,6 +64,94 @@ def fetch_meeting(meeting_code: str, output_dir: str | Path) -> Path:
 def fetch_results(meeting_code: str, output_dir: str | Path) -> Path:
     html = fetch_rendered_html(build_results_url(meeting_code))
     return save_html(html, Path(output_dir) / f"results_{meeting_code}.html")
+
+
+def fetch_results_history(
+    output_dir: str | Path,
+    tracks: list[str] | None = None,
+    limit: int | None = None,
+    force_refresh: bool = False,
+) -> list[Path]:
+    index_html = fetch_rendered_html(build_hrnsw_results_index_url(), wait_ms=3000)
+    requested_tracks = {_normalize_person_key(track) for track in (tracks or [])}
+    track_options = parse_hrnsw_track_options(index_html)
+    options_in_scope = [
+        option
+        for option in track_options
+        if not requested_tracks or _normalize_person_key(option["label"]) in requested_tracks
+    ]
+    if options_in_scope:
+        entries: list[dict[str, str]] = []
+        for option in options_in_scope:
+            print(f"Searching HRNSW results for track: {option['label']}", flush=True)
+            search_html = fetch_hrnsw_results_search_html(option["value"], wait_ms=3000)
+            entries.extend(parse_hrnsw_results_index(search_html))
+            time.sleep(0.5)
+    else:
+        entries = parse_hrnsw_results_index(index_html)
+
+    deduped_entries: list[dict[str, str]] = []
+    seen_codes: set[str] = set()
+    for entry in entries:
+        code = entry["meeting_code"]
+        if code in seen_codes:
+            continue
+        seen_codes.add(code)
+        deduped_entries.append(entry)
+    entries = deduped_entries
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    if requested_tracks:
+        entries = [
+            entry for entry in entries
+            if _normalize_person_key(entry["track_name"]) in requested_tracks
+        ]
+    if limit is not None:
+        entries = entries[:limit]
+
+    saved_paths: list[Path] = []
+    failures: list[str] = []
+    for entry in entries:
+        target = output_path / f"results_{entry['meeting_code']}.html"
+        if target.exists() and not force_refresh:
+            print(f"Skipping existing results HTML: {target.name}", flush=True)
+            saved_paths.append(target)
+            continue
+        print(
+            f"Fetching results history: {entry['track_name']} {entry['meeting_date']} "
+            f"({entry['meeting_code']})",
+            flush=True,
+        )
+        try:
+            html = fetch_rendered_html(entry["results_url"], wait_ms=3000)
+        except Exception as exc:
+            print(
+                f"  First attempt failed for {entry['meeting_code']}: {exc}",
+                flush=True,
+            )
+            time.sleep(2.0)
+            try:
+                html = fetch_rendered_html(entry["results_url"], wait_ms=5000)
+            except Exception as retry_exc:
+                print(
+                    f"  Skipping {entry['meeting_code']} after retry failure: {retry_exc}",
+                    flush=True,
+                )
+                failures.append(entry["meeting_code"])
+                continue
+        saved_paths.append(save_html(html, target))
+        time.sleep(1.0)
+
+    print(
+        "\nResults history summary:\n"
+        f"  Meetings in scope:    {len(entries)}\n"
+        f"  Files ready:          {len(saved_paths)}\n"
+        f"  Failed meetings:      {len(failures)}",
+        flush=True,
+    )
+    return saved_paths
 
 
 def fetch_horse_pages_from_meeting_html(
