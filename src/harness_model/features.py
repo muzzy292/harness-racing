@@ -219,6 +219,7 @@ def _build_feature_row(
         "trainer_last_90_starts": trainer_stats["starts_90"],
         "trainer_last_90_wins": trainer_stats["wins_90"],
         "trainer_last_90_win_rate": trainer_stats["win_rate_90"],
+        "trainer_page_season_win_rate": _trainer_page_win_rate(conn, runner["nominated_trainer"]),
         "trainer_change_flag": _trainer_change_flag(last_runs, runner["nominated_trainer"]),
         "trainer_change_recent_flag": _trainer_change_recent_flag(last_runs, runner["nominated_trainer"]),
         "driver_change_flag": _driver_change_flag(last_runs, runner["nominated_driver"]),
@@ -314,6 +315,17 @@ def _driver_page_win_rate(conn: sqlite3.Connection, driver_name: object) -> floa
     slug = str(driver_name).lower().strip().replace(" ", "-")
     row = conn.execute(
         "SELECT season_win_rate FROM driver_stats WHERE driver_slug = ?",
+        (slug,),
+    ).fetchone()
+    return float(row["season_win_rate"]) if row and row["season_win_rate"] is not None else None
+
+
+def _trainer_page_win_rate(conn: sqlite3.Connection, trainer_name: object) -> float | None:
+    if not trainer_name:
+        return None
+    slug = str(trainer_name).lower().strip().replace(" ", "-")
+    row = conn.execute(
+        "SELECT season_win_rate FROM trainer_stats WHERE trainer_slug = ?",
         (slug,),
     ).fetchone()
     return float(row["season_win_rate"]) if row and row["season_win_rate"] is not None else None

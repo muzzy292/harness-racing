@@ -271,6 +271,7 @@ def _stage2_components(row: dict[str, str]) -> dict[str, float]:
     driver_win_rate = _to_float(row.get("driver_page_season_win_rate"))
     trainer_change_flag = _to_float(row.get("trainer_change_flag"))
     trainer_change_recent_flag = _to_float(row.get("trainer_change_recent_flag"))
+    trainer_page_win_rate = _to_float(row.get("trainer_page_season_win_rate"))
     trainer_win_rate_30 = _to_float(row.get("trainer_last_30_win_rate"))
     trainer_win_rate_90 = _to_float(row.get("trainer_last_90_win_rate"))
     class_delta = _to_float(row.get("class_delta"))
@@ -293,7 +294,7 @@ def _stage2_components(row: dict[str, str]) -> dict[str, float]:
         # Trainer form and stable-change overlay.
         # We keep this measured: genuine trainer changes matter, but they should
         # not drown out the horse's core profile.
-        "trainer_form": _trainer_form_score(trainer_win_rate_30, trainer_win_rate_90),
+        "trainer_form": _trainer_form_score(trainer_page_win_rate, trainer_win_rate_30, trainer_win_rate_90),
         "stable_change": _stable_change_score(
             trainer_change_flag,
             trainer_change_recent_flag,
@@ -447,10 +448,11 @@ def _fitness_score(days: float | None) -> float:
     return 0.0
 
 
-def _trainer_form_score(win_rate_30: float | None, win_rate_90: float | None) -> float:
-    score_30 = _pos_scale(win_rate_30, center=0.12, divisor=0.08, missing=0.0) * 0.18
-    score_90 = _pos_scale(win_rate_90, center=0.12, divisor=0.08, missing=0.0) * 0.12
-    return score_30 + score_90
+def _trainer_form_score(page_win_rate: float | None, win_rate_30: float | None, win_rate_90: float | None) -> float:
+    score_page = _pos_scale(page_win_rate, center=0.12, divisor=0.08, missing=0.0) * 0.24
+    score_30 = _pos_scale(win_rate_30, center=0.12, divisor=0.08, missing=0.0) * 0.12
+    score_90 = _pos_scale(win_rate_90, center=0.12, divisor=0.08, missing=0.0) * 0.08
+    return score_page + score_30 + score_90
 
 
 def _stable_change_score(
