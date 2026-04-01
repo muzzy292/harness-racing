@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from datetime import date
 
 from .models import HorseProfile, MeetingInfo, RunnerInfo
 
@@ -23,7 +24,9 @@ CREATE TABLE IF NOT EXISTS race_runners (
     horse_name TEXT NOT NULL,
     barrier TEXT,
     driver_name TEXT,
+    driver_link TEXT,
     trainer_name TEXT,
+    trainer_link TEXT,
     scratched INTEGER NOT NULL DEFAULT 0,
     race_name TEXT,
     race_distance INTEGER,
@@ -122,6 +125,16 @@ CREATE TABLE IF NOT EXISTS driver_stats (
     career_win_rate REAL,
     fetched_date TEXT
 );
+
+CREATE TABLE IF NOT EXISTS trainer_stats (
+    trainer_slug TEXT PRIMARY KEY,
+    trainer_name TEXT NOT NULL,
+    season_starts INTEGER,
+    season_wins INTEGER,
+    season_win_rate REAL,
+    career_win_rate REAL,
+    fetched_date TEXT
+);
 """
 
 
@@ -145,6 +158,8 @@ def init_db(conn: sqlite3.Connection) -> None:
             "form_bmr": "TEXT",
             "form_bmr_dist_rge": "TEXT",
             "race_purse": "REAL",
+            "driver_link": "TEXT",
+            "trainer_link": "TEXT",
         },
     )
     _ensure_columns(
@@ -199,18 +214,20 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
         """
         INSERT INTO race_runners(
             meeting_code, race_number, horse_id, runner_number, horse_name,
-            barrier, driver_name, trainer_name, scratched, race_name,
+            barrier, driver_name, driver_link, trainer_name, trainer_link, scratched, race_name,
             race_distance, race_type, class_name, raw_price,
             form_career_summary, form_this_season_summary, form_last_season_summary,
             form_bmr, form_bmr_dist_rge, race_purse
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(meeting_code, race_number, horse_id) DO UPDATE SET
             runner_number = excluded.runner_number,
             horse_name = excluded.horse_name,
             barrier = excluded.barrier,
             driver_name = excluded.driver_name,
+            driver_link = excluded.driver_link,
             trainer_name = excluded.trainer_name,
+            trainer_link = excluded.trainer_link,
             scratched = excluded.scratched,
             race_name = excluded.race_name,
             race_distance = excluded.race_distance,
@@ -233,7 +250,9 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
                 runner.horse_name,
                 runner.barrier,
                 runner.driver_name,
+                runner.driver_link,
                 runner.trainer_name,
+                runner.trainer_link,
                 int(runner.scratched),
                 runner.race_name,
                 runner.race_distance,
@@ -313,6 +332,132 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
         ],
     )
     conn.commit()
+
+
+def horse_has_runs(conn: sqlite3.Connection, horse_id: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM horse_runs
+        WHERE horse_id = ?
+        LIMIT 1
+        """,
+        (horse_id,),
+    ).fetchone()
+    return row is not None
+
+
+def driver_stats_are_fresh(conn: sqlite3.Connection, driver_slug: str, max_age_days: int) -> bool:
+    row = conn.execute(
+        """
+        SELECT fetched_date
+        FROM driver_stats
+        WHERE driver_slug = ?
+        LIMIT 1
+        """,
+        (driver_slug,),
+    ).fetchone()
+    if row is None or not row["fetched_date"]:
+        return False
+    try:
+        fetched = date.fromisoformat(str(row["fetched_date"]))
+    except ValueError:
+        return False
+    age_days = (date.today() - fetched).days
+    return age_days <= max_age_days
+
+
+def trainer_stats_are_fresh(conn: sqlite3.Connection, trainer_slug: str, max_age_days: int) -> bool:
+    row = conn.execute(
+        """
+        SELECT fetched_date
+        FROM trainer_stats
+        WHERE trainer_slug = ?
+        LIMIT 1
+        """,
+        (trainer_slug,),
+    ).fetchone()
+    if row is None or not row["fetched_date"]:
+        return False
+    try:
+        fetched = date.fromisoformat(str(row["fetched_date"]))
+    except ValueError:
+        return False
+    age_days = (date.today() - fetched).days
+    return age_days <= max_age_days
+
+
+def sync_runner_recent_lines_to_horse_runs(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> int:
+    synced_rows: list[tuple] = []
+    for runner in runners:
+        # Skip form lines that are already covered by a fetched horse profile.
+        # Matching on (run_date, track_code) is sufficient — a horse cannot race
+        # twice at the same track on the same day.
+        existing_keys = {
+            (row["run_date"], row["track_code"])
+            for row in conn.execute(
+                "SELECT run_date, track_code FROM horse_runs WHERE horse_id = ?",
+                (runner.horse_id,),
+            ).fetchall()
+        }
+        for line in runner.recent_lines:
+            if (line.run_date, line.track_code) in existing_keys:
+                continue
+            race_name = f"FORM:{line.track_name or line.track_code or 'UNK'}:{line.run_date or 'UNK'}"
+            distance_code = str(line.distance or "")
+            synced_rows.append(
+                (
+                    runner.horse_id,
+                    line.run_date,
+                    line.track_code,
+                    line.finish_position,
+                    None,
+                    line.raw_margin,
+                    line.mile_rate,
+                    None,
+                    None,
+                    line.run_purse,
+                    line.distance,
+                    distance_code,
+                    race_name,
+                    None,
+                    line.raw_comment,
+                    line.comment_adjustment,
+                    int(line.null_run),
+                    line.adjusted_margin,
+                    "RACE",
+                )
+            )
+
+    if not synced_rows:
+        return 0
+
+    conn.executemany(
+        """
+        INSERT INTO horse_runs(
+            horse_id, run_date, track_code, finish_position, barrier, margin,
+            mile_rate, driver_name, trainer_name, stake, distance, distance_code,
+            race_name, start_price, comment_codes, comment_adjustment, null_run,
+            adjusted_margin, race_type
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(horse_id, run_date, race_name, distance_code) DO UPDATE SET
+            track_code = excluded.track_code,
+            finish_position = COALESCE(excluded.finish_position, horse_runs.finish_position),
+            margin = COALESCE(excluded.margin, horse_runs.margin),
+            mile_rate = COALESCE(excluded.mile_rate, horse_runs.mile_rate),
+            stake = COALESCE(excluded.stake, horse_runs.stake),
+            distance = COALESCE(excluded.distance, horse_runs.distance),
+            comment_codes = COALESCE(excluded.comment_codes, horse_runs.comment_codes),
+            comment_adjustment = COALESCE(excluded.comment_adjustment, horse_runs.comment_adjustment),
+            null_run = excluded.null_run,
+            adjusted_margin = COALESCE(excluded.adjusted_margin, horse_runs.adjusted_margin),
+            race_type = COALESCE(excluded.race_type, horse_runs.race_type)
+        """,
+        synced_rows,
+    )
+    conn.commit()
+    return len(synced_rows)
 
 
 def upsert_horse_profile(conn: sqlite3.Connection, profile: HorseProfile) -> None:
@@ -493,7 +638,6 @@ def _summary_to_text(summary: tuple[int, int, int, int] | None) -> str | None:
 
 
 def upsert_driver_stats(conn: sqlite3.Connection, driver_slug: str, stats: dict[str, object]) -> None:
-    from datetime import date
     conn.execute(
         """
         INSERT INTO driver_stats(driver_slug, driver_name, season_starts, season_wins, season_win_rate, career_win_rate, fetched_date)
@@ -509,6 +653,32 @@ def upsert_driver_stats(conn: sqlite3.Connection, driver_slug: str, stats: dict[
         (
             driver_slug,
             stats["driver_name"],
+            stats.get("season_starts"),
+            stats.get("season_wins"),
+            stats.get("season_win_rate"),
+            stats.get("career_win_rate"),
+            date.today().isoformat(),
+        ),
+    )
+    conn.commit()
+
+
+def upsert_trainer_stats(conn: sqlite3.Connection, trainer_slug: str, stats: dict[str, object]) -> None:
+    conn.execute(
+        """
+        INSERT INTO trainer_stats(trainer_slug, trainer_name, season_starts, season_wins, season_win_rate, career_win_rate, fetched_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(trainer_slug) DO UPDATE SET
+            trainer_name = excluded.trainer_name,
+            season_starts = excluded.season_starts,
+            season_wins = excluded.season_wins,
+            season_win_rate = excluded.season_win_rate,
+            career_win_rate = excluded.career_win_rate,
+            fetched_date = excluded.fetched_date
+        """,
+        (
+            trainer_slug,
+            stats["trainer_name"],
             stats.get("season_starts"),
             stats.get("season_wins"),
             stats.get("season_win_rate"),

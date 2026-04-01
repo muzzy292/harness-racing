@@ -21,7 +21,9 @@ class RunnerInfo:
     horse_name: str
     barrier: str | None = None
     driver_name: str | None = None
+    driver_link: str | None = None
     trainer_name: str | None = None
+    trainer_link: str | None = None
     scratched: bool = False
     race_name: str | None = None
     race_distance: int | None = None
