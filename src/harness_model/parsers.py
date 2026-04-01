@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import html as html_lib
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import parse_qs, urljoin, urlparse
@@ -187,7 +188,8 @@ def parse_hrnsw_results_index(html: str) -> list[dict[str, str]]:
         label = _clean_spaces(re.sub(r"<[^>]+>", " ", match.group("label")))
         if "RESULTS" not in label.upper():
             continue
-        absolute_link = urljoin("https://www.hrnsw.com.au", match.group("link"))
+        absolute_link = urljoin("https://www.hrnsw.com.au", html_lib.unescape(match.group("link")))
+        absolute_link = absolute_link.replace("http://www.harness.org.au/", "https://www.harness.org.au/")
         entries.append(
             {
                 "track_name": _clean_spaces(re.sub(r"<[^>]+>", " ", match.group("track"))).title(),
@@ -198,6 +200,28 @@ def parse_hrnsw_results_index(html: str) -> list[dict[str, str]]:
             }
         )
     return _dedupe_hrnsw_entries(entries)
+
+
+def parse_hrnsw_track_options(html: str) -> list[dict[str, str]]:
+    select_match = re.search(
+        r'<select[^>]+id="ContentPlaceHolderMain_ContentPlaceHolderContent_ddlSearchTrack"[^>]*>(?P<body>.*?)</select>',
+        html,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if not select_match:
+        return []
+    options: list[dict[str, str]] = []
+    option_pattern = re.compile(
+        r'<option value="(?P<value>[^"]*)">(?P<label>.*?)</option>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for match in option_pattern.finditer(select_match.group("body")):
+        value = _clean_spaces(match.group("value"))
+        label = _clean_spaces(re.sub(r"<[^>]+>", " ", match.group("label")))
+        if not value or not label:
+            continue
+        options.append({"value": value, "label": label.title()})
+    return options
 
 
 def _parse_runners_from_html(html: str, meeting_code: str) -> list[RunnerInfo]:
