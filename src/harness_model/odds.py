@@ -56,10 +56,20 @@ def score_race_rows(
     if not race_rows:
         return []
 
+    # Field-normalise map lead and death scores.
+    # A horse that leads 70% of the time should get less credit when 3 other speed
+    # horses are in the same race — only one horse can actually lead.
+    # Softmax converts each horse's raw tendency into a field-relative probability
+    # (all horses sum to 1.0) so contested pace automatically reduces the lead bonus.
+    _lead_raw = [_to_float(row.get("map_lead_score")) or 0.0 for row in race_rows]
+    _death_raw = [_to_float(row.get("map_death_score")) or 0.0 for row in race_rows]
+    field_lead_probs = _softmax(_lead_raw, temperature=1.0)
+    field_death_probs = _softmax(_death_raw, temperature=1.0)
+
     enriched = []
-    for row in race_rows:
+    for i, row in enumerate(race_rows):
         s1 = _stage1_components(row)
-        s2 = _stage2_components(row)
+        s2 = _stage2_components(row, field_lead_prob=field_lead_probs[i], field_death_prob=field_death_probs[i])
         stage1_score = round(sum(s1.values()), 4)
         stage2_score = round(sum(s2.values()), 4)
         enriched.append(
@@ -254,17 +264,24 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
     }
 
 
-def _stage2_components(row: dict[str, str]) -> dict[str, float]:
+def _stage2_components(
+    row: dict[str, str],
+    field_lead_prob: float | None = None,
+    field_death_prob: float | None = None,
+) -> dict[str, float]:
     """Stage 2 — Today's race adjustment.
 
     Built from race-day factors: barrier draw, projected map position,
     distance suitability (BMR), and fitness (days since last run).
     These are independent of the horse's historical ability rating.
+
+    field_lead_prob / field_death_prob are softmax-normalised across the race
+    field so that only one horse can realistically lead.  Weights are scaled up
+    (×2.0 / ×1.2) vs the old raw-score weights to preserve a similar contribution
+    to the total score despite the probability (0–1) input range.
     """
-    map_lead = _to_float(row.get("map_lead_score"))
     map_soft = _to_float(row.get("map_soft_trip_score"))
     map_wide = _to_float(row.get("map_wide_risk_score"))
-    map_death = _to_float(row.get("map_death_score"))
     barrier = row.get("barrier") or ""
     bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
     days_since_last_run = _to_float(row.get("days_since_last_run"))
@@ -279,10 +296,14 @@ def _stage2_components(row: dict[str, str]) -> dict[str, float]:
 
     return {
         "barrier":      _barrier_score(barrier),
-        "map_lead":     (map_lead or 0.0) * 0.7,
+        # Lead and death use field-normalised probabilities (sum to 1.0 across the
+        # race) so contested pace automatically reduces the lead bonus.
+        # Weight ×2.0 for lead, ×1.2 for death — scaled to match old raw-score
+        # contribution for a typical uncontested leader / single death-seat horse.
+        "map_lead":     (field_lead_prob or 0.0) * 2.0,
         "map_soft":     (map_soft or 0.0) * 0.45,
         "map_wide":    -(map_wide or 0.0) * 0.5,
-        "map_death":   -(map_death or 0.0) * 0.35,
+        "map_death":   -(field_death_prob or 0.0) * 1.2,
         # BMR at race distance — faster (lower seconds) = better.
         # Centred at 117s (1:57.0), capped at ±1.2 to prevent one component dominating.
         "bmr_dist_rge": max(-1.2, min(1.2, _pos_scale(bmr_dist_rge, center=117.0, divisor=-2.0, missing=0.0))) * 0.6,
