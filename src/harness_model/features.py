@@ -454,7 +454,17 @@ def _map_signals(recent_lines: list[dict[str, object]], barrier: object) -> dict
         "style_restrained_rate": restrained_rate,
         "style_death_rate": death_rate,
         "style_wide_rate": wide_rate,
-        "map_lead_score": round((lead_rate * 1.2) + (forward_rate * 0.6) + _barrier_map_bonus(barrier, "lead"), 4),
+        # Interaction term: inside draw × lead tendency compound bonus.
+        # A Fr1 horse that leads 70% is worth more than Fr1 + 70% summed separately —
+        # the draw makes the tendency more likely to be realised, and realising it is
+        # disproportionately valuable.  Only fires when real form-line rates are available.
+        "map_lead_score": round(
+            (lead_rate * 1.2)
+            + (forward_rate * 0.6)
+            + _barrier_map_bonus(barrier, "lead")
+            + _barrier_lead_interaction(barrier, lead_rate, forward_rate),
+            4,
+        ),
         "map_death_score": round((death_rate * 1.1) + (forward_rate * 0.4) + _barrier_map_bonus(barrier, "death"), 4),
         "map_soft_trip_score": round((lead_rate * 0.6) - (restrained_rate * 0.15) + _barrier_map_bonus(barrier, "soft"), 4),
         "map_wide_risk_score": round((wide_rate * 1.1) + (death_rate * 0.35) + _barrier_map_bonus(barrier, "wide"), 4),
@@ -493,6 +503,38 @@ def _barrier_map_bonus(barrier: object, mode: str) -> float:
         if mode == "wide":
             return 0.12 + 0.05 * (num - 1)
     return 0.0
+
+
+def _barrier_lead_interaction(barrier: object, lead_rate: float, forward_rate: float) -> float:
+    """Extra bonus when inside draw AND lead tendency compound each other.
+
+    An Fr1 horse that leads 70% is more valuable than Fr1 + 70% added separately:
+    the draw makes the tendency more likely to be realised, and the lead is
+    disproportionately valuable in harness racing.
+
+    Scale: Fr1 × high lead tendency → +0.30–0.35 bonus.
+           Fr4+ → 0.0 (draw no longer amplifies lead ability).
+           Lead tendency ≤ 30% → 0.0 (not a genuine speed horse).
+    """
+    text = str(barrier or "").upper().strip()
+    if not text.startswith("FR"):
+        return 0.0
+    try:
+        num = int(text[2:])
+    except ValueError:
+        return 0.0
+
+    # draw_factor: Fr1=1.5, Fr2=1.0, Fr3=0.5, Fr4+=0.0
+    draw_factor = max(0.0, (5 - num) * 0.5 - 0.5)
+    if draw_factor == 0.0:
+        return 0.0
+
+    # Combined speed tendency; forward runs count half (press early but not lead)
+    speed_tendency = lead_rate + forward_rate * 0.5
+    if speed_tendency <= 0.30:
+        return 0.0
+
+    return round((speed_tendency - 0.30) * draw_factor * 0.40, 4)
 
 
 def _parse_bmr_secs(bmr: object) -> float | None:
