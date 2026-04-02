@@ -109,6 +109,23 @@ Tables: `meetings`, `race_runners`, `runner_recent_lines`, `horse_profiles`, `ho
 
 Auto-migration via `_ensure_columns()` — new columns added non-destructively on connect.
 
+## Model Improvement Backlog
+
+Known gaps and future work. Do not implement without discussing with the user first.
+
+### Race Map (field-awareness)
+- **`map_soft` pace context** — sitting behind a contested leader is better than an uncontested one (contested leader tires). `map_soft_trip_score` should be boosted when the field has multiple speed horses competing for the lead.
+- **Pace pressure bonus for backmarkers** — horses with restrained/back style benefit when the field is speed-heavy (fast early, tired late). Detect contested pace (≥2 horses with high lead probability) and apply a small bonus to restrained-style horses.
+
+### Scoring / Weights
+- **Weight optimisation** — weights are currently hand-tuned. Once 30+ meetings of results are stored in `race_results`, fit weights against actual win outcomes (simple logistic regression on scored probabilities vs finish position).
+- **`competitive_rate` redundancy** — overlaps heavily with `consistency` (avg adj margin). Consider removing or halving its weight (currently 0.5) after calibration review.
+- **`class_pos` (nr_headroom) redundancy** — derived from the same NR value as `nr`. Low marginal value at weight 0.15. Candidate for removal.
+
+### Data Quality
+- **Trainer rolling stats are thin** — `trainer_last_30_win_rate` and `trainer_last_90_win_rate` are calculated from `horse_runs`, which only covers horses we have profiles for. Until historical results are bulk-ingested these numbers are unreliable. `trainer_form` score should be treated with caution until `fetch-results-history` has been run.
+- **`trainer_change_recent_flag` misfires on FORM:xxx runs** — FORM-synced runs have no `trainer_name`, so the streak calculation can't build a reliable history. May produce false positives for horses that haven't had profiles fetched.
+
 ## Key Validation Meeting
 
 **LM300326** (Goulburn, 30 March 2026) — use this for pipeline validation.
