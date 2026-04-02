@@ -54,7 +54,10 @@ CODES = {
     "SHO": -3.0, "OIR": 5.0, "ODS": 3.0, "SLE": 5.0, "USL": 3.0, "SOUP": 5.0, "SIUP": 5.0,
 }
 
-NULL_RUN_CODES = {"BSU", "BL", "BCE", "SLM"}
+# These codes indicate a run should be discarded regardless of margin.
+# Do not include positional markers like BL ("bell lap"), which are common
+# trip notes rather than failure/null-run flags.
+NULL_RUN_CODES = {"BSU", "BCE", "SLM"}
 
 
 class TextExtractor(HTMLParser):
@@ -595,14 +598,15 @@ def _parse_run_block(block: list[str], horse_id: str) -> HorseRun | None:
     if len(block) < 12:
         return None
 
+    margin = _parse_margin(block[4].strip() if len(block) > 4 else "")
+
     comment_codes = ""
     if len(block) > 12:
         candidate = block[12].strip()
         if candidate and not re.fullmatch(r"\d{2}\s+\w+\s+\d{4}", candidate):
             comment_codes = candidate
 
-    adjustment, null_run = _apply_comment_codes(comment_codes)
-    margin = _parse_margin(block[4].strip() if len(block) > 4 else "")
+    adjustment, null_run = _apply_comment_codes(comment_codes, raw_margin=margin)
 
     distance_code = block[9].strip() if len(block) > 9 else None
     distance_match = re.match(r"^(\d{4})(MS|SS)?$", distance_code or "")
@@ -1062,6 +1066,12 @@ def _apply_form_line_text_rules(
         if raw_margin is None or raw_margin <= 30.0:
             comment_adjustment -= 10.0
 
+    if "contacted sulky" in comment:
+        if raw_margin is not None and raw_margin > 20.0:
+            null_run = True
+        else:
+            comment_adjustment -= 7.5
+
     if "locked wheels" in comment:
         null_run = True
     if "checked and broke" in comment or "broke in score up" in comment or "broke" in comment:
@@ -1149,11 +1159,18 @@ def _parse_results_margin(value: str) -> float | None:
     return float(match.group(1)) if match else None
 
 
-def _apply_comment_codes(comment_codes: str) -> tuple[float, bool]:
+def _apply_comment_codes(comment_codes: str, raw_margin: float | None = None) -> tuple[float, bool]:
     total = 0.0
     null_run = False
     for part in comment_codes.upper().split():
-        if part in NULL_RUN_CODES:
+        if part == "RR":
+            continue
+        if part == "CTS":
+            if raw_margin is not None and raw_margin > 20.0:
+                null_run = True
+            else:
+                total -= 7.5
+        elif part in NULL_RUN_CODES:
             null_run = True
         elif part in CODES:
             total += CODES[part]
