@@ -122,6 +122,10 @@ Known gaps and future work. Do not implement without discussing with the user fi
 - **`competitive_rate` redundancy** — overlaps heavily with `consistency` (avg adj margin). Consider removing or halving its weight (currently 0.5) after calibration review.
 - **`class_pos` (nr_headroom) redundancy** — derived from the same NR value as `nr`. Low marginal value at weight 0.15. Candidate for removal.
 
+### BMR
+- **Track-speed adjustment for BMR** — `bmr_dist_rge_secs` is currently compared to a fixed 117.0s (1:57.0) centre. Different tracks run faster/slower (Menangle fast, country tracks slow). Requires adding a `par_mile_rate` field per track/distance to `track_pars.json`. Once added, express BMR as delta from track par (same approach as sectionals) and remove the hardcoded 117.0 centre from `odds.py`.
+- **Tempo adjustment for BMR** — full mile rate is affected by the pace of the first half, which is harder to normalise than last-half sectionals. Consider using pace-adjusted mile rate if tempo data becomes available at the run level.
+
 ### Data Quality
 - **Trainer rolling stats are thin** — `trainer_last_30_win_rate` and `trainer_last_90_win_rate` are calculated from `horse_runs`, which only covers horses we have profiles for. Until historical results are bulk-ingested these numbers are unreliable. `trainer_form` score should be treated with caution until `fetch-results-history` has been run.
 - **`trainer_change_recent_flag` misfires on FORM:xxx runs** — FORM-synced runs have no `trainer_name`, so the streak calculation can't build a reliable history. May produce false positives for horses that haven't had profiles fetched.

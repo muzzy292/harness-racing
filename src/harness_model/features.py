@@ -141,7 +141,13 @@ def _build_feature_row(
     last_5_competitive_rate = round(len(competitive_in_5) / len(primary_source_5), 4) if primary_source_5 else None
     map_signals = _map_signals(valid_recent_lines, runner.get("barrier"))
     bmr_secs = _parse_bmr_secs(runner.get("form_bmr"))
-    bmr_dist_rge_secs = _parse_bmr_secs(runner.get("form_bmr_dist_rge"))
+    # Avg of best 3 runs at today's distance from profile data — more reliable than
+    # the single form-page best.  Falls back to the form-page value when no profile
+    # data exists at this distance (new horse or different distance range).
+    bmr_dist_rge_secs = (
+        _compute_bmr_avg_top3(last_runs, runner.get("race_distance"))
+        or _parse_bmr_secs(runner.get("form_bmr_dist_rge"))
+    )
     days_since_last_run = _days_since_last_run(recent_lines, runner.get("meeting_date"))
     race_nr_ceiling = _parse_race_nr_ceiling(runner.get("class_name"))
     nr_rating = runner["nr_rating"]
@@ -535,6 +541,50 @@ def _barrier_lead_interaction(barrier: object, lead_rate: float, forward_rate: f
         return 0.0
 
     return round((speed_tendency - 0.30) * draw_factor * 0.40, 4)
+
+
+def _compute_bmr_avg_top3(
+    last_runs: list[dict[str, object]],
+    race_distance: object,
+    tolerance_m: int = 200,
+) -> float | None:
+    """Average of the 3 fastest mile rates from horse_runs at a similar distance.
+
+    Using the average of 3 performances rather than the single best handles
+    the case where a horse posted one exceptional time but is typically slower —
+    a genuine 1:57.0 horse should be averaging 1:57s, not posting it once.
+
+    Returns None when fewer than 1 qualifying run exists (caller falls back to
+    the form-page BMR in that case).
+    """
+    if not last_runs or race_distance is None:
+        return None
+    try:
+        target = int(float(str(race_distance)))
+    except (TypeError, ValueError):
+        return None
+
+    times: list[float] = []
+    for run in last_runs:
+        dist = run.get("distance")
+        mile_rate = run.get("mile_rate")
+        if dist is None or mile_rate is None:
+            continue
+        try:
+            d = int(dist)
+        except (TypeError, ValueError):
+            continue
+        if abs(d - target) > tolerance_m:
+            continue
+        secs = _parse_bmr_secs(mile_rate)
+        if secs is not None:
+            times.append(secs)
+
+    if not times:
+        return None
+    times.sort()  # ascending = fastest first
+    best3 = times[:3]
+    return round(sum(best3) / len(best3), 1)
 
 
 def _parse_bmr_secs(bmr: object) -> float | None:
