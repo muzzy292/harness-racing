@@ -658,6 +658,51 @@ def fetch_trainer_stats_for_meeting(
     return count
 
 
+def calibrate_temperature(
+    feature_csv: str | Path,
+    db_path: str | Path,
+    meeting_codes: list[str] | None = None,
+    temperatures: list[float] | None = None,
+) -> list[dict[str, object]]:
+    """Sweep softmax temperatures and report log loss against stored race results.
+
+    Queries race_results for finish_position = 1, scores each race at every
+    candidate temperature, and returns rows sorted by log_loss ascending.
+
+    Requires at least ~20 races of results to be meaningful.
+    """
+    from .odds import load_feature_rows, sweep_temperature
+
+    rows = load_feature_rows(feature_csv)
+    conn = connect(db_path)
+    init_db(conn)
+
+    if meeting_codes:
+        placeholders = ",".join("?" * len(meeting_codes))
+        result_rows = conn.execute(
+            f"SELECT meeting_code, race_number, horse_name FROM race_results "
+            f"WHERE finish_position = 1 AND meeting_code IN ({placeholders})",
+            meeting_codes,
+        ).fetchall()
+    else:
+        result_rows = conn.execute(
+            "SELECT meeting_code, race_number, horse_name FROM race_results "
+            "WHERE finish_position = 1"
+        ).fetchall()
+    conn.close()
+
+    winners = {
+        (row["meeting_code"], int(row["race_number"])): row["horse_name"]
+        for row in result_rows
+    }
+    if not winners:
+        print("No race results found in DB — run ingest-results first.", flush=True)
+        return []
+
+    print(f"Calibrating temperature across {len(winners)} races...", flush=True)
+    return sweep_temperature(rows, winners, temperatures=temperatures)
+
+
 def build_feature_dataset(db_path: str | Path, csv_path: str | Path, track_pars_path: str | Path | None = None) -> Path:
     conn = connect(db_path)
     init_db(conn)

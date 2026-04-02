@@ -48,6 +48,7 @@ def score_race_rows(
     market_rows: list[dict[str, str]] | None = None,
     model_weight: float = 0.45,
     market_weight: float = 0.55,
+    temperature: float = 2.75,
 ) -> list[dict[str, object]]:
     race_rows = [
         row for row in rows
@@ -87,7 +88,7 @@ def score_race_rows(
         )
 
     scores = [item["score"] for item in enriched]
-    probs = _softmax(scores, temperature=2.75)
+    probs = _softmax(scores, temperature=temperature)
     probs = _apply_probability_guardrails(probs, min_probability=min_probability, max_probability=max_probability)
     fair_market_probs = _fair_market_probs(race_rows, market_rows, meeting_code, race_number)
     for item, prob in zip(enriched, probs):
@@ -115,6 +116,7 @@ def score_meeting_rows(
     market_rows: list[dict[str, str]] | None = None,
     model_weight: float = 0.45,
     market_weight: float = 0.55,
+    temperature: float = 2.75,
 ) -> dict[int, list[dict[str, object]]]:
     race_numbers = sorted(
         {
@@ -133,6 +135,7 @@ def score_meeting_rows(
             market_rows=market_rows,
             model_weight=model_weight,
             market_weight=market_weight,
+            temperature=temperature,
         )
         for race_number in race_numbers
     }
@@ -513,3 +516,59 @@ def _market_key(horse_name: object, runner_number: object) -> tuple[str, int | N
     except (TypeError, ValueError):
         number = None
     return name, number
+
+
+def sweep_temperature(
+    rows: list[dict[str, str]],
+    winners: dict[tuple[str, int], str],
+    temperatures: list[float] | None = None,
+) -> list[dict[str, object]]:
+    """Sweep softmax temperatures and report log loss against known race winners.
+
+    winners maps (meeting_code, race_number) → winning horse name.
+    Lower log loss = better calibrated probabilities.
+    Returns rows sorted by log_loss ascending so the first entry is the best temperature.
+
+    Requires results from at least ~20 races to be meaningful.  With fewer races
+    the optimal temperature will overfit to noise.
+    """
+    if temperatures is None:
+        # 0.5 to 6.0 in 0.25 steps
+        temperatures = [round(0.5 + i * 0.25, 2) for i in range(23)]
+
+    race_keys = sorted({
+        (row["meeting_code"], int(row["race_number"]))
+        for row in rows
+        if row.get("meeting_code") and row.get("race_number")
+    })
+
+    results: list[dict[str, object]] = []
+    for temp in temperatures:
+        total_log_loss = 0.0
+        race_count = 0
+        for meeting_code, race_number in race_keys:
+            winner_name = winners.get((meeting_code, race_number))
+            if not winner_name:
+                continue
+            scored = score_race_rows(rows, meeting_code, race_number, temperature=temp)
+            if not scored:
+                continue
+            winner_key = str(winner_name).strip().upper()
+            winner_prob = next(
+                (h["win_probability"] for h in scored
+                 if str(h["horse_name"]).strip().upper() == winner_key),
+                None,
+            )
+            if winner_prob is None or winner_prob <= 0:
+                continue
+            total_log_loss += -math.log(winner_prob)
+            race_count += 1
+        if race_count > 0:
+            results.append({
+                "temperature": temp,
+                "log_loss": round(total_log_loss / race_count, 4),
+                "races_scored": race_count,
+            })
+
+    results.sort(key=lambda r: r["log_loss"])
+    return results

@@ -2,68 +2,162 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Ingest Meeting",
+      "name": "1. Sync Upcoming Meetings (NSW)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": ["sync-upcoming", "--db", "data/harness.db", "--out", "data/raw"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "2. Fetch Meeting",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": ["fetch-meeting", "--meeting-code", "${input:meetingCode}", "--out", "data/raw"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "3. Ingest Meeting",
       "type": "debugpy",
       "request": "launch",
       "module": "harness_model.cli",
       "args": [
         "ingest-meeting",
-        "--html",
-        "data/raw/meeting_${input:meetingCode}.html",
-        "--db",
-        "data/harness.db"
+        "--html", "data/raw/meeting_${input:meetingCode}.html",
+        "--db", "data/harness.db"
       ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": true
     },
     {
-      "name": "Build Features",
+      "name": "4. Fetch Horses",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": [
+        "fetch-horses",
+        "--meeting-html", "data/raw/meeting_${input:meetingCode}.html",
+        "--out", "data/raw/horses",
+        "--db", "data/harness.db"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "5. Ingest Horses",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": ["ingest-horses", "--horse-dir", "data/raw/horses", "--db", "data/harness.db"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "6. Fetch Driver Stats",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": ["fetch-driver-stats", "--meeting-code", "${input:meetingCode}", "--db", "data/harness.db"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "7. Fetch Trainer Stats",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": ["fetch-trainer-stats", "--meeting-code", "${input:meetingCode}", "--db", "data/harness.db"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "8. Build Features",
       "type": "debugpy",
       "request": "launch",
       "module": "harness_model.cli",
       "args": [
         "build-features",
-        "--db",
-        "data/harness.db",
-        "--csv",
-        "data/features/runner_features.csv",
-        "--track-pars",
-        "${input:trackParsPath}"
+        "--db", "data/harness.db",
+        "--csv", "data/features/runner_features.csv",
+        "--track-pars", "C:\\Users\\Paul Mustica\\Desktop\\track_pars.json"
       ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": true
     },
     {
-      "name": "Score Meeting",
+      "name": "9. Score Meeting",
       "type": "debugpy",
       "request": "launch",
       "module": "harness_model.cli",
       "args": [
         "score-meeting",
-        "--csv",
-        "data/features/runner_features.csv",
-        "--meeting-code",
-        "${input:meetingCode}"
+        "--csv", "data/features/runner_features.csv",
+        "--meeting-code", "${input:meetingCode}"
       ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": true
     },
     {
-      "name": "Score Race",
+      "name": "9b. Score Race",
       "type": "debugpy",
       "request": "launch",
       "module": "harness_model.cli",
       "args": [
         "score-race",
-        "--csv",
-        "data/features/runner_features.csv",
-        "--meeting-code",
-        "${input:meetingCode}",
-        "--race-number",
-        "${input:raceNumber}"
+        "--csv", "data/features/runner_features.csv",
+        "--meeting-code", "${input:meetingCode}",
+        "--race-number", "${input:raceNumber}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "10. Sync Recent Results (NSW)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": ["sync-results", "--db", "data/harness.db", "--out", "data/raw"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "11. Calibrate Temperature",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": [
+        "calibrate-temperature",
+        "--csv", "data/features/runner_features.csv",
+        "--db", "data/harness.db"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Scratch Horse",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": [
+        "scratch-horse",
+        "--meeting-code", "${input:meetingCode}",
+        "--horse-name", "${input:horseName}",
+        "--db", "data/harness.db"
       ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
@@ -74,20 +168,20 @@
     {
       "id": "meetingCode",
       "type": "promptString",
-      "description": "Meeting code (e.g. LM300326)",
-      "default": "LM300326"
+      "description": "Meeting code (e.g. BH010426)",
+      "default": "BH010426"
     },
     {
       "id": "raceNumber",
       "type": "promptString",
       "description": "Race number",
-      "default": "4"
+      "default": "1"
     },
     {
-      "id": "trackParsPath",
+      "id": "horseName",
       "type": "promptString",
-      "description": "Full path to track pars JSON",
-      "default": "C:\\Users\\Paul Mustica\\Desktop\\track_pars.json"
+      "description": "Horse name to scratch (partial match, case-insensitive)",
+      "default": ""
     }
   ]
 }

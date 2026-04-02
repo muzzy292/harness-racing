@@ -6,6 +6,7 @@ from pathlib import Path
 from .storage import connect, scratch_horse as db_scratch_horse
 from .pipeline import (
     build_feature_dataset,
+    calibrate_temperature,
     fetch_driver_stats_for_meeting,
     fetch_horse_pages_from_meeting_html,
     fetch_meeting,
@@ -93,6 +94,7 @@ def main() -> None:
     score_parser.add_argument("--market-csv")
     score_parser.add_argument("--model-weight", type=float, default=0.45)
     score_parser.add_argument("--market-weight", type=float, default=0.55)
+    score_parser.add_argument("--temperature", type=float, default=2.75, help="Softmax temperature (default 2.75)")
     score_parser.add_argument("--out-csv")
 
     score_meeting_parser = subparsers.add_parser("score-meeting", help="Score all races in a meeting and print fair odds tables")
@@ -103,7 +105,14 @@ def main() -> None:
     score_meeting_parser.add_argument("--market-csv")
     score_meeting_parser.add_argument("--model-weight", type=float, default=0.45)
     score_meeting_parser.add_argument("--market-weight", type=float, default=0.55)
+    score_meeting_parser.add_argument("--temperature", type=float, default=2.75, help="Softmax temperature (default 2.75)")
     score_meeting_parser.add_argument("--out-csv")
+
+    calibrate_parser = subparsers.add_parser("calibrate-temperature", help="Sweep softmax temperatures and report log loss against stored results")
+    calibrate_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    calibrate_parser.add_argument("--db", default="data/harness.db")
+    calibrate_parser.add_argument("--meetings", help="Comma-separated meeting codes to include (default: all)")
+    calibrate_parser.add_argument("--temperatures", help="Comma-separated temperatures to test (default: 0.5–6.0 step 0.25)")
 
     scratch_parser = subparsers.add_parser("scratch-horse", help="Mark a horse as scratched in the DB (for late scratchings not yet on the form page)")
     scratch_parser.add_argument("--meeting-code", required=True)
@@ -195,6 +204,7 @@ def main() -> None:
             market_rows=market_rows,
             model_weight=args.model_weight,
             market_weight=args.market_weight,
+            temperature=args.temperature,
         )
         if args.out_csv:
             out_path = write_scored_rows_csv(
@@ -217,6 +227,7 @@ def main() -> None:
             market_rows=market_rows,
             model_weight=args.model_weight,
             market_weight=args.market_weight,
+            temperature=args.temperature,
         )
         if args.out_csv:
             out_path = write_scored_rows_csv(
@@ -268,6 +279,16 @@ def main() -> None:
     elif args.command == "sync-results":
         fetched, skipped = sync_recent_results(args.db, args.out, delay_s=args.delay)
         print(f"Done: {fetched} fetched, {skipped} skipped")
+    elif args.command == "calibrate-temperature":
+        meeting_codes = [m.strip() for m in (args.meetings or "").split(",") if m.strip()] or None
+        temperatures = [float(t.strip()) for t in (args.temperatures or "").split(",") if t.strip()] or None
+        results = calibrate_temperature(args.csv, args.db, meeting_codes=meeting_codes, temperatures=temperatures)
+        if results:
+            print(f"\n{'Temperature':>12}  {'Log Loss':>10}  {'Races':>6}")
+            print("-" * 34)
+            for r in results:
+                marker = " <-- best" if r == results[0] else ""
+                print(f"{r['temperature']:>12.2f}  {r['log_loss']:>10.4f}  {r['races_scored']:>6}{marker}")
 
 
 if __name__ == "__main__":
