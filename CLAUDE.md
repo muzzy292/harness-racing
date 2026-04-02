@@ -116,8 +116,10 @@ Known gaps and future work. Do not implement without discussing with the user fi
 ### Race Map (field-awareness)
 - **`map_soft` pace context** — sitting behind a contested leader is better than an uncontested one (contested leader tires). `map_soft_trip_score` should be boosted when the field has multiple speed horses competing for the lead.
 - **Pace pressure bonus for backmarkers** — horses with restrained/back style benefit when the field is speed-heavy (fast early, tired late). Detect contested pace (≥2 horses with high lead probability) and apply a small bonus to restrained-style horses.
+- **Early speed pressure metric** — `pace_pressure = sum of lead_scores for top 3 lead horses in the field`. High pressure signals a speed duel: penalise all front-runners and bonus backmarkers. Compute `pace_pressure` in `score_race_rows()` alongside `field_lead_probs`, pass into `_stage2_components()`, and adjust `map_lead`/`map_soft` weights accordingly. Requires threshold calibration against results before committing weights.
 
 ### Scoring / Weights
+- **Field strength z-score normalisation** — `relative_score` (score − field_mean) is already computed and displayed. Extending to z-score (÷ field_std_dev) would make the softmax temperature consistent across fields of varying spread. Low priority until temperature is calibrated from results data.
 - **Weight optimisation** — weights are currently hand-tuned. Once 30+ meetings of results are stored in `race_results`, fit weights against actual win outcomes (simple logistic regression on scored probabilities vs finish position).
 - **`competitive_rate` redundancy** — overlaps heavily with `consistency` (avg adj margin). Consider removing or halving its weight (currently 0.5) after calibration review.
 - **`class_pos` (nr_headroom) redundancy** — derived from the same NR value as `nr`. Low marginal value at weight 0.15. Candidate for removal.
