@@ -94,7 +94,7 @@ def main() -> None:
     score_parser.add_argument("--market-csv")
     score_parser.add_argument("--model-weight", type=float, default=0.45)
     score_parser.add_argument("--market-weight", type=float, default=0.55)
-    score_parser.add_argument("--temperature", type=float, default=2.75, help="Softmax temperature (default 2.75)")
+    score_parser.add_argument("--temperature", type=float, default=2.0, help="Softmax temperature (default 2.0)")
     score_parser.add_argument("--out-csv")
 
     score_meeting_parser = subparsers.add_parser("score-meeting", help="Score all races in a meeting and print fair odds tables")
@@ -105,7 +105,7 @@ def main() -> None:
     score_meeting_parser.add_argument("--market-csv")
     score_meeting_parser.add_argument("--model-weight", type=float, default=0.45)
     score_meeting_parser.add_argument("--market-weight", type=float, default=0.55)
-    score_meeting_parser.add_argument("--temperature", type=float, default=2.75, help="Softmax temperature (default 2.75)")
+    score_meeting_parser.add_argument("--temperature", type=float, default=2.0, help="Softmax temperature (default 2.0)")
     score_meeting_parser.add_argument("--out-csv")
 
     calibrate_parser = subparsers.add_parser("calibrate-temperature", help="Sweep softmax temperatures and report log loss against stored results")

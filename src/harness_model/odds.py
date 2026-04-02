@@ -48,7 +48,7 @@ def score_race_rows(
     market_rows: list[dict[str, str]] | None = None,
     model_weight: float = 0.45,
     market_weight: float = 0.55,
-    temperature: float = 2.75,
+    temperature: float = 2.0,
 ) -> list[dict[str, object]]:
     race_rows = [
         row for row in rows
@@ -120,7 +120,7 @@ def score_meeting_rows(
     market_rows: list[dict[str, str]] | None = None,
     model_weight: float = 0.45,
     market_weight: float = 0.55,
-    temperature: float = 2.75,
+    temperature: float = 2.0,
 ) -> dict[int, list[dict[str, object]]]:
     race_numbers = sorted(
         {
