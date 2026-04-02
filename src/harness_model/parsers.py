@@ -202,6 +202,45 @@ def parse_hrnsw_results_index(html: str) -> list[dict[str, str]]:
     return _dedupe_hrnsw_entries(entries)
 
 
+def parse_hrnsw_upcoming_meetings(html: str) -> list[dict[str, str]]:
+    """Parse upcoming meetings from the HRNSW upcoming meetings page.
+
+    Returns a list of dicts with keys: track_name, session, meeting_date,
+    meeting_code, form_url.  Trials section is excluded.
+    """
+    entries: list[dict[str, str]] = []
+    meetings_section = html
+    trials_marker = re.search(r'<div[^>]+id="[^"]*pnlTrials"[^>]*>', html, re.IGNORECASE)
+    if trials_marker:
+        meetings_section = html[:trials_marker.start()]
+
+    row_pattern = re.compile(
+        r"<tr\b[^>]*>\s*"
+        r'<td\b[^>]*class="[^"]*\btrackname\b[^"]*"[^>]*>(?P<track>.*?)</td>\s*'
+        r'<td\b[^>]*class="[^"]*\btimeofday\b[^"]*"[^>]*>(?P<session>.*?)</td>\s*'
+        r'<td\b[^>]*class="[^"]*\bdate\b[^"]*"[^>]*>(?P<date>.*?)</td>\s*'
+        r"<td>.*?"
+        r'<a[^>]+href="(?P<link>[^"]*(?:form|fields)\.cfm\?mc=(?P<code>[A-Z0-9]+)[^"]*)"',
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    for match in row_pattern.finditer(meetings_section):
+        code = match.group("code").upper()
+        raw_link = html_lib.unescape(match.group("link"))
+        absolute_link = urljoin("https://www.harness.org.au", raw_link)
+        absolute_link = absolute_link.replace("http://www.harness.org.au/", "https://www.harness.org.au/")
+        entries.append(
+            {
+                "track_name": _clean_spaces(re.sub(r"<[^>]+>", " ", match.group("track"))).title(),
+                "session": _clean_spaces(re.sub(r"<[^>]+>", " ", match.group("session"))).title(),
+                "meeting_date": _clean_spaces(re.sub(r"<[^>]+>", " ", match.group("date"))),
+                "meeting_code": code,
+                "form_url": absolute_link,
+            }
+        )
+    return _dedupe_hrnsw_entries(entries)
+
+
 def parse_hrnsw_track_options(html: str) -> list[dict[str, str]]:
     select_match = re.search(
         r'<select[^>]+id="ContentPlaceHolderMain_ContentPlaceHolderContent_ddlSearchTrack"[^>]*>(?P<body>.*?)</select>',

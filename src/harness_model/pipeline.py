@@ -10,6 +10,7 @@ from .parsers import (
     parse_horse_profile_html,
     parse_hrnsw_results_index,
     parse_hrnsw_track_options,
+    parse_hrnsw_upcoming_meetings,
     parse_meeting_html,
     parse_results_html,
     parse_trainer_links_from_fields_html,
@@ -153,6 +154,120 @@ def fetch_results_history(
         flush=True,
     )
     return saved_paths
+
+
+_HRNSW_UPCOMING_URL = "https://www.hrnsw.com.au/racing/upcomingmeetings"
+_HRNSW_RESULTS_URL = "https://www.hrnsw.com.au/racing/results"
+
+
+def sync_upcoming_meetings(
+    db_path: str | Path,
+    output_dir: str | Path = "data/raw",
+    delay_s: float = 2.0,
+) -> tuple[int, int]:
+    """Fetch and ingest all upcoming NSW meetings not already in the DB.
+
+    Returns (fetched, skipped).
+    """
+    print("Fetching HRNSW upcoming meetings index...", flush=True)
+    html = fetch_rendered_html(_HRNSW_UPCOMING_URL, wait_ms=4000)
+    entries = parse_hrnsw_upcoming_meetings(html)
+    if not entries:
+        print("No upcoming meetings found on HRNSW page.", flush=True)
+        return 0, 0
+
+    conn = connect(db_path)
+    init_db(conn)
+    existing = {row[0] for row in conn.execute("SELECT meeting_code FROM meetings").fetchall()}
+    conn.close()
+
+    fetched = 0
+    skipped = 0
+    for entry in entries:
+        code = entry["meeting_code"]
+        label = f"{entry['track_name']} {entry['meeting_date']} ({code})"
+        if code in existing:
+            print(f"  Skip {label} — already in DB", flush=True)
+            skipped += 1
+            continue
+        print(f"  Fetching {label}...", flush=True)
+        try:
+            path = fetch_meeting(code, output_dir)
+            ingest_meeting_html(db_path, path)
+            fetched += 1
+            existing.add(code)
+        except Exception as exc:
+            print(f"  Warning: {code} failed — {exc}", flush=True)
+        time.sleep(delay_s)
+
+    print(
+        f"\nUpcoming meetings sync summary:\n"
+        f"  Meetings found:  {len(entries)}\n"
+        f"  Fetched:         {fetched}\n"
+        f"  Skipped (known): {skipped}",
+        flush=True,
+    )
+    return fetched, skipped
+
+
+def sync_recent_results(
+    db_path: str | Path,
+    output_dir: str | Path = "data/raw",
+    delay_s: float = 2.0,
+) -> tuple[int, int]:
+    """Fetch and ingest results for recently run NSW meetings with no stored results.
+
+    For meetings not yet in the meetings table the form page is ingested first.
+    Returns (fetched, skipped).
+    """
+    print("Fetching HRNSW recent results index...", flush=True)
+    html = fetch_rendered_html(_HRNSW_RESULTS_URL, wait_ms=4000)
+    entries = parse_hrnsw_results_index(html)
+    if not entries:
+        print("No results found on HRNSW page.", flush=True)
+        return 0, 0
+
+    conn = connect(db_path)
+    init_db(conn)
+    existing_meetings = {row[0] for row in conn.execute("SELECT meeting_code FROM meetings").fetchall()}
+    with_results = {
+        row[0]
+        for row in conn.execute("SELECT DISTINCT meeting_code FROM race_results").fetchall()
+    }
+    conn.close()
+
+    fetched = 0
+    skipped = 0
+    for entry in entries:
+        code = entry["meeting_code"]
+        label = f"{entry['track_name']} {entry['meeting_date']} ({code})"
+        if code in with_results:
+            print(f"  Skip {label} — results already in DB", flush=True)
+            skipped += 1
+            continue
+        print(f"  Fetching results for {label}...", flush=True)
+        try:
+            if code not in existing_meetings:
+                form_path = fetch_meeting(code, output_dir)
+                ingest_meeting_html(db_path, form_path)
+                existing_meetings.add(code)
+                time.sleep(delay_s)
+            results_path = fetch_results(code, output_dir)
+            ingest_results_html(db_path, results_path)
+            fetched += 1
+            with_results.add(code)
+        except Exception as exc:
+            print(f"  Warning: {code} failed — {exc}", flush=True)
+        time.sleep(delay_s)
+
+    print(
+        f"\nRecent results sync summary:\n"
+        f"  Meetings found:  {len(entries)}\n"
+        f"  Fetched:         {fetched}\n"
+        f"  Skipped (known): {skipped}",
+        flush=True,
+    )
+    return fetched, skipped
 
 
 def fetch_horse_pages_from_meeting_html(

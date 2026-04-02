@@ -18,6 +18,8 @@ from .pipeline import (
     ingest_results_html,
     ingest_results_dir,
     snapshot_meeting,
+    sync_upcoming_meetings,
+    sync_recent_results,
 )
 from .odds import (
     flatten_meeting_scores,
@@ -128,6 +130,16 @@ def main() -> None:
     snapshot_parser.add_argument("--snapshots-root", default="data/snapshots")
     snapshot_parser.add_argument("--race-number", type=int)
     snapshot_parser.add_argument("--horse-library", default="data/horse_library/nsw")
+
+    sync_upcoming_parser = subparsers.add_parser("sync-upcoming", help="Fetch and ingest all upcoming NSW meetings not already in the DB")
+    sync_upcoming_parser.add_argument("--db", default="data/harness.db")
+    sync_upcoming_parser.add_argument("--out", default="data/raw")
+    sync_upcoming_parser.add_argument("--delay", type=float, default=2.0, help="Seconds between fetches (default 2)")
+
+    sync_results_parser = subparsers.add_parser("sync-results", help="Fetch and ingest results for recently run NSW meetings with no stored results")
+    sync_results_parser.add_argument("--db", default="data/harness.db")
+    sync_results_parser.add_argument("--out", default="data/raw")
+    sync_results_parser.add_argument("--delay", type=float, default=2.0, help="Seconds between fetches (default 2)")
 
     args = parser.parse_args()
 
@@ -250,6 +262,12 @@ def main() -> None:
         print(f"Snapshot saved to {result['snapshot_dir']}")
         print(f"Meeting HTML: {result['meeting_path']}")
         print(f"Horse pages saved: {result['horse_count']}")
+    elif args.command == "sync-upcoming":
+        fetched, skipped = sync_upcoming_meetings(args.db, args.out, delay_s=args.delay)
+        print(f"Done: {fetched} fetched, {skipped} skipped")
+    elif args.command == "sync-results":
+        fetched, skipped = sync_recent_results(args.db, args.out, delay_s=args.delay)
+        print(f"Done: {fetched} fetched, {skipped} skipped")
 
 
 if __name__ == "__main__":
