@@ -88,7 +88,11 @@ def score_race_rows(
         )
 
     scores = [item["score"] for item in enriched]
-    probs = _softmax(scores, temperature=temperature)
+    field_mean = sum(scores) / len(scores) if scores else 0.0
+    for item in enriched:
+        item["relative_score"] = round(item["score"] - field_mean, 4)
+    relative_scores = [item["relative_score"] for item in enriched]
+    probs = _softmax(relative_scores, temperature=temperature)
     probs = _apply_probability_guardrails(probs, min_probability=min_probability, max_probability=max_probability)
     fair_market_probs = _fair_market_probs(race_rows, market_rows, meeting_code, race_number)
     for item, prob in zip(enriched, probs):
@@ -155,14 +159,16 @@ def render_race_odds_table(scored_rows: list[dict[str, object]]) -> str:
     lines = []
     has_market = any(row.get("fair_market_probability") is not None for row in display_rows)
     if has_market:
-        lines.append("No.  Horse                 Barrier  ModelP  AdjP    Fair Odds  Adj Odds  S1      S2      Score")
-        lines.append("---  --------------------  -------  ------  ------  ---------  --------  ------  ------  ------")
+        lines.append("No.  Horse                 Barrier  ModelP  AdjP    Fair Odds  Adj Odds  S1      S2      Score    Rel")
+        lines.append("---  --------------------  -------  ------  ------  ---------  --------  ------  ------  ------  ------")
     else:
-        lines.append("No.  Horse                 Barrier  Prob    Fair Odds  S1      S2      Score")
-        lines.append("---  --------------------  -------  ------  ---------  ------  ------  ------")
+        lines.append("No.  Horse                 Barrier  Prob    Fair Odds  S1      S2      Score    Rel")
+        lines.append("---  --------------------  -------  ------  ---------  ------  ------  ------  ------")
     for row in display_rows:
         s1 = f"{row.get('stage1_score', 0.0):>6.3f}"
         s2 = f"{row.get('stage2_score', 0.0):>6.3f}"
+        rel = row.get("relative_score")
+        rel_str = f"{rel:>+7.3f}" if rel is not None else f"{'':>7}"
         if has_market:
             lines.append(
                 f"{str(row['runner_number'] or ''):<3}  "
@@ -173,7 +179,7 @@ def render_race_odds_table(scored_rows: list[dict[str, object]]) -> str:
                 f"{row['fair_odds']:<9}  "
                 f"{row['adjusted_fair_odds']:<8}  "
                 f"{s1}  {s2}  "
-                f"{row['score']:.4f}"
+                f"{row['score']:.4f}  {rel_str}"
             )
         else:
             lines.append(
@@ -183,7 +189,7 @@ def render_race_odds_table(scored_rows: list[dict[str, object]]) -> str:
                 f"{row['win_probability']:.4f}  "
                 f"{row['fair_odds']:<9}  "
                 f"{s1}  {s2}  "
-                f"{row['score']:.4f}"
+                f"{row['score']:.4f}  {rel_str}"
             )
     return "\n".join(lines)
 
