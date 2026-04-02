@@ -122,7 +122,8 @@ def parse_results_html(html: str, meeting_code: str) -> list[ResultRunner]:
     header_pattern = re.compile(
         r'<tr class="raceHeader">.*?'
         r'<td class="raceNumber[^"]*"[^>]*>\s*(?P<race_number>\d+)\s*</td>.*?'
-        r'<td class="raceTitle">(?P<race_title>.*?)</td>',
+        r'<td class="raceTitle">(?P<race_title>.*?)</td>.*?'
+        r'<td class="distance">(?P<distance>[^<]*)</td>',
         re.IGNORECASE | re.DOTALL,
     )
     table_pattern = re.compile(
@@ -146,20 +147,69 @@ def parse_results_html(html: str, meeting_code: str) -> list[ResultRunner]:
         race_title = _clean_spaces(re.sub(r"<[^>]+>", " ", header_match.group("race_title")))
         if _is_excluded_race(race_title):
             continue
+        distance_text = _clean_spaces(header_match.group("distance") or "")
+        distance_m = re.match(r"(\d+)", distance_text)
+        race_distance = int(distance_m.group(1)) if distance_m else None
+
         table_html = table_match.group("table")
         for row_match in row_pattern.finditer(table_html):
             place_text = (row_match.group("place") or "").strip()
             margin_text = _clean_spaces(row_match.group("margin") or "")
             odds_text = _clean_spaces(re.sub(r"<[^>]+>", " ", row_match.group("starting_price") or ""))
+            margin = 0.0 if place_text == "1" else (_parse_results_margin(margin_text) if margin_text else None)
+
+            # Sub-extract additional fields from the full row HTML.
+            # Start at the row match start; end at the next </tr>.
+            row_end = table_html.find("</tr>", row_match.end())
+            full_row = table_html[row_match.start(): row_end if row_end != -1 else row_match.end()]
+
+            barrier_m = re.search(r'<td class="barrier[^"]*">\s*([^<]*)\s*</td>', full_row, re.IGNORECASE)
+            barrier = barrier_m.group(1).strip() or None if barrier_m else None
+
+            trainer_m = re.search(r'<td class="trainer nowrap">.*?<a[^>]*>([^<]+)</a>', full_row, re.IGNORECASE | re.DOTALL)
+            trainer_name = _clean_spaces(trainer_m.group(1)) if trainer_m else None
+
+            driver_m = re.search(r'<td class="driver nowrap">.*?<a[^>]*>([^<]+)</a>', full_row, re.IGNORECASE | re.DOTALL)
+            driver_name = _clean_spaces(driver_m.group(1)) if driver_m else None
+
+            prizemoney_m = re.search(r'<td class="prizemoney[^"]*">\s*([^<]*)\s*</td>', full_row, re.IGNORECASE)
+            stake = _parse_prizemoney(prizemoney_m.group(1)) if prizemoney_m else None
+
+            # Short codes (e.g. "BL 3 SWAB") stored for reference only —
+            # they use a different code system to horse profile pages.
+            # Adjustments are computed from the full text in data-original-title.
+            comment_codes_m = re.search(
+                r'<td class="stewards_comments">.*?<span[^>]*>([^<]+)</span>',
+                full_row, re.IGNORECASE | re.DOTALL,
+            )
+            comment_text_m = re.search(
+                r'<td class="stewards_comments">.*?data-original-title="([^"]*)"',
+                full_row, re.IGNORECASE | re.DOTALL,
+            )
+            comment_codes = _clean_spaces(comment_codes_m.group(1)) if comment_codes_m else None
+            full_comment_text = comment_text_m.group(1) if comment_text_m else ""
+            comment_adj, _, null_run = _apply_form_line_text_rules(full_comment_text, None, None, margin)
+            adjusted_margin = None if null_run or margin is None else round(margin + comment_adj, 2)
+
             results.append(
                 ResultRunner(
                     meeting_code=meeting_code,
                     race_number=race_number,
                     horse_name=_clean_spaces(row_match.group("horse_name")).title(),
                     finish_position=int(place_text) if place_text.isdigit() else None,
-                    margin=0.0 if place_text == "1" else (_parse_results_margin(margin_text) if margin_text else None),
+                    margin=margin,
                     starting_price=_parse_results_price(odds_text),
                     horse_id=row_match.group("horse_id"),
+                    barrier=barrier,
+                    trainer_name=trainer_name,
+                    driver_name=driver_name,
+                    stake=stake,
+                    comment_codes=comment_codes,
+                    comment_adjustment=comment_adj,
+                    null_run=null_run,
+                    adjusted_margin=adjusted_margin,
+                    race_name=race_title,
+                    distance=race_distance,
                 )
             )
 
@@ -304,20 +354,48 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
         race_type = _extract_form_start_type(info)
         race_purse = _extract_form_race_purse(info)
 
-        horse_pattern = re.compile(
-            r'<td class="horse_name_td"><span class="horse_number">(?P<number>\d+)</span><span class="horse_name">\s*'
-            r'<a href="[^"]*horseId=(?P<horse_id>\d+)">(?P<horse_name>[^<]+)</a>.*?'
-            r'<div class="horse_handicap">(?P<barrier>[^<]+)</div>.*?'
-            r'<div class="horse_class">(?P<horse_class>[^<]+)</div>.*?'
-            r'<div class="driver">Driver:\s*<span class="driver_name">.*?<a href="(?P<driver_link>[^"]+)">(?P<driver>[^<]*)</a>.*?'
-            r'<div class="trainer">Trainer:\s*<span class="trainer_name">(?:<span class="bolded">)?(?:<a href="(?P<trainer_link>[^"]+)">)?(?P<trainer>[^<(]+)',
-            flags=re.IGNORECASE | re.DOTALL,
-        )
+        horse_start_pattern = re.compile(r'<td class="horse_name_td">', flags=re.IGNORECASE)
+        horse_starts = [match.start() for match in horse_start_pattern.finditer(body)]
+        if not horse_starts:
+            continue
 
-        for horse_match in horse_pattern.finditer(body):
-            horse_html_start = horse_match.start()
-            next_start = body.find('<td class="horse_name_td">', horse_html_start + 1)
-            horse_block = body[horse_html_start: next_start if next_start != -1 else len(body)]
+        for idx, horse_html_start in enumerate(horse_starts):
+            next_start = horse_starts[idx + 1] if idx + 1 < len(horse_starts) else len(body)
+            horse_block = body[horse_html_start:next_start]
+
+            number_match = re.search(
+                r'<span class="horse_number">(?P<number>\d+)</span>',
+                horse_block,
+                flags=re.IGNORECASE,
+            )
+            horse_match = re.search(
+                r'<span class="horse_name">\s*<a href="[^"]*horseId=(?P<horse_id>\d+)">(?P<horse_name>[^<]+)</a>',
+                horse_block,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            barrier_match = re.search(
+                r'<div class="horse_handicap">(?P<barrier>[^<]+)</div>',
+                horse_block,
+                flags=re.IGNORECASE,
+            )
+            class_match = re.search(
+                r'<div class="horse_class">(?P<horse_class>[^<]+)</div>',
+                horse_block,
+                flags=re.IGNORECASE,
+            )
+            driver_match = re.search(
+                r'<div class="driver">Driver:\s*<span class="driver_name">.*?<a href="(?P<driver_link>[^"]+)">(?P<driver>[^<]*)</a>',
+                horse_block,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            trainer_match = re.search(
+                r'<div class="trainer">Trainer:\s*<span class="trainer_name">(?:<span class="bolded">)?(?:<a href="(?P<trainer_link>[^"]+)">)?(?P<trainer>[^<(]+)',
+                horse_block,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            if not number_match or not horse_match:
+                continue
+
             recent_lines = _extract_recent_lines_from_horse_block(
                 horse_block=horse_block,
                 meeting_code=meeting_code,
@@ -343,19 +421,19 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
                 RunnerInfo(
                     meeting_code=meeting_code,
                     race_number=race_number,
-                    runner_number=int(horse_match.group("number")),
+                    runner_number=int(number_match.group("number")),
                     horse_id=horse_match.group("horse_id"),
                     horse_name=_clean_spaces(horse_match.group("horse_name")),
-                    barrier=_clean_spaces(horse_match.group("barrier")),
-                    driver_name=_clean_driver_name(_clean_spaces(horse_match.group("driver"))),
-                    driver_link=horse_match.group("driver_link"),
-                    trainer_name=_clean_spaces(horse_match.group("trainer")).rstrip(","),
-                    trainer_link=horse_match.group("trainer_link"),
+                    barrier=_clean_spaces(barrier_match.group("barrier")) if barrier_match else None,
+                    driver_name=_clean_driver_name(_clean_spaces(driver_match.group("driver"))) if driver_match else None,
+                    driver_link=driver_match.group("driver_link") if driver_match else None,
+                    trainer_name=_clean_spaces(trainer_match.group("trainer")).rstrip(",") if trainer_match else None,
+                    trainer_link=trainer_match.group("trainer_link") if trainer_match else None,
                     scratched=scratched,
                     race_name=race_name,
                     race_distance=race_distance,
                     race_type=race_type,
-                    class_name=race_conditions or _clean_spaces(horse_match.group("horse_class")),
+                    class_name=race_conditions or (_clean_spaces(class_match.group("horse_class")) if class_match else None),
                     raw_price=None,
                     form_career_summary=career_summary,
                     form_this_season_summary=this_season_summary,
@@ -1044,6 +1122,14 @@ def _parse_stake(value: str) -> float | None:
 def _parse_price(value: str) -> float | None:
     match = re.match(r"^\$([\d]+\.[\d]{2})$", value)
     return float(match.group(1)) if match else None
+
+
+def _parse_prizemoney(value: str) -> float | None:
+    clean = re.sub(r"[$,\s]", "", value.strip())
+    try:
+        return float(clean) if clean else None
+    except ValueError:
+        return None
 
 
 def _parse_results_price(value: str) -> float | None:
