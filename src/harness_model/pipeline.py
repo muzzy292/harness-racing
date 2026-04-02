@@ -37,6 +37,7 @@ from .scraper import (
 from .storage import (
     connect,
     driver_stats_are_fresh,
+    cleanup_form_entries_for_horse,
     horse_has_runs,
     init_db,
     sync_runner_recent_lines_to_horse_runs,
@@ -314,6 +315,7 @@ def ingest_horse_html(db_path: str | Path, html_path: str | Path) -> str:
     conn = connect(db_path)
     init_db(conn)
     upsert_horse_profile(conn, profile)
+    cleanup_form_entries_for_horse(conn, profile.horse_id)
     conn.close()
     return profile.horse_id
 

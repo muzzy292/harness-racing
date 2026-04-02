@@ -335,16 +335,38 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
 
 
 def horse_has_runs(conn: sqlite3.Connection, horse_id: str) -> bool:
+    """Return True only if the horse has real profile-sourced runs (not FORM placeholders)."""
     row = conn.execute(
         """
         SELECT 1
         FROM horse_runs
         WHERE horse_id = ?
+          AND race_name NOT LIKE 'FORM:%'
         LIMIT 1
         """,
         (horse_id,),
     ).fetchone()
     return row is not None
+
+
+def cleanup_form_entries_for_horse(conn: sqlite3.Connection, horse_id: str) -> int:
+    """Delete FORM placeholder runs now covered by real profile data for this horse."""
+    cursor = conn.execute(
+        """
+        DELETE FROM horse_runs
+        WHERE horse_id = ?
+          AND race_name LIKE 'FORM:%'
+          AND (run_date, track_code) IN (
+              SELECT run_date, track_code
+              FROM horse_runs
+              WHERE horse_id = ?
+                AND race_name NOT LIKE 'FORM:%'
+          )
+        """,
+        (horse_id, horse_id),
+    )
+    conn.commit()
+    return cursor.rowcount
 
 
 def driver_stats_are_fresh(conn: sqlite3.Connection, driver_slug: str, max_age_days: int) -> bool:
