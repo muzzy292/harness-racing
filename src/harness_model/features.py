@@ -38,6 +38,7 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
             COALESCE(rr.form_last_season_summary, hp.last_season_summary) AS last_season_summary,
             rr.form_bmr,
             rr.form_bmr_dist_rge,
+            rr.form_dist_rge_summary,
             rr.race_purse
         FROM race_runners rr
         LEFT JOIN meetings m ON m.meeting_code = rr.meeting_code
@@ -235,6 +236,10 @@ def _build_feature_row(
         "driver_page_season_win_rate": _driver_page_win_rate(conn, runner["nominated_driver"]),
         "form_bmr_secs": bmr_secs,
         "form_bmr_dist_rge_secs": bmr_dist_rge_secs,
+        "dist_strike_rate_ratio": _dist_strike_rate_ratio(
+            runner.get("form_dist_rge_summary"),
+            runner.get("career_summary"),
+        ),
         "days_since_last_run": days_since_last_run,
         "race_nr_ceiling": race_nr_ceiling,
         "nr_headroom": nr_headroom,
@@ -338,6 +343,35 @@ def _trainer_page_win_rate(conn: sqlite3.Connection, trainer_name: object) -> fl
         (slug,),
     ).fetchone()
     return float(row["season_win_rate"]) if row and row["season_win_rate"] is not None else None
+
+
+def _dist_strike_rate_ratio(
+    dist_rge_summary: object,
+    career_summary: object,
+) -> float | None:
+    """Ratio of distance win rate to career win rate.
+
+    Returns None (neutral) when:
+    - dist_starts < 2 (insufficient distance sample)
+    - career_starts == 0 (no career data)
+    - career win rate == 0 (avoid division by zero; treat as neutral)
+    """
+    dist_starts = _summary_part(dist_rge_summary, 0)
+    dist_wins = _summary_part(dist_rge_summary, 1)
+    career_starts = _summary_part(career_summary, 0)
+    career_wins = _summary_part(career_summary, 1)
+
+    if dist_starts is None or dist_starts < 2:
+        return None
+    if not career_starts or not career_wins:
+        return None
+
+    career_win_rate = career_wins / career_starts
+    if career_win_rate == 0.0:
+        return None
+
+    dist_win_rate = dist_wins / dist_starts
+    return round(dist_win_rate / career_win_rate, 4)
 
 
 def _summary_part(summary_text: object, idx: int) -> int | None:

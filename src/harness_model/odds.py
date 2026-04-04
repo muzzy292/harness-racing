@@ -293,6 +293,7 @@ def _stage2_components(
     map_wide = _to_float(row.get("map_wide_risk_score"))
     barrier = row.get("barrier") or ""
     bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
+    dist_strike_rate_ratio = _to_float(row.get("dist_strike_rate_ratio"))
     days_since_last_run = _to_float(row.get("days_since_last_run"))
     driver_win_rate = _to_float(row.get("driver_page_season_win_rate"))
     trainer_change_flag = _to_float(row.get("trainer_change_flag"))
@@ -316,6 +317,16 @@ def _stage2_components(
         # BMR at race distance — faster (lower seconds) = better.
         # Centred at 117s (1:57.0), capped at ±1.2 to prevent one component dominating.
         "bmr_dist_rge": max(-1.2, min(1.2, _pos_scale(bmr_dist_rge, center=117.0, divisor=-2.0, missing=0.0))) * 0.6,
+        # Distance strike rate — ratio of win% at this distance band vs career win%.
+        # ratio > 1 = horse wins more often at this distance than on average → boost.
+        # ratio < 1 = horse wins less often → penalty.
+        # Neutral (0) when dist_starts < 2 or no career data.
+        # Capped at ±1.35 (larger than bmr_dist_rge ±0.72) — distance preference is a
+        # meaningful signal and justifies a stronger adjustment than raw time alone.
+        "dist_strike_rate": (
+            max(-1.35, min(1.35, (dist_strike_rate_ratio - 1.0) / 0.4)) * 0.9
+            if dist_strike_rate_ratio is not None else 0.0
+        ),
         # Fitness — graduated penalty by days since last run.
         "fitness":      _fitness_score(days_since_last_run),
         # Driver form — current season win rate from official profile page.

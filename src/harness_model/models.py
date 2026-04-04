@@ -33,6 +33,7 @@ class RunnerInfo:
     form_career_summary: tuple[int, int, int, int] | None = None
     form_this_season_summary: tuple[int, int, int, int] | None = None
     form_last_season_summary: tuple[int, int, int, int] | None = None
+    form_dist_rge_summary: tuple[int, int, int, int] | None = None
     form_bmr: str | None = None
     form_bmr_dist_rge: str | None = None
     race_purse: float | None = None

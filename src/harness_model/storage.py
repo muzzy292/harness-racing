@@ -156,6 +156,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             "form_career_summary": "TEXT",
             "form_this_season_summary": "TEXT",
             "form_last_season_summary": "TEXT",
+            "form_dist_rge_summary": "TEXT",
             "form_bmr": "TEXT",
             "form_bmr_dist_rge": "TEXT",
             "race_purse": "REAL",
@@ -218,9 +219,9 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             barrier, driver_name, driver_link, trainer_name, trainer_link, scratched, race_name,
             race_distance, race_type, class_name, raw_price,
             form_career_summary, form_this_season_summary, form_last_season_summary,
-            form_bmr, form_bmr_dist_rge, race_purse
+            form_dist_rge_summary, form_bmr, form_bmr_dist_rge, race_purse
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(meeting_code, race_number, horse_id) DO UPDATE SET
             runner_number = excluded.runner_number,
             horse_name = excluded.horse_name,
@@ -238,6 +239,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             form_career_summary = excluded.form_career_summary,
             form_this_season_summary = excluded.form_this_season_summary,
             form_last_season_summary = excluded.form_last_season_summary,
+            form_dist_rge_summary = excluded.form_dist_rge_summary,
             form_bmr = excluded.form_bmr,
             form_bmr_dist_rge = excluded.form_bmr_dist_rge,
             race_purse = excluded.race_purse
@@ -263,6 +265,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
                 _summary_to_text(runner.form_career_summary),
                 _summary_to_text(runner.form_this_season_summary),
                 _summary_to_text(runner.form_last_season_summary),
+                _summary_to_text(runner.form_dist_rge_summary),
                 runner.form_bmr,
                 runner.form_bmr_dist_rge,
                 runner.race_purse,

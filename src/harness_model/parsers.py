@@ -408,6 +408,7 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
             career_summary = _extract_form_stats_summary(horse_block, "Career")
             this_season_summary = _extract_form_stats_summary(horse_block, "TS")
             last_season_summary = _extract_form_stats_summary(horse_block, "LS")
+            dist_rge_summary = _extract_form_stats_summary(horse_block, "DistRge")
             form_bmr = _extract_form_bmr(horse_block)
             form_bmr_dist_rge = _extract_form_bmr_dist_rge(horse_block)
             # Only check for scratching markers in the horse's own header area,
@@ -441,6 +442,7 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
                     form_career_summary=career_summary,
                     form_this_season_summary=this_season_summary,
                     form_last_season_summary=last_season_summary,
+                    form_dist_rge_summary=dist_rge_summary,
                     form_bmr=form_bmr,
                     form_bmr_dist_rge=form_bmr_dist_rge,
                     race_purse=race_purse,
@@ -1010,6 +1012,7 @@ def _extract_form_stats_summary(horse_block: str, label: str) -> tuple[int, int,
         "Career": r"Career:\s*<span class=\"form_stats\">([\d\-]+)</span>",
         "TS": r"<span title=\"This Season\">TS:</span>\s*<span class=\"form_stats\">([\d\-]+)</span>",
         "LS": r"<span title=\"Last Season\">LS:</span>\s*<span class=\"form_stats\">([\d\-]+)</span>",
+        "DistRge": r"DistRge:\s*<span class=\"form_stats\">([\d\-]+)</span>",
     }
     pattern = patterns.get(label)
     if not pattern:
