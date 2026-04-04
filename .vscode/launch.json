@@ -117,7 +117,8 @@
       "args": [
         "score-meeting",
         "--csv", "data/features/runner_features.csv",
-        "--meeting-code", "${input:meetingCode}"
+        "--meeting-code", "${input:meetingCode}",
+        "--temperature", "${input:temperature}"
       ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
@@ -132,7 +133,8 @@
         "score-race",
         "--csv", "data/features/runner_features.csv",
         "--meeting-code", "${input:meetingCode}",
-        "--race-number", "${input:raceNumber}"
+        "--race-number", "${input:raceNumber}",
+        "--temperature", "${input:temperature}"
       ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
@@ -211,6 +213,12 @@
       "type": "promptString",
       "description": "Horse name to scratch (partial match, case-insensitive)",
       "default": ""
+    },
+    {
+      "id": "temperature",
+      "type": "promptString",
+      "description": "Softmax temperature (lower = more spread, higher = tighter). Default 2.0",
+      "default": "2.0"
     }
   ]
 }
