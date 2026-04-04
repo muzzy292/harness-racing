@@ -6,6 +6,7 @@ from pathlib import Path
 from .storage import connect, scratch_horse as db_scratch_horse
 from .pipeline import (
     build_feature_dataset,
+    build_track_par_database,
     calibrate_temperature,
     fetch_driver_stats_for_meeting,
     fetch_horse_pages_from_meeting_html,
@@ -80,10 +81,14 @@ def main() -> None:
     ingest_horses_parser.add_argument("--horse-dir", required=True)
     ingest_horses_parser.add_argument("--db", default="data/harness.db")
 
+    track_pars_parser = subparsers.add_parser("build-track-pars", help="Generate track par database from runner_recent_lines in SQLite")
+    track_pars_parser.add_argument("--db", default="data/harness.db")
+    track_pars_parser.add_argument("--output", default="data/track_pars.json")
+
     features_parser = subparsers.add_parser("build-features", help="Build runner-level feature CSV from SQLite")
     features_parser.add_argument("--db", default="data/harness.db")
     features_parser.add_argument("--csv", default="data/features/runner_features.csv")
-    features_parser.add_argument("--track-pars")
+    features_parser.add_argument("--track-pars", default="data/track_pars.json", help="Path to track_pars.json (default: data/track_pars.json)")
 
     score_parser = subparsers.add_parser("score-race", help="Score one race and print fair odds")
     score_parser.add_argument("--csv", default="data/features/runner_features.csv")
@@ -190,8 +195,13 @@ def main() -> None:
     elif args.command == "ingest-horses":
         count = ingest_horse_dir(args.db, args.horse_dir)
         print(f"Stored {count} horse profiles in {Path(args.db)}")
+    elif args.command == "build-track-pars":
+        build_track_par_database(args.db, args.output)
     elif args.command == "build-features":
-        print(f"Wrote feature dataset to {build_feature_dataset(args.db, args.csv, track_pars_path=args.track_pars)}")
+        track_pars_path = args.track_pars if Path(args.track_pars).exists() else None
+        if args.track_pars and not track_pars_path:
+            print(f"  Warning: --track-pars file not found ({args.track_pars}) — sectional deltas will be empty. Run build-track-pars first.")
+        print(f"Wrote feature dataset to {build_feature_dataset(args.db, args.csv, track_pars_path=track_pars_path)}")
     elif args.command == "score-race":
         rows = load_feature_rows(args.csv)
         market_rows = load_market_rows(args.market_csv) if args.market_csv else None

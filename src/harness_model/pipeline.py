@@ -4,7 +4,7 @@ from pathlib import Path
 import time
 from datetime import datetime
 
-from .features import build_runner_feature_rows, install_sqlite_helpers, write_feature_csv
+from .features import build_runner_feature_rows, generate_track_pars_from_db, install_sqlite_helpers, write_feature_csv, write_track_pars
 from .parsers import (
     parse_driver_page_html,
     parse_horse_profile_html,
@@ -701,6 +701,27 @@ def calibrate_temperature(
 
     print(f"Calibrating temperature across {len(winners)} races...", flush=True)
     return sweep_temperature(rows, winners, temperatures=temperatures)
+
+
+def build_track_par_database(db_path: str | Path, output_path: str | Path) -> Path:
+    """Generate track_pars.json from last_half sectionals stored in runner_recent_lines.
+
+    Uses median per track/distance/condition (min 10 samples).  The output
+    file is in the same format as track_pars.json expected by build-features.
+    """
+    conn = connect(db_path)
+    init_db(conn)
+    pars = generate_track_pars_from_db(conn)
+    conn.close()
+    out = write_track_pars(pars, output_path)
+    print(
+        f"  Track pars written to {out}\n"
+        f"  Tracks: {len(pars['pars'])}  "
+        f"Cells: {pars['total_cells']}  "
+        f"Runs used: {pars['total_runs']}",
+        flush=True,
+    )
+    return out
 
 
 def build_feature_dataset(db_path: str | Path, csv_path: str | Path, track_pars_path: str | Path | None = None) -> Path:

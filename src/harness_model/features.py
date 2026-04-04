@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import csv
+import json
 import re
 import sqlite3
+import statistics
+from datetime import date
 from pathlib import Path
 
 from .track_pars import lookup_race_par
@@ -699,3 +702,73 @@ def _sort_run_date(date_text: object) -> int:
         return int(year) * 10000 + months[mon.upper()] * 100 + int(day)
     except Exception:
         return 0
+
+
+def generate_track_pars_from_db(conn: sqlite3.Connection) -> dict:
+    """Build a track par database from last_half sectionals in runner_recent_lines.
+
+    Uses the median of trimmed values (top/bottom 5% removed) per
+    track_name / distance / condition combination.  Only includes cells with
+    n >= 10 samples to avoid spurious pars from thin data.
+
+    Returns a dict in the same structure as track_pars.json so it can be
+    passed directly to lookup_race_par().
+    """
+    # Sanity bounds: harness last-half times are almost always 52–68 seconds.
+    rows = conn.execute(
+        """
+        SELECT track_name, distance, condition, last_half
+        FROM runner_recent_lines
+        WHERE last_half IS NOT NULL
+          AND last_half BETWEEN 52.0 AND 68.0
+          AND distance IS NOT NULL
+          AND track_name IS NOT NULL
+          AND track_name != ''
+        """
+    ).fetchall()
+
+    # Group into {track_name: {distance: {condition: [times]}}}
+    grouped: dict[str, dict[int, dict[str, list[float]]]] = {}
+    for row in rows:
+        track = str(row["track_name"])
+        dist = int(row["distance"])
+        cond = str(row["condition"] or "Good")
+        grouped.setdefault(track, {}).setdefault(dist, {}).setdefault(cond, []).append(float(row["last_half"]))
+
+    pars: dict[str, dict[str, dict[str, dict[str, object]]]] = {}
+    total_cells = 0
+    for track, dist_dict in grouped.items():
+        pars[track] = {}
+        for dist, cond_dict in dist_dict.items():
+            pars[track][str(dist)] = {}
+            for cond, times in cond_dict.items():
+                if len(times) < 10:
+                    continue
+                sorted_times = sorted(times)
+                trim = max(1, len(sorted_times) // 20)
+                trimmed = sorted_times[trim:-trim] if len(sorted_times) > 20 else sorted_times
+                par = round(statistics.median(trimmed), 2)
+                std = round(statistics.stdev(trimmed), 2) if len(trimmed) > 1 else 0.0
+                pars[track][str(dist)][cond] = {
+                    "par": par,
+                    "std": std,
+                    "n": len(times),
+                    "min": round(min(trimmed), 2),
+                    "max": round(max(trimmed), 2),
+                }
+                total_cells += 1
+
+    return {
+        "generated": date.today().isoformat(),
+        "source": "runner_recent_lines",
+        "total_runs": len(rows),
+        "total_cells": total_cells,
+        "pars": pars,
+    }
+
+
+def write_track_pars(track_pars: dict, output_path: str | Path) -> Path:
+    out = Path(output_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(track_pars, indent=2), encoding="utf-8")
+    return out
