@@ -36,7 +36,7 @@
       "justMyCode": true
     },
     {
-      "name": "4. Fetch Horses",
+      "name": "4. [Optional] Fetch Horses",
       "type": "debugpy",
       "request": "launch",
       "module": "harness_model.cli",
@@ -51,7 +51,7 @@
       "justMyCode": true
     },
     {
-      "name": "5. Ingest Horses",
+      "name": "5. [Optional] Ingest Horses",
       "type": "debugpy",
       "request": "launch",
       "module": "harness_model.cli",
@@ -156,6 +156,21 @@
       "args": [
         "calibrate-temperature",
         "--csv", "data/features/runner_features.csv",
+        "--db", "data/harness.db"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Flag Trainer Change",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "harness_model.cli",
+      "args": [
+        "flag-trainer-change",
+        "--meeting-code", "${input:meetingCode}",
+        "--horse-name", "${input:horseName}",
         "--db", "data/harness.db"
       ],
       "cwd": "${workspaceFolder}",

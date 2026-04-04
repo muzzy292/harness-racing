@@ -301,8 +301,7 @@ def _stage2_components(
     dist_strike_rate_ratio = _to_float(row.get("dist_strike_rate_ratio"))
     days_since_last_run = _to_float(row.get("days_since_last_run"))
     driver_win_rate = _to_float(row.get("driver_page_season_win_rate"))
-    trainer_change_flag = _to_float(row.get("trainer_change_flag"))
-    trainer_change_recent_flag = _to_float(row.get("trainer_change_recent_flag"))
+    trainer_change_manual = _to_float(row.get("trainer_change_manual"))
     trainer_page_win_rate = _to_float(row.get("trainer_page_season_win_rate"))
     trainer_win_rate_30 = _to_float(row.get("trainer_last_30_win_rate"))
     trainer_win_rate_90 = _to_float(row.get("trainer_last_90_win_rate"))
@@ -342,8 +341,7 @@ def _stage2_components(
         # not drown out the horse's core profile.
         "trainer_form": _trainer_form_score(trainer_page_win_rate, trainer_win_rate_30, trainer_win_rate_90),
         "stable_change": _stable_change_score(
-            trainer_change_flag,
-            trainer_change_recent_flag,
+            trainer_change_manual,
             days_since_last_run,
             class_delta,
             nr_headroom,
@@ -502,16 +500,21 @@ def _trainer_form_score(page_win_rate: float | None, win_rate_30: float | None, 
 
 
 def _stable_change_score(
-    trainer_change_flag: float | None,
-    trainer_change_recent_flag: float | None,
+    trainer_change_manual: float | None,
     days_since_last_run: float | None,
     class_delta: float | None,
     nr_headroom: float | None,
 ) -> float:
-    if trainer_change_flag != 1 and trainer_change_recent_flag != 1:
+    """Score a manually flagged trainer change.
+
+    Set via the flag-trainer-change CLI command before scoring.
+    Applies a base boost then adjusts for supporting context
+    (time off, class rise/drop, NR headroom).
+    """
+    if trainer_change_manual != 1:
         return 0.0
 
-    score = 0.25 if trainer_change_flag == 1 else 0.18
+    score = 0.25
     if days_since_last_run is not None and days_since_last_run >= 45:
         score += 0.20
     elif days_since_last_run is not None and days_since_last_run >= 21:

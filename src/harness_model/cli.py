@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .storage import connect, scratch_horse as db_scratch_horse
+from .storage import connect, scratch_horse as db_scratch_horse, set_trainer_change_manual as db_set_trainer_change
 from .pipeline import (
     build_feature_dataset,
     build_track_par_database,
@@ -124,6 +124,13 @@ def main() -> None:
     scratch_parser.add_argument("--horse-name", required=True, help="Horse name (case-insensitive partial match)")
     scratch_parser.add_argument("--race-number", type=int, help="Limit to a specific race number (optional)")
     scratch_parser.add_argument("--db", default="data/harness.db")
+
+    flag_trainer_parser = subparsers.add_parser("flag-trainer-change", help="Manually flag a trainer change for a horse before scoring")
+    flag_trainer_parser.add_argument("--meeting-code", required=True)
+    flag_trainer_parser.add_argument("--horse-name", required=True, help="Horse name (case-insensitive partial match)")
+    flag_trainer_parser.add_argument("--race-number", type=int, help="Limit to a specific race number (optional)")
+    flag_trainer_parser.add_argument("--clear", action="store_true", help="Clear the flag instead of setting it")
+    flag_trainer_parser.add_argument("--db", default="data/harness.db")
 
     fetch_driver_stats_parser = subparsers.add_parser("fetch-driver-stats", help="Fetch driver profile pages and store season win rates")
     fetch_driver_stats_parser.add_argument("--meeting-code", required=True)
@@ -253,6 +260,17 @@ def main() -> None:
         if scratched:
             for name, race in scratched:
                 print(f"Scratched: {name}  (Race {race})")
+        else:
+            print(f"No matching horse found for '{args.horse_name}' in meeting {args.meeting_code}")
+    elif args.command == "flag-trainer-change":
+        conn = connect(args.db)
+        value = 0 if args.clear else 1
+        updated = db_set_trainer_change(conn, args.meeting_code, args.horse_name, value=value, race_number=args.race_number)
+        conn.close()
+        action = "Cleared" if args.clear else "Flagged"
+        if updated:
+            for name, race in updated:
+                print(f"{action} trainer change: {name}  (Race {race})")
         else:
             print(f"No matching horse found for '{args.horse_name}' in meeting {args.meeting_code}")
     elif args.command == "fetch-driver-stats":
