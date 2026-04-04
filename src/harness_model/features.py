@@ -162,6 +162,11 @@ def _build_feature_row(
     avg_recent_run_purse = _avg(capped_run_purses[:5])
     race_purse = runner.get("race_purse")
     class_delta = round(float(race_purse) - avg_recent_run_purse, 0) if (race_purse is not None and avg_recent_run_purse is not None) else None
+    career_starts = _summary_part(runner["career_summary"], 0)
+    career_wins = _summary_part(runner["career_summary"], 1)
+    # Require ≥5 career starts before trusting the win rate — fewer starts give
+    # too noisy a signal (1/2 = 50% and 1/30 = 3% should not be treated equally).
+    career_win_rate = round(career_wins / career_starts, 4) if (career_starts is not None and career_starts >= 5 and career_wins is not None) else None
 
     return {
         "meeting_code": runner["meeting_code"],
@@ -202,8 +207,9 @@ def _build_feature_row(
         "map_death_score": map_signals["map_death_score"],
         "map_soft_trip_score": map_signals["map_soft_trip_score"],
         "map_wide_risk_score": map_signals["map_wide_risk_score"],
-        "career_starts": _summary_part(runner["career_summary"], 0),
-        "career_wins": _summary_part(runner["career_summary"], 1),
+        "career_starts": career_starts,
+        "career_wins": career_wins,
+        "career_win_rate": career_win_rate,
         "season_starts": _summary_part(runner["this_season_summary"], 0),
         "season_wins": _summary_part(runner["this_season_summary"], 1),
         "last_5_avg_adj_margin": _avg(primary_adj_margins[:5]),

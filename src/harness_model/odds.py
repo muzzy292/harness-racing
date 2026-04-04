@@ -232,6 +232,7 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
     nr_headroom = _to_float(row.get("nr_headroom"))
     avg_run_purse = _to_float(row.get("avg_recent_run_purse"))
     class_delta = _to_float(row.get("class_delta"))
+    career_win_rate = _to_float(row.get("career_win_rate"))
 
     # Horse-page run data takes priority over form-page recent lines —
     # they should not stack.
@@ -268,6 +269,11 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
         # win_rate reduced; supplemented by top3_rate and competitive_rate which
         # are less distorted by field quality and bad luck runs.
         "win_rate":      (win_rate or 0.0) * 0.7,
+        # Career win rate — a horse that has rarely won over a full career (e.g. 1/32)
+        # should carry a meaningful S1 penalty regardless of recent sectional speed.
+        # Centred at 12% (typical NSW win rate), capped ±1.5 before applying weight
+        # so no single extreme case dominates. Requires ≥5 career starts (None → 0).
+        "career_win_rate": max(-1.5, min(1.5, _pos_scale(career_win_rate, center=0.12, divisor=0.08, missing=0.0))) * 0.6,
         "top3_rate":     (top3_rate or 0.0) * 0.6,
         "competitive_rate": (competitive_rate or 0.0) * 0.5,
         "nr":          _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * 0.25,
