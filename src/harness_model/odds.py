@@ -230,7 +230,7 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
     null_flags = _to_float(row.get("recent_line_null_flags"))
     nr = _to_float(row.get("nr_rating"))
     nr_headroom = _to_float(row.get("nr_headroom"))
-    avg_stake = _to_float(row.get("last_5_avg_stake"))
+    avg_run_purse = _to_float(row.get("avg_recent_run_purse"))
     class_delta = _to_float(row.get("class_delta"))
 
     # Horse-page run data takes priority over form-page recent lines —
@@ -268,7 +268,12 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
         # Class signals — lower NR headroom = near top of grade; stake class and
         # class delta capture recent competition level vs today's race.
         "class_pos":   _neg_scale(nr_headroom, divisor=8.0, floor=-2.0, missing=0.0) * 0.15,
-        "stake_class": _pos_scale(avg_stake, center=4500.0, divisor=2500.0, missing=0.0) * 0.2,
+        # Race purse of recent runs — measures the class of races competed in,
+        # not prize money won (which is position-dependent and unreliable as a
+        # class proxy). Centred at $8,000 (between the two most common NSW purses
+        # of $6,936 and $9,792). Divisor $3,000 gives meaningful spread:
+        # country ($6,936) ≈ −0.35, metro ($20k+) capped at +1.2.
+        "stake_class": _pos_scale(avg_run_purse, center=8000.0, divisor=3000.0, missing=0.0) * 0.2,
         "class_delta": _pos_scale(class_delta, center=0.0, divisor=-2000.0, missing=0.0) * 0.3,
     }
 

@@ -156,15 +156,6 @@ def _build_feature_row(
     race_nr_ceiling = _parse_race_nr_ceiling(runner.get("class_name"))
     nr_rating = runner["nr_rating"]
     nr_headroom = round(race_nr_ceiling - float(nr_rating), 1) if (race_nr_ceiling is not None and nr_rating is not None) else None
-    raw_stakes = [run["stake"] for run in last_runs if run.get("stake") is not None]
-    capped_stakes = _cap_outlier_stakes([float(s) for s in raw_stakes])
-    last_5_avg_stake = _avg(capped_stakes[:5])
-    # When no horse-profile stake data exists, approximate using race purse.
-    # A typical mid-field horse earns ~45% of the purse across positions 1-3;
-    # this keeps the value in the same range as real stake data so the
-    # stake_class centre ($4,500) in odds.py stays calibrated.
-    if last_5_avg_stake is None and avg_recent_run_purse is not None:
-        last_5_avg_stake = round(avg_recent_run_purse * 0.45, 0)
     raw_run_purses = [line["run_purse"] for line in recent_lines if line.get("run_purse") is not None]
     capped_run_purses = _cap_outlier_stakes([float(p) for p in raw_run_purses])
     avg_recent_run_purse = _avg(capped_run_purses[:5])
@@ -249,7 +240,6 @@ def _build_feature_row(
         "days_since_last_run": days_since_last_run,
         "race_nr_ceiling": race_nr_ceiling,
         "nr_headroom": nr_headroom,
-        "last_5_avg_stake": last_5_avg_stake,
         "race_purse": race_purse,
         "avg_recent_run_purse": avg_recent_run_purse,
         "class_delta": class_delta,
