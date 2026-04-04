@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 from datetime import date
@@ -335,13 +336,14 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
 
 
 def horse_has_runs(conn: sqlite3.Connection, horse_id: str) -> bool:
-    """Return True only if the horse has real profile-sourced runs (not FORM placeholders)."""
+    """Return True only if the horse has real profile-sourced runs (not FORM/RESULT placeholders)."""
     row = conn.execute(
         """
         SELECT 1
         FROM horse_runs
         WHERE horse_id = ?
           AND race_name NOT LIKE 'FORM:%'
+          AND race_name NOT LIKE 'RESULT:%'
         LIMIT 1
         """,
         (horse_id,),
@@ -350,8 +352,9 @@ def horse_has_runs(conn: sqlite3.Connection, horse_id: str) -> bool:
 
 
 def cleanup_form_entries_for_horse(conn: sqlite3.Connection, horse_id: str) -> int:
-    """Delete FORM placeholder runs now covered by real profile data for this horse."""
-    cursor = conn.execute(
+    """Delete FORM and RESULT placeholder runs now covered by real profile data for this horse."""
+    # FORM entries: match on (run_date, track_code) — both are populated from form-page parsing.
+    c1 = conn.execute(
         """
         DELETE FROM horse_runs
         WHERE horse_id = ?
@@ -361,12 +364,30 @@ def cleanup_form_entries_for_horse(conn: sqlite3.Connection, horse_id: str) -> i
               FROM horse_runs
               WHERE horse_id = ?
                 AND race_name NOT LIKE 'FORM:%'
+                AND race_name NOT LIKE 'RESULT:%'
+          )
+        """,
+        (horse_id, horse_id),
+    )
+    # RESULT entries: match on run_date alone (track_code from meeting code prefix differs
+    # from the 7-char profile page track codes, so we can't join on it).
+    c2 = conn.execute(
+        """
+        DELETE FROM horse_runs
+        WHERE horse_id = ?
+          AND race_name LIKE 'RESULT:%'
+          AND run_date IN (
+              SELECT run_date
+              FROM horse_runs
+              WHERE horse_id = ?
+                AND race_name NOT LIKE 'FORM:%'
+                AND race_name NOT LIKE 'RESULT:%'
           )
         """,
         (horse_id, horse_id),
     )
     conn.commit()
-    return cursor.rowcount
+    return c1.rowcount + c2.rowcount
 
 
 def driver_stats_are_fresh(conn: sqlite3.Connection, driver_slug: str, max_age_days: int) -> bool:
@@ -567,7 +588,103 @@ def upsert_horse_profile(conn: sqlite3.Connection, profile: HorseProfile) -> Non
     conn.commit()
 
 
+def _normalize_run_date(meeting_date: str) -> str:
+    """Zero-pad day in meeting dates like '1 Apr 2026' → '01 Apr 2026'."""
+    m = re.match(r"^(\d{1,2})\s+(\w+)\s+(\d{4})$", meeting_date.strip())
+    if m:
+        return f"{int(m.group(1)):02d} {m.group(2)} {m.group(3)}"
+    return meeting_date
+
+
+def upsert_result_horse_runs(conn: sqlite3.Connection, results: list, resolved_ids: dict) -> None:
+    """Write results-sourced runs into horse_runs.
+
+    Uses race_name = 'RESULT:{meeting_code}:{race_number}' as the dedup key so
+    these entries are distinguishable from real profile runs and cleaned up when
+    a profile is later ingested via cleanup_form_entries_for_horse().
+
+    resolved_ids maps horse_name.upper() → horse_id for the current batch.
+    """
+    meeting_dates: dict[str, str | None] = {}
+
+    rows = []
+    for result in results:
+        horse_id = resolved_ids.get(result.horse_name.upper())
+        if not horse_id:
+            continue
+
+        meeting_code = result.meeting_code
+        if meeting_code not in meeting_dates:
+            row = conn.execute(
+                "SELECT meeting_date FROM meetings WHERE meeting_code = ? LIMIT 1",
+                (meeting_code,),
+            ).fetchone()
+            meeting_dates[meeting_code] = row["meeting_date"] if row else None
+
+        meeting_date = meeting_dates[meeting_code]
+        if not meeting_date:
+            continue
+
+        run_date = _normalize_run_date(meeting_date)
+        # Track code from meeting code: strip the trailing 6-digit date (DDMMYY).
+        track_code = re.sub(r"\d{6}$", "", meeting_code) or None
+        race_name = f"RESULT:{meeting_code}:{result.race_number}"
+        distance_code = str(result.distance) if result.distance else None
+
+        rows.append((
+            horse_id,
+            run_date,
+            track_code,
+            result.finish_position,
+            result.barrier,
+            result.margin,
+            None,               # mile_rate — not available from results pages
+            result.driver_name,
+            result.trainer_name,
+            result.stake,
+            result.distance,
+            distance_code,
+            race_name,
+            result.starting_price,
+            result.comment_codes,
+            result.comment_adjustment,
+            int(result.null_run),
+            result.adjusted_margin,
+            "RACE",
+        ))
+
+    if not rows:
+        return
+
+    conn.executemany(
+        """
+        INSERT INTO horse_runs(
+            horse_id, run_date, track_code, finish_position, barrier, margin,
+            mile_rate, driver_name, trainer_name, stake, distance, distance_code,
+            race_name, start_price, comment_codes, comment_adjustment, null_run,
+            adjusted_margin, race_type
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(horse_id, run_date, race_name, distance_code) DO UPDATE SET
+            finish_position  = COALESCE(excluded.finish_position,  horse_runs.finish_position),
+            barrier          = COALESCE(excluded.barrier,          horse_runs.barrier),
+            margin           = COALESCE(excluded.margin,           horse_runs.margin),
+            driver_name      = COALESCE(excluded.driver_name,      horse_runs.driver_name),
+            trainer_name     = COALESCE(excluded.trainer_name,     horse_runs.trainer_name),
+            stake            = COALESCE(excluded.stake,            horse_runs.stake),
+            start_price      = COALESCE(excluded.start_price,      horse_runs.start_price),
+            comment_codes    = COALESCE(excluded.comment_codes,    horse_runs.comment_codes),
+            comment_adjustment = excluded.comment_adjustment,
+            null_run         = excluded.null_run,
+            adjusted_margin  = COALESCE(excluded.adjusted_margin,  horse_runs.adjusted_margin)
+        """,
+        rows,
+    )
+    conn.commit()
+
+
 def upsert_results(conn: sqlite3.Connection, results: list) -> None:
+    resolved_ids: dict[str, str | None] = {}
     rows = []
     for result in results:
         matched_horse_id = conn.execute(
@@ -582,6 +699,7 @@ def upsert_results(conn: sqlite3.Connection, results: list) -> None:
             (result.meeting_code, result.race_number, result.horse_name),
         ).fetchone()
         horse_id = matched_horse_id["horse_id"] if matched_horse_id else result.horse_id
+        resolved_ids[result.horse_name.upper()] = horse_id
         rows.append(
             (
                 result.meeting_code,
@@ -609,6 +727,8 @@ def upsert_results(conn: sqlite3.Connection, results: list) -> None:
         rows,
     )
     conn.commit()
+
+    upsert_result_horse_runs(conn, results, resolved_ids)
 
 
 def scratch_horse(

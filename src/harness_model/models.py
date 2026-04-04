@@ -113,3 +113,13 @@ class ResultRunner:
     margin: float | None = None
     starting_price: float | None = None
     horse_id: str | None = None
+    barrier: str | None = None
+    trainer_name: str | None = None
+    driver_name: str | None = None
+    stake: float | None = None
+    comment_codes: str | None = None
+    comment_adjustment: float = 0.0
+    null_run: bool = False
+    adjusted_margin: float | None = None
+    race_name: str | None = None
+    distance: int | None = None
