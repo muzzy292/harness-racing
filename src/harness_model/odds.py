@@ -253,7 +253,13 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
         "consistency": _neg_scale(consistency_adj, divisor=12.0, floor=-4.0, missing=0.0) * 1.8,
         "ceiling":     _neg_scale(ceiling_adj,     divisor=10.0, floor=-3.5, missing=0.0) * 1.2,
         "late_speed":  _neg_scale(sec3,            divisor=1.2,  floor=-2.5, missing=0.0) * 1.4,
-        "comment_adj": _pos_scale(comment_adj, center=0.0, divisor=6.0, missing=0.0) * 0.5,
+        # comment_adj removed — the margin adjustments in adjusted_margin already
+        # capture positional/trouble credit. Using it as a separate feature
+        # double-penalised horses that ran in tough conditions (negative adj)
+        # while rewarding soft-trip horses, which is the wrong direction.
+        # Data is preserved in recent_line_avg_comment_adj (CSV) and
+        # comment_adjustment (DB) for future revisiting.
+        # "comment_adj": _pos_scale(comment_adj, center=0.0, divisor=6.0, missing=0.0) * 0.5,
         "tempo_adj":   _pos_scale(tempo_adj, center=0.0, divisor=1.2, missing=0.0) * 0.45,
         "tempo_flags": -(tempo_flags or 0.0) * 0.08,
         "null_flags":  -(null_flags or 0.0) * 0.25,
