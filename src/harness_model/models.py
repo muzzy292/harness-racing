@@ -30,6 +30,7 @@ class RunnerInfo:
     race_type: str | None = None
     class_name: str | None = None
     raw_price: float | None = None
+    form_nr: int | None = None
     form_career_summary: tuple[int, int, int, int] | None = None
     form_this_season_summary: tuple[int, int, int, int] | None = None
     form_last_season_summary: tuple[int, int, int, int] | None = None

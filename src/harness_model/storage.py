@@ -153,6 +153,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         conn,
         "race_runners",
         {
+            "form_nr": "INTEGER",
             "form_career_summary": "TEXT",
             "form_this_season_summary": "TEXT",
             "form_last_season_summary": "TEXT",
@@ -218,10 +219,10 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             meeting_code, race_number, horse_id, runner_number, horse_name,
             barrier, driver_name, driver_link, trainer_name, trainer_link, scratched, race_name,
             race_distance, race_type, class_name, raw_price,
-            form_career_summary, form_this_season_summary, form_last_season_summary,
+            form_nr, form_career_summary, form_this_season_summary, form_last_season_summary,
             form_dist_rge_summary, form_bmr, form_bmr_dist_rge, race_purse
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(meeting_code, race_number, horse_id) DO UPDATE SET
             runner_number = excluded.runner_number,
             horse_name = excluded.horse_name,
@@ -236,6 +237,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             race_type = excluded.race_type,
             class_name = excluded.class_name,
             raw_price = excluded.raw_price,
+            form_nr = excluded.form_nr,
             form_career_summary = excluded.form_career_summary,
             form_this_season_summary = excluded.form_this_season_summary,
             form_last_season_summary = excluded.form_last_season_summary,
@@ -262,6 +264,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
                 runner.race_type,
                 runner.class_name,
                 runner.raw_price,
+                runner.form_nr,
                 _summary_to_text(runner.form_career_summary),
                 _summary_to_text(runner.form_this_season_summary),
                 _summary_to_text(runner.form_last_season_summary),

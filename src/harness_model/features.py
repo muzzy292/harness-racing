@@ -32,7 +32,7 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
             rr.class_name,
             m.meeting_date,
             m.track_name,
-            hp.nr_rating,
+            COALESCE(rr.form_nr, hp.nr_rating) AS nr_rating,
             COALESCE(rr.form_career_summary, hp.career_summary) AS career_summary,
             COALESCE(rr.form_this_season_summary, hp.this_season_summary) AS this_season_summary,
             COALESCE(rr.form_last_season_summary, hp.last_season_summary) AS last_season_summary,
@@ -159,6 +159,12 @@ def _build_feature_row(
     raw_stakes = [run["stake"] for run in last_runs if run.get("stake") is not None]
     capped_stakes = _cap_outlier_stakes([float(s) for s in raw_stakes])
     last_5_avg_stake = _avg(capped_stakes[:5])
+    # When no horse-profile stake data exists, approximate using race purse.
+    # A typical mid-field horse earns ~45% of the purse across positions 1-3;
+    # this keeps the value in the same range as real stake data so the
+    # stake_class centre ($4,500) in odds.py stays calibrated.
+    if last_5_avg_stake is None and avg_recent_run_purse is not None:
+        last_5_avg_stake = round(avg_recent_run_purse * 0.45, 0)
     raw_run_purses = [line["run_purse"] for line in recent_lines if line.get("run_purse") is not None]
     capped_run_purses = _cap_outlier_stakes([float(p) for p in raw_run_purses])
     avg_recent_run_purse = _avg(capped_run_purses[:5])

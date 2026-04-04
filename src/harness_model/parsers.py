@@ -409,6 +409,7 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
             this_season_summary = _extract_form_stats_summary(horse_block, "TS")
             last_season_summary = _extract_form_stats_summary(horse_block, "LS")
             dist_rge_summary = _extract_form_stats_summary(horse_block, "DistRge")
+            form_horse_nr = _extract_form_horse_nr(horse_block)
             form_bmr = _extract_form_bmr(horse_block)
             form_bmr_dist_rge = _extract_form_bmr_dist_rge(horse_block)
             # Only check for scratching markers in the horse's own header area,
@@ -443,6 +444,7 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
                     form_this_season_summary=this_season_summary,
                     form_last_season_summary=last_season_summary,
                     form_dist_rge_summary=dist_rge_summary,
+                    form_nr=form_horse_nr,
                     form_bmr=form_bmr,
                     form_bmr_dist_rge=form_bmr_dist_rge,
                     race_purse=race_purse,
@@ -761,6 +763,16 @@ def _extract_class_name(block: str) -> str | None:
     plain = _clean_spaces(re.sub(r"<[^>]+>", " ", block))
     match = re.search(r"\b(NR\s*\d+[^$<]{0,80}|CLASS\s*[A-Z0-9]+[^$<]{0,80}|C\d[\w\s\-]{0,40})", plain, re.IGNORECASE)
     return match.group(1).strip() if match else None
+
+
+def _extract_form_horse_nr(horse_block: str) -> int | None:
+    """Extract the horse's individual NR from the form page horse block.
+
+    The NR appears as: <div class="horse_class">NR36</div>
+    Sometimes includes an apprentice rating: NR48 (A43) — we take only the base NR.
+    """
+    match = re.search(r'<div class="horse_class">\s*NR\s*(\d+)', horse_block, re.IGNORECASE)
+    return int(match.group(1)) if match else None
 
 
 def _extract_runner_number(snippet: str) -> int | None:
