@@ -510,15 +510,24 @@ def _fair_market_probs(
 def _fitness_score(days: float | None) -> float:
     """Graduated penalty by days since last run.
 
-    ≤ 14 days  →  0.00  (fit, no penalty)
-    15–28 days → -0.35  (short freshening)
-    29–42 days → -0.60  (spell, fitness uncertain)
-    43–84 days → -0.85  (extended spell, likely returning from injury/prep)
-    85+ days   → -1.10  (long absence, significant fitness risk)
-    None       →  0.00  (no data, treat as fit)
+    ≤ 14 days   →  0.00  (fit, no penalty)
+    15–28 days  → -0.35  (short freshening)
+    29–42 days  → -0.60  (spell, fitness uncertain)
+    43–84 days  → -0.85  (extended spell, likely returning from injury/prep)
+    85–99 days  → -1.10  (long absence, significant fitness risk)
+    100–119 days → -1.45 (100+ day spell — harshly penalised; horse rarely race-fit first-up)
+    120–149 days → -1.70 (extended absence)
+    150+ days   → -2.00  (very long layoff)
+    None        →  0.00  (no data, treat as fit)
     """
     if days is None:
         return 0.0
+    if days > 149:
+        return -2.00
+    if days > 119:
+        return -1.70
+    if days > 99:
+        return -1.45
     if days > 84:
         return -1.10
     if days > 42:
