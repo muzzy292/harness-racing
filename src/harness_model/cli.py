@@ -34,6 +34,7 @@ from .odds import (
     score_race_rows,
     write_scored_rows_csv,
 )
+from .web import build_meeting_site, serve_site
 
 
 _DEFAULT_WEIGHTS_PATH = Path("weights.json")
@@ -180,6 +181,24 @@ def main() -> None:
     sync_results_parser.add_argument("--db", default="data/harness.db")
     sync_results_parser.add_argument("--out", default="data/raw")
     sync_results_parser.add_argument("--delay", type=float, default=2.0, help="Seconds between fetches (default 2)")
+
+    build_site_parser = subparsers.add_parser("build-meeting-site", help="Build a light static website page for one scored meeting")
+    build_site_parser.add_argument("--meeting-code", required=True)
+    build_site_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    build_site_parser.add_argument("--db", default="data/harness.db")
+    build_site_parser.add_argument("--out", default="data/site")
+    build_site_parser.add_argument("--market-csv")
+    build_site_parser.add_argument("--min-prob", type=float, default=0.0)
+    build_site_parser.add_argument("--max-prob", type=float, default=1.0)
+    build_site_parser.add_argument("--model-weight", type=float, default=None)
+    build_site_parser.add_argument("--market-weight", type=float, default=None)
+    build_site_parser.add_argument("--temperature", type=float, default=None, help="Softmax temperature (overrides weights file)")
+    build_site_parser.add_argument("--weights", default=None, help="Path to weights JSON file (default: data/weights.json if it exists)")
+
+    serve_site_parser = subparsers.add_parser("serve-site", help="Serve the generated site folder locally")
+    serve_site_parser.add_argument("--site-dir", default="data/site")
+    serve_site_parser.add_argument("--host", default="127.0.0.1")
+    serve_site_parser.add_argument("--port", type=int, default=8000)
 
     args = parser.parse_args()
 
@@ -330,6 +349,24 @@ def main() -> None:
     elif args.command == "sync-results":
         fetched, skipped = sync_recent_results(args.db, args.out, delay_s=args.delay)
         print(f"Done: {fetched} fetched, {skipped} skipped")
+    elif args.command == "build-meeting-site":
+        weights = _resolve_weights(getattr(args, "weights", None))
+        page_path = build_meeting_site(
+            args.meeting_code,
+            csv_path=args.csv,
+            db_path=args.db,
+            out_dir=args.out,
+            market_csv=args.market_csv,
+            min_probability=args.min_prob,
+            max_probability=args.max_prob,
+            model_weight=args.model_weight,
+            market_weight=args.market_weight,
+            temperature=args.temperature,
+            weights=weights,
+        )
+        print(f"Built meeting site page at {page_path}")
+    elif args.command == "serve-site":
+        serve_site(args.site_dir, host=args.host, port=args.port)
     elif args.command == "calibrate-temperature":
         meeting_codes = [m.strip() for m in (args.meetings or "").split(",") if m.strip()] or None
         temperatures = [float(t.strip()) for t in (args.temperatures or "").split(",") if t.strip()] or None
