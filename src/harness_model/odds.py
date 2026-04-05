@@ -309,6 +309,7 @@ def _stage2_components(
     map_soft = _to_float(row.get("map_soft_trip_score"))
     map_wide = _to_float(row.get("map_wide_risk_score"))
     barrier = row.get("barrier") or ""
+    nr_grade_delta = _to_float(row.get("nr_grade_delta"))
     bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
     dist_strike_rate_ratio = _to_float(row.get("dist_strike_rate_ratio"))
     days_since_last_run = _to_float(row.get("days_since_last_run"))
@@ -343,6 +344,10 @@ def _stage2_components(
             max(-1.35, min(1.35, (dist_strike_rate_ratio - 1.0) / 0.4)) * 0.9
             if dist_strike_rate_ratio is not None else 0.0
         ),
+        # NR grade delta — today's NR ceiling vs avg ceiling of last 5 runs.
+        # Negative = dropping in grade → boost. Positive = rising → penalty.
+        # ~0.04 per NR point of drop. Requires ≥2 recent lines with NR data (else 0).
+        "nr_grade_delta": max(-1.5, min(1.5, _pos_scale(nr_grade_delta, center=0.0, divisor=-10.0, missing=0.0))) * 0.4,
         # Fitness — graduated penalty by days since last run.
         "fitness":      _fitness_score(days_since_last_run),
         # Driver form — current season win rate from official profile page.

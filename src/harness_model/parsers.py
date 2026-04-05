@@ -906,6 +906,7 @@ def _extract_recent_lines_from_horse_block(
                 finish_position=finish_position,
                 raw_margin=raw_margin,
                 run_purse=parsed.get("purse"),
+                line_nr_ceiling=parsed.get("line_nr_ceiling"),
                 comment_adjustment=comment_adjustment,
                 tempo_adjustment=tempo_adjustment,
                 null_run=null_run,
@@ -940,6 +941,8 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
 
     raw_purse = results_match.group("purse")
     purse = float(raw_purse.replace(",", "")) if raw_purse else None
+    nr_ceiling_match = re.search(r'NR\s+up\s+to\s+(\d+)', line_html, re.IGNORECASE)
+    line_nr_ceiling = int(nr_ceiling_match.group(1)) if nr_ceiling_match else None
     return {
         "form_place": form_place_match.group("form_place"),
         "track_code": results_match.group("track"),
@@ -952,6 +955,7 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
         "comment": comment,
         "line_text": plain,
         "purse": purse,
+        "line_nr_ceiling": line_nr_ceiling,
     }
 
 

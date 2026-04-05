@@ -63,6 +63,7 @@ class RunnerRecentLine:
     finish_position: int | None = None
     raw_margin: float | None = None
     run_purse: float | None = None
+    line_nr_ceiling: int | None = None
     comment_adjustment: float = 0.0
     tempo_adjustment: float = 0.0
     null_run: bool = False

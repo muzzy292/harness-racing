@@ -155,8 +155,18 @@ def _build_feature_row(
     )
     days_since_last_run = _days_since_last_run(recent_lines, runner.get("meeting_date"))
     race_nr_ceiling = _parse_race_nr_ceiling(runner.get("class_name"))
+    race_nr_floor = _parse_race_nr_floor(runner.get("class_name"))
     nr_rating = runner["nr_rating"]
     nr_headroom = round(race_nr_ceiling - float(nr_rating), 1) if (race_nr_ceiling is not None and nr_rating is not None) else None
+    # Use all recent lines (including null runs) — line_nr_ceiling is a property of
+    # the race entered, not the horse's performance, so null runs are still valid.
+    recent_line_nr_ceilings = [
+        line["line_nr_ceiling"] for line in recent_lines[:5]
+        if line.get("line_nr_ceiling") is not None
+    ]
+    avg_recent_nr_ceiling = _avg(recent_line_nr_ceilings) if len(recent_line_nr_ceilings) >= 2 else None
+    # Negative = dropping in grade (today's ceiling lower than recent), positive = rising.
+    nr_grade_delta = round(race_nr_ceiling - avg_recent_nr_ceiling, 1) if (race_nr_ceiling is not None and avg_recent_nr_ceiling is not None) else None
     raw_run_purses = [line["run_purse"] for line in recent_lines if line.get("run_purse") is not None]
     capped_run_purses = _cap_outlier_stakes([float(p) for p in raw_run_purses])
     avg_recent_run_purse = _avg(capped_run_purses[:5])
@@ -244,7 +254,10 @@ def _build_feature_row(
         ),
         "days_since_last_run": days_since_last_run,
         "race_nr_ceiling": race_nr_ceiling,
+        "race_nr_floor": race_nr_floor,
         "nr_headroom": nr_headroom,
+        "avg_recent_nr_ceiling": avg_recent_nr_ceiling,
+        "nr_grade_delta": nr_grade_delta,
         "race_purse": race_purse,
         "avg_recent_run_purse": avg_recent_run_purse,
         "class_delta": class_delta,
@@ -712,14 +725,41 @@ def _cap_outlier_stakes(stakes: list[float]) -> list[float]:
 
 
 def _parse_race_nr_ceiling(class_name: object) -> float | None:
-    """Extract the NR ceiling from a class_name string like 'NR up to 52. ...'
+    """Extract the NR ceiling from a class_name string.
 
-    Returns the ceiling as a float, or None for MAIDEN races and unrecognised formats.
+    Handles three formats:
+      - 'NR up to 52. ...'       → 52  (standard ceiling race)
+      - 'NR 45 to 55. ...'       → 55  (banded race — ceiling is upper bound)
+      - 'Also eligible NR.47. ..' → 47  (LTW/win-based race with NR also-eligible clause)
+
+    Returns None for MAIDEN, win-based, Listed, and unrecognised formats.
     """
     if not class_name:
         return None
     text = str(class_name)
     match = re.search(r"NR\s+up\s+to\s+(\d+)", text, re.IGNORECASE)
+    if match:
+        return float(match.group(1))
+    match = re.search(r"NR\s+(\d+)\s+to\s+(\d+)", text, re.IGNORECASE)
+    if match:
+        return float(match.group(2))
+    match = re.search(r"NR\.(\d+)", text, re.IGNORECASE)
+    if match:
+        return float(match.group(1))
+    return None
+
+
+def _parse_race_nr_floor(class_name: object) -> float | None:
+    """Extract the NR floor from a banded class_name like 'NR 45 to 55. ...'
+
+    Returns None for ceiling-only races (NR up to XX) and unrecognised formats.
+    Only banded races have a meaningful floor — all other race types allow any NR
+    from 0 up to the ceiling.
+    """
+    if not class_name:
+        return None
+    text = str(class_name)
+    match = re.search(r"NR\s+(\d+)\s+to\s+(\d+)", text, re.IGNORECASE)
     if match:
         return float(match.group(1))
     return None
