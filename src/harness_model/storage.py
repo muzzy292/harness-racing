@@ -184,6 +184,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             "adjusted_margin": "REAL",
             "run_purse": "REAL",
             "line_nr_ceiling": "INTEGER",
+            "run_sp": "REAL",
         },
     )
     _ensure_columns(
@@ -284,9 +285,9 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             meeting_code, race_number, horse_id, line_index, run_date,
             track_name, track_code, distance, condition, last_half, mile_rate,
             first_half, q1, q2, q3, q4, raw_comment, finish_position,
-            raw_margin, run_purse, line_nr_ceiling, comment_adjustment, tempo_adjustment, null_run, adjusted_margin
+            raw_margin, run_purse, line_nr_ceiling, run_sp, comment_adjustment, tempo_adjustment, null_run, adjusted_margin
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(meeting_code, race_number, horse_id, line_index) DO UPDATE SET
             run_date = excluded.run_date,
             track_name = excluded.track_name,
@@ -305,6 +306,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             raw_margin = excluded.raw_margin,
             run_purse = excluded.run_purse,
             line_nr_ceiling = excluded.line_nr_ceiling,
+            run_sp = excluded.run_sp,
             comment_adjustment = excluded.comment_adjustment,
             tempo_adjustment = excluded.tempo_adjustment,
             null_run = excluded.null_run,
@@ -333,6 +335,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
                 line.raw_margin,
                 line.run_purse,
                 line.line_nr_ceiling,
+                line.run_sp,
                 line.comment_adjustment,
                 line.tempo_adjustment,
                 int(line.null_run),
