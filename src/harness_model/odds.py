@@ -1,8 +1,72 @@
 from __future__ import annotations
 
+import copy
 import csv
+import json
 import math
 from pathlib import Path
+
+_DEFAULT_WEIGHTS: dict = {
+    "stage1": {
+        "consistency": 1.8,
+        "ceiling": 1.2,
+        "late_speed": 1.4,
+        "tempo_adj": 0.45,
+        "tempo_flags": 0.08,
+        "null_flags": 0.25,
+        "market_min": 0.3,
+        "market_max": 0.6,
+        "win_rate": 0.7,
+        "career_win_rate": 0.6,
+        "top3_rate": 0.6,
+        "competitive_rate": 0.5,
+        "nr": 0.25,
+        "class_pos": 0.15,
+        "stake_class": 0.2,
+        "class_delta": 0.3,
+    },
+    "stage2": {
+        "map_lead": 2.0,
+        "map_soft": 0.45,
+        "map_soft_context": 0.3,
+        "pace_backmarker": 0.6,
+        "pace_backmarker_threshold": 0.4,
+        "map_wide": 0.5,
+        "map_death": 1.2,
+        "dist_strike_rate": 0.9,
+        "nr_grade_delta": 0.4,
+        "driver_form": 0.3,
+        "trainer_form_page": 0.24,
+        "trainer_form_30d": 0.12,
+        "trainer_form_90d": 0.08,
+    },
+    "fitness": {
+        "tier_15_28": -0.35,
+        "tier_29_42": -0.60,
+        "tier_43_84": -0.85,
+        "tier_85_99": -1.10,
+        "tier_100_119": -1.45,
+        "tier_120_149": -1.70,
+        "tier_150_plus": -2.00,
+    },
+    "softmax": {
+        "temperature": 2.0,
+        "model_weight": 0.45,
+        "market_weight": 0.55,
+    },
+}
+
+
+def load_weights(path: str | Path) -> dict:
+    """Load weights from a JSON file, merging with defaults so partial files work."""
+    override = json.loads(Path(path).read_text(encoding="utf-8"))
+    merged = copy.deepcopy(_DEFAULT_WEIGHTS)
+    for section, values in override.items():
+        if section in merged and isinstance(values, dict):
+            merged[section].update(values)
+        else:
+            merged[section] = values
+    return merged
 
 
 def load_feature_rows(csv_path: str | Path) -> list[dict[str, str]]:
@@ -46,10 +110,17 @@ def score_race_rows(
     min_probability: float = 0.0,
     max_probability: float = 1.0,
     market_rows: list[dict[str, str]] | None = None,
-    model_weight: float = 0.45,
-    market_weight: float = 0.55,
-    temperature: float = 2.0,
+    model_weight: float | None = None,
+    market_weight: float | None = None,
+    temperature: float | None = None,
+    weights: dict | None = None,
 ) -> list[dict[str, object]]:
+    w = weights if weights is not None else _DEFAULT_WEIGHTS
+    sw = w.get("softmax", _DEFAULT_WEIGHTS["softmax"])
+    _temperature = temperature if temperature is not None else sw.get("temperature", 2.0)
+    _model_weight = model_weight if model_weight is not None else sw.get("model_weight", 0.45)
+    _market_weight = market_weight if market_weight is not None else sw.get("market_weight", 0.55)
+
     race_rows = [
         row for row in rows
         if row.get("meeting_code") == meeting_code and int(row.get("race_number", 0) or 0) == race_number
@@ -74,8 +145,8 @@ def score_race_rows(
 
     enriched = []
     for i, row in enumerate(race_rows):
-        s1 = _stage1_components(row)
-        s2 = _stage2_components(row, field_lead_prob=field_lead_probs[i], field_death_prob=field_death_probs[i], pace_pressure=pace_pressure)
+        s1 = _stage1_components(row, w)
+        s2 = _stage2_components(row, w, field_lead_prob=field_lead_probs[i], field_death_prob=field_death_probs[i], pace_pressure=pace_pressure)
         stage1_score = round(sum(s1.values()), 4)
         stage2_score = round(sum(s2.values()), 4)
         enriched.append(
@@ -97,7 +168,7 @@ def score_race_rows(
     for item in enriched:
         item["relative_score"] = round(item["score"] - field_mean, 4)
     relative_scores = [item["relative_score"] for item in enriched]
-    probs = _softmax(relative_scores, temperature=temperature)
+    probs = _softmax(relative_scores, temperature=_temperature)
     probs = _apply_probability_guardrails(probs, min_probability=min_probability, max_probability=max_probability)
     fair_market_probs = _fair_market_probs(race_rows, market_rows, meeting_code, race_number)
     for item, prob in zip(enriched, probs):
@@ -106,7 +177,7 @@ def score_race_rows(
         market_prob = fair_market_probs.get(_market_key(item["horse_name"], item["runner_number"]))
         item["fair_market_probability"] = round(market_prob, 4) if market_prob is not None else None
         if market_prob is not None:
-            adjusted_prob = (model_weight * prob) + (market_weight * market_prob)
+            adjusted_prob = (_model_weight * prob) + (_market_weight * market_prob)
             item["adjusted_probability"] = round(adjusted_prob, 4)
             item["adjusted_fair_odds"] = round(1.0 / adjusted_prob, 2) if adjusted_prob > 0 else None
         else:
@@ -123,9 +194,10 @@ def score_meeting_rows(
     min_probability: float = 0.0,
     max_probability: float = 1.0,
     market_rows: list[dict[str, str]] | None = None,
-    model_weight: float = 0.45,
-    market_weight: float = 0.55,
-    temperature: float = 2.0,
+    model_weight: float | None = None,
+    market_weight: float | None = None,
+    temperature: float | None = None,
+    weights: dict | None = None,
 ) -> dict[int, list[dict[str, object]]]:
     race_numbers = sorted(
         {
@@ -145,6 +217,7 @@ def score_meeting_rows(
             model_weight=model_weight,
             market_weight=market_weight,
             temperature=temperature,
+            weights=weights,
         )
         for race_number in race_numbers
     }
@@ -212,13 +285,14 @@ def render_meeting_odds(meeting_scores: dict[int, list[dict[str, object]]], meet
     return "\n".join(sections)
 
 
-def _stage1_components(row: dict[str, str]) -> dict[str, float]:
+def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict[str, float]:
     """Stage 1 — Horse performance rating.
 
     Built from historical form: adjusted margins, sectionals, consistency,
     ceiling run, win rate, NR, and class-normalised form signals.
     These components are independent of today's specific race conditions.
     """
+    w = (weights or _DEFAULT_WEIGHTS).get("stage1", _DEFAULT_WEIGHTS["stage1"])
     last5_adj = _to_float(row.get("last_5_avg_adj_margin"))
     best_adj = _to_float(row.get("last_5_best_adj_margin"))
     recent_line_adj = _to_float(row.get("recent_line_avg_adj_margin"))
@@ -255,17 +329,20 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
     # Market weight weakens as the horse accumulates starts — for exposed horses
     # the model's own data is more reliable than market history (which risks
     # just learning public opinion). For lightly raced horses, trust market more.
+    market_min = w.get("market_min", 0.3)
+    market_max = w.get("market_max", 0.6)
     if career_starts is None or career_starts < 5:
-        market_wt = 0.6
+        market_wt = market_max
     elif career_starts >= 15:
-        market_wt = 0.3
+        market_wt = market_min
     else:
-        market_wt = round(0.6 - 0.03 * (career_starts - 5), 2)
+        step = (market_max - market_min) / 10.0
+        market_wt = round(market_max - step * (career_starts - 5), 2)
 
     return {
-        "consistency": _neg_scale(consistency_adj, divisor=12.0, floor=-4.0, missing=0.0) * 1.8,
-        "ceiling":     _neg_scale(ceiling_adj,     divisor=10.0, floor=-3.5, missing=0.0) * 1.2,
-        "late_speed":  _neg_scale(sec3,            divisor=1.2,  floor=-2.5, missing=0.0) * 1.4,
+        "consistency": _neg_scale(consistency_adj, divisor=12.0, floor=-4.0, missing=0.0) * w.get("consistency", 1.8),
+        "ceiling":     _neg_scale(ceiling_adj,     divisor=10.0, floor=-3.5, missing=0.0) * w.get("ceiling", 1.2),
+        "late_speed":  _neg_scale(sec3,            divisor=1.2,  floor=-2.5, missing=0.0) * w.get("late_speed", 1.4),
         # comment_adj removed — the margin adjustments in adjusted_margin already
         # capture positional/trouble credit. Using it as a separate feature
         # double-penalised horses that ran in tough conditions (negative adj)
@@ -273,37 +350,38 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
         # Data is preserved in recent_line_avg_comment_adj (CSV) and
         # comment_adjustment (DB) for future revisiting.
         # "comment_adj": _pos_scale(comment_adj, center=0.0, divisor=6.0, missing=0.0) * 0.5,
-        "tempo_adj":   _pos_scale(tempo_adj, center=0.0, divisor=1.2, missing=0.0) * 0.45,
-        "tempo_flags": -(tempo_flags or 0.0) * 0.08,
-        "null_flags":  -(null_flags or 0.0) * 0.25,
+        "tempo_adj":   _pos_scale(tempo_adj, center=0.0, divisor=1.2, missing=0.0) * w.get("tempo_adj", 0.45),
+        "tempo_flags": -(tempo_flags or 0.0) * w.get("tempo_flags", 0.08),
+        "null_flags":  -(null_flags or 0.0) * w.get("null_flags", 0.25),
         # Market weakens for exposed horses; stronger prior for lightly raced.
         "market":      _neg_log_scale(avg_sp, missing=0.0) * market_wt,
         # win_rate reduced; supplemented by top3_rate and competitive_rate which
         # are less distorted by field quality and bad luck runs.
-        "win_rate":      (win_rate or 0.0) * 0.7,
+        "win_rate":      (win_rate or 0.0) * w.get("win_rate", 0.7),
         # Career win rate — a horse that has rarely won over a full career (e.g. 1/32)
         # should carry a meaningful S1 penalty regardless of recent sectional speed.
         # Centred at 12% (typical NSW win rate), capped ±1.5 before applying weight
         # so no single extreme case dominates. Requires ≥5 career starts (None → 0).
-        "career_win_rate": max(-1.5, min(1.5, _pos_scale(career_win_rate, center=0.12, divisor=0.08, missing=0.0))) * 0.6,
-        "top3_rate":     (top3_rate or 0.0) * 0.6,
-        "competitive_rate": (competitive_rate or 0.0) * 0.5,
-        "nr":          _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * 0.25,
+        "career_win_rate": max(-1.5, min(1.5, _pos_scale(career_win_rate, center=0.12, divisor=0.08, missing=0.0))) * w.get("career_win_rate", 0.6),
+        "top3_rate":     (top3_rate or 0.0) * w.get("top3_rate", 0.6),
+        "competitive_rate": (competitive_rate or 0.0) * w.get("competitive_rate", 0.5),
+        "nr":          _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * w.get("nr", 0.25),
         # Class signals — lower NR headroom = near top of grade; stake class and
         # class delta capture recent competition level vs today's race.
-        "class_pos":   _neg_scale(nr_headroom, divisor=8.0, floor=-2.0, missing=0.0) * 0.15,
+        "class_pos":   _neg_scale(nr_headroom, divisor=8.0, floor=-2.0, missing=0.0) * w.get("class_pos", 0.15),
         # Race purse of recent runs — measures the class of races competed in,
         # not prize money won (which is position-dependent and unreliable as a
         # class proxy). Centred at $8,000 (between the two most common NSW purses
         # of $6,936 and $9,792). Divisor $3,000 gives meaningful spread:
         # country ($6,936) ≈ −0.35, metro ($20k+) capped at +1.2.
-        "stake_class": _pos_scale(avg_run_purse, center=8000.0, divisor=3000.0, missing=0.0) * 0.2,
-        "class_delta": _pos_scale(class_delta, center=0.0, divisor=-2000.0, missing=0.0) * 0.3,
+        "stake_class": _pos_scale(avg_run_purse, center=8000.0, divisor=3000.0, missing=0.0) * w.get("stake_class", 0.2),
+        "class_delta": _pos_scale(class_delta, center=0.0, divisor=-2000.0, missing=0.0) * w.get("class_delta", 0.3),
     }
 
 
 def _stage2_components(
     row: dict[str, str],
+    weights: dict | None = None,
     field_lead_prob: float | None = None,
     field_death_prob: float | None = None,
     pace_pressure: float = 0.0,
@@ -323,6 +401,8 @@ def _stage2_components(
     (uncontested), approaches 1.0 when pace is contested across multiple horses.
     Used to boost soft-trip horses and restrained backmarkers in contested fields.
     """
+    w = (weights or _DEFAULT_WEIGHTS).get("stage2", _DEFAULT_WEIGHTS["stage2"])
+    fw = (weights or _DEFAULT_WEIGHTS).get("fitness", _DEFAULT_WEIGHTS["fitness"])
     map_soft = _to_float(row.get("map_soft_trip_score"))
     map_wide = _to_float(row.get("map_wide_risk_score"))
     style_restrained_rate = _to_float(row.get("style_restrained_rate"))
@@ -345,18 +425,18 @@ def _stage2_components(
         # race) so contested pace automatically reduces the lead bonus.
         # Weight ×2.0 for lead, ×1.2 for death — scaled to match old raw-score
         # contribution for a typical uncontested leader / single death-seat horse.
-        "map_lead":     (field_lead_prob or 0.0) * 2.0,
-        "map_soft":     (map_soft or 0.0) * 0.45,
+        "map_lead":     (field_lead_prob or 0.0) * w.get("map_lead", 2.0),
+        "map_soft":     (map_soft or 0.0) * w.get("map_soft", 0.45),
         # Soft-trip horses get an extra bonus when pace is genuinely contested —
         # sitting behind a tired, pressured leader is better than an uncontested one.
         # Only fires when pace_pressure > 0; weight 0.3 keeps total soft influence reasonable.
-        "map_soft_context": (map_soft or 0.0) * pace_pressure * 0.3,
+        "map_soft_context": (map_soft or 0.0) * pace_pressure * w.get("map_soft_context", 0.3),
         # Backmarker bonus when pace is contested — restrained-style horses benefit
-        # from speed duels (fast early, tired late). Only kicks in at pace_pressure > 0.4
+        # from speed duels (fast early, tired late). Only kicks in at pace_pressure > threshold
         # to avoid rewarding backmarkers in genuinely uncontested fields.
-        "pace_backmarker": (style_restrained_rate or 0.0) * max(0.0, pace_pressure - 0.4) * 0.6,
-        "map_wide":    -(map_wide or 0.0) * 0.5,
-        "map_death":   -(field_death_prob or 0.0) * 1.2,
+        "pace_backmarker": (style_restrained_rate or 0.0) * max(0.0, pace_pressure - w.get("pace_backmarker_threshold", 0.4)) * w.get("pace_backmarker", 0.6),
+        "map_wide":    -(map_wide or 0.0) * w.get("map_wide", 0.5),
+        "map_death":   -(field_death_prob or 0.0) * w.get("map_death", 1.2),
         # Distance strike rate — ratio of win% at this distance band vs career win%.
         # ratio > 1 = horse wins more often at this distance than on average → boost.
         # ratio < 1 = horse wins less often → penalty.
@@ -365,23 +445,23 @@ def _stage2_components(
         # scaling linearly to 0 at 0 starts. Prevents a single win in 5 starts
         # from capping the signal at ±1.215 (e.g. 7 starts → 47% confidence).
         "dist_strike_rate": (
-            max(-1.35, min(1.35, (dist_strike_rate_ratio - 1.0) / 0.4)) * 0.9
+            max(-1.35, min(1.35, (dist_strike_rate_ratio - 1.0) / 0.4)) * w.get("dist_strike_rate", 0.9)
             * min(1.0, dist_rge_starts / 15.0)
             if dist_strike_rate_ratio is not None else 0.0
         ),
         # NR grade delta — today's NR ceiling vs avg ceiling of last 5 runs.
         # Negative = dropping in grade → boost. Positive = rising → penalty.
         # ~0.04 per NR point of drop. Requires ≥2 recent lines with NR data (else 0).
-        "nr_grade_delta": max(-1.5, min(1.5, _pos_scale(nr_grade_delta, center=0.0, divisor=-10.0, missing=0.0))) * 0.4,
+        "nr_grade_delta": max(-1.5, min(1.5, _pos_scale(nr_grade_delta, center=0.0, divisor=-10.0, missing=0.0))) * w.get("nr_grade_delta", 0.4),
         # Fitness — graduated penalty by days since last run.
-        "fitness":      _fitness_score(days_since_last_run),
+        "fitness":      _fitness_score(days_since_last_run, fw),
         # Driver form — current season win rate from official profile page.
         # Centred at 15% (average NSW win rate). Missing = 0 (no effect).
-        "driver_form":  _pos_scale(driver_win_rate, center=0.15, divisor=0.10, missing=0.0) * 0.3,
+        "driver_form":  _pos_scale(driver_win_rate, center=0.15, divisor=0.10, missing=0.0) * w.get("driver_form", 0.3),
         # Trainer form and stable-change overlay.
         # We keep this measured: genuine trainer changes matter, but they should
         # not drown out the horse's core profile.
-        "trainer_form": _trainer_form_score(trainer_page_win_rate, trainer_win_rate_30, trainer_win_rate_90),
+        "trainer_form": _trainer_form_score(trainer_page_win_rate, trainer_win_rate_30, trainer_win_rate_90, w),
         "stable_change": _stable_change_score(
             trainer_change_manual,
             days_since_last_run,
@@ -511,7 +591,7 @@ def _fair_market_probs(
     return {key: prob / total for key, prob in implied}
 
 
-def _fitness_score(days: float | None) -> float:
+def _fitness_score(days: float | None, fw: dict | None = None) -> float:
     """Graduated penalty by days since last run.
 
     ≤ 14 days   →  0.00  (fit, no penalty)
@@ -526,27 +606,29 @@ def _fitness_score(days: float | None) -> float:
     """
     if days is None:
         return 0.0
+    f = fw or _DEFAULT_WEIGHTS["fitness"]
     if days > 149:
-        return -2.00
+        return f.get("tier_150_plus", -2.00)
     if days > 119:
-        return -1.70
+        return f.get("tier_120_149", -1.70)
     if days > 99:
-        return -1.45
+        return f.get("tier_100_119", -1.45)
     if days > 84:
-        return -1.10
+        return f.get("tier_85_99", -1.10)
     if days > 42:
-        return -0.85
+        return f.get("tier_43_84", -0.85)
     if days > 28:
-        return -0.60
+        return f.get("tier_29_42", -0.60)
     if days > 14:
-        return -0.35
+        return f.get("tier_15_28", -0.35)
     return 0.0
 
 
-def _trainer_form_score(page_win_rate: float | None, win_rate_30: float | None, win_rate_90: float | None) -> float:
-    score_page = _pos_scale(page_win_rate, center=0.12, divisor=0.08, missing=0.0) * 0.24
-    score_30 = _pos_scale(win_rate_30, center=0.12, divisor=0.08, missing=0.0) * 0.12
-    score_90 = _pos_scale(win_rate_90, center=0.12, divisor=0.08, missing=0.0) * 0.08
+def _trainer_form_score(page_win_rate: float | None, win_rate_30: float | None, win_rate_90: float | None, w: dict | None = None) -> float:
+    sw = w or _DEFAULT_WEIGHTS["stage2"]
+    score_page = _pos_scale(page_win_rate, center=0.12, divisor=0.08, missing=0.0) * sw.get("trainer_form_page", 0.24)
+    score_30 = _pos_scale(win_rate_30, center=0.12, divisor=0.08, missing=0.0) * sw.get("trainer_form_30d", 0.12)
+    score_90 = _pos_scale(win_rate_90, center=0.12, divisor=0.08, missing=0.0) * sw.get("trainer_form_90d", 0.08)
     return score_page + score_30 + score_90
 
 

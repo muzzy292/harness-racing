@@ -1,0 +1,49 @@
+{
+  "stage1": {
+    "consistency": 1.8,
+    "ceiling": 1.2,
+    "late_speed": 1.4,
+    "tempo_adj": 0.45,
+    "tempo_flags": 0.08,
+    "null_flags": 0.25,
+    "market_min": 0.3,
+    "market_max": 0.6,
+    "win_rate": 0.7,
+    "career_win_rate": 0.6,
+    "top3_rate": 0.6,
+    "competitive_rate": 0.5,
+    "nr": 0.25,
+    "class_pos": 0.15,
+    "stake_class": 0.2,
+    "class_delta": 0.3
+  },
+  "stage2": {
+    "map_lead": 2.0,
+    "map_soft": 0.45,
+    "map_soft_context": 0.3,
+    "pace_backmarker": 0.6,
+    "pace_backmarker_threshold": 0.4,
+    "map_wide": 0.5,
+    "map_death": 1.2,
+    "dist_strike_rate": 0.9,
+    "nr_grade_delta": 0.4,
+    "driver_form": 0.3,
+    "trainer_form_page": 0.24,
+    "trainer_form_30d": 0.12,
+    "trainer_form_90d": 0.08
+  },
+  "fitness": {
+    "tier_15_28": -0.35,
+    "tier_29_42": -0.60,
+    "tier_43_84": -0.85,
+    "tier_85_99": -1.10,
+    "tier_100_119": -1.45,
+    "tier_120_149": -1.70,
+    "tier_150_plus": -2.00
+  },
+  "softmax": {
+    "temperature": 2.0,
+    "model_weight": 0.45,
+    "market_weight": 0.55
+  }
+}

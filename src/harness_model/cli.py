@@ -27,12 +27,29 @@ from .odds import (
     flatten_meeting_scores,
     load_feature_rows,
     load_market_rows,
+    load_weights,
     render_meeting_odds,
     render_race_odds_table,
     score_meeting_rows,
     score_race_rows,
     write_scored_rows_csv,
 )
+
+
+_DEFAULT_WEIGHTS_PATH = Path("weights.json")
+
+
+def _resolve_weights(explicit_path: str | None) -> dict | None:
+    """Load weights from an explicit path, or from data/weights.json if it exists.
+
+    Returns None if no weights file is found — callers fall back to hardcoded defaults.
+    """
+    path = Path(explicit_path) if explicit_path else _DEFAULT_WEIGHTS_PATH
+    if path.exists():
+        return load_weights(path)
+    if explicit_path:
+        raise FileNotFoundError(f"Weights file not found: {explicit_path}")
+    return None
 
 
 def main() -> None:
@@ -97,9 +114,10 @@ def main() -> None:
     score_parser.add_argument("--min-prob", type=float, default=0.0)
     score_parser.add_argument("--max-prob", type=float, default=1.0)
     score_parser.add_argument("--market-csv")
-    score_parser.add_argument("--model-weight", type=float, default=0.45)
-    score_parser.add_argument("--market-weight", type=float, default=0.55)
-    score_parser.add_argument("--temperature", type=float, default=2.0, help="Softmax temperature (default 2.0)")
+    score_parser.add_argument("--model-weight", type=float, default=None)
+    score_parser.add_argument("--market-weight", type=float, default=None)
+    score_parser.add_argument("--temperature", type=float, default=None, help="Softmax temperature (overrides weights file)")
+    score_parser.add_argument("--weights", default=None, help="Path to weights JSON file (default: data/weights.json if it exists)")
     score_parser.add_argument("--out-csv")
 
     score_meeting_parser = subparsers.add_parser("score-meeting", help="Score all races in a meeting and print fair odds tables")
@@ -108,9 +126,10 @@ def main() -> None:
     score_meeting_parser.add_argument("--min-prob", type=float, default=0.0)
     score_meeting_parser.add_argument("--max-prob", type=float, default=1.0)
     score_meeting_parser.add_argument("--market-csv")
-    score_meeting_parser.add_argument("--model-weight", type=float, default=0.45)
-    score_meeting_parser.add_argument("--market-weight", type=float, default=0.55)
-    score_meeting_parser.add_argument("--temperature", type=float, default=2.0, help="Softmax temperature (default 2.0)")
+    score_meeting_parser.add_argument("--model-weight", type=float, default=None)
+    score_meeting_parser.add_argument("--market-weight", type=float, default=None)
+    score_meeting_parser.add_argument("--temperature", type=float, default=None, help="Softmax temperature (overrides weights file)")
+    score_meeting_parser.add_argument("--weights", default=None, help="Path to weights JSON file (default: data/weights.json if it exists)")
     score_meeting_parser.add_argument("--out-csv")
 
     calibrate_parser = subparsers.add_parser("calibrate-temperature", help="Sweep softmax temperatures and report log loss against stored results")
@@ -212,6 +231,7 @@ def main() -> None:
     elif args.command == "score-race":
         rows = load_feature_rows(args.csv)
         market_rows = load_market_rows(args.market_csv) if args.market_csv else None
+        weights = _resolve_weights(getattr(args, "weights", None))
         scored = score_race_rows(
             rows,
             args.meeting_code,
@@ -222,6 +242,7 @@ def main() -> None:
             model_weight=args.model_weight,
             market_weight=args.market_weight,
             temperature=args.temperature,
+            weights=weights,
         )
         if args.out_csv:
             out_path = write_scored_rows_csv(
@@ -236,6 +257,7 @@ def main() -> None:
     elif args.command == "score-meeting":
         rows = load_feature_rows(args.csv)
         market_rows = load_market_rows(args.market_csv) if args.market_csv else None
+        weights = _resolve_weights(getattr(args, "weights", None))
         scored = score_meeting_rows(
             rows,
             args.meeting_code,
@@ -245,6 +267,7 @@ def main() -> None:
             model_weight=args.model_weight,
             market_weight=args.market_weight,
             temperature=args.temperature,
+            weights=weights,
         )
         if args.out_csv:
             out_path = write_scored_rows_csv(
