@@ -71,6 +71,22 @@ def serve_site(site_dir: str | Path = "data/site", host: str = "127.0.0.1", port
         server.server_close()
 
 
+def _track_from_raw_title(raw_title: str | None) -> str | None:
+    if not raw_title:
+        return None
+    prefix = "form guide for "
+    lower = raw_title.lower()
+    if prefix not in lower:
+        return None
+    name = raw_title[lower.index(prefix) + len(prefix):]
+    for sep in ("\xa0", "  "):
+        if sep in name:
+            name = name[: name.index(sep)]
+    if " at " in name:
+        name = name.split(" at ")[0]
+    return name.strip() or None
+
+
 def _load_meeting_metadata(conn: sqlite3.Connection, meeting_code: str) -> dict[str, Any]:
     row = conn.execute(
         """
@@ -83,7 +99,10 @@ def _load_meeting_metadata(conn: sqlite3.Connection, meeting_code: str) -> dict[
     ).fetchone()
     if row is None:
         return {"meeting_code": meeting_code, "meeting_date": None, "track_name": None, "state": None, "raw_title": None}
-    return dict(row)
+    result = dict(row)
+    if not result.get("track_name"):
+        result["track_name"] = _track_from_raw_title(result.get("raw_title"))
+    return result
 
 
 def _load_results(conn: sqlite3.Connection, meeting_code: str) -> dict[int, dict[str, dict[str, Any]]]:
@@ -222,7 +241,7 @@ def _render_meeting_html(
     meeting_meta: dict[str, Any],
     result_rows: dict[int, dict[str, dict[str, Any]]],
 ) -> str:
-    meeting_title = " ".join(part for part in [meeting_meta.get("track_name"), meeting_meta.get("meeting_date")] if part) or meeting_code
+    meeting_title = " — ".join(part for part in [meeting_meta.get("track_name"), meeting_meta.get("meeting_date")] if part) or meeting_code
     generated = datetime.now().strftime("%d %b %Y %H:%M")
     race_nav = "".join(
         f'<a href="#race-{race_number}">Race {race_number}</a>'
@@ -258,9 +277,9 @@ def _render_meeting_html(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{html.escape(meeting_code)} - Harness Odds Viewer</title>
-<style>
-    :root {
+  <title>{html.escape(meeting_title)}</title>
+  <style>
+    :root {{
       /* Modern Deep & Crisp Palette */
       --bg: #f8fafc;
       --card-bg: #ffffff;
@@ -274,27 +293,27 @@ def _render_meeting_html(
       --pick-text: #0369a1;  /* Sky 700 */
       --winner-bg: #f0fdf4;
       --highlight: #f1f5f9;
-    }
+    }}
 
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    * {{ box-sizing: border-box; }}
+    html {{ scroll-behavior: smooth; }}
 
-    body {
+    body {{
       margin: 0;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       color: var(--primary);
       background-color: var(--bg);
       line-height: 1.5;
-    }
+    }}
 
-    .wrap { 
+    .wrap {{ 
       max-width: 1200px; 
       margin: 0 auto; 
       padding: 40px 20px; 
-    }
+    }}
 
     /* Hero Section */
-    .hero {
+    .hero {{
       background: var(--primary);
       color: white;
       border-radius: 24px;
@@ -303,18 +322,18 @@ def _render_meeting_html(
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
       position: relative;
       overflow: hidden;
-    }
+    }}
 
-    .hero::after {
+    .hero::after {{
       content: "";
       position: absolute;
       top: 0; right: 0;
       width: 300px; height: 300px;
       background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
       pointer-events: none;
-    }
+    }}
 
-    .eyebrow {
+    .eyebrow {{
       display: inline-block;
       padding: 4px 12px;
       border-radius: 6px;
@@ -325,37 +344,37 @@ def _render_meeting_html(
       letter-spacing: 0.05em;
       text-transform: uppercase;
       margin-bottom: 16px;
-    }
+    }}
 
-    h1 { margin: 0; font-size: 42px; font-weight: 800; letter-spacing: -0.02em; }
-    .sub { color: var(--secondary); font-size: 16px; margin-top: 8px; font-weight: 400; }
+    h1 {{ margin: 0; font-size: 42px; font-weight: 800; letter-spacing: -0.02em; }}
+    .sub {{ color: var(--secondary); font-size: 16px; margin-top: 8px; font-weight: 400; }}
 
-    .summary-grid {
+    .summary-grid {{
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 16px;
       margin-top: 32px;
-    }
+    }}
 
-    .summary-card {
+    .summary-card {{
       background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.1);
       border-radius: 12px;
       padding: 16px;
-    }
+    }}
 
-    .summary-card .label { 
+    .summary-card .label {{ 
       display: block;
       font-size: 11px; 
       color: var(--secondary); 
       text-transform: uppercase; 
       letter-spacing: 0.05em;
       margin-bottom: 4px;
-    }
-    .summary-card .value { font-size: 18px; font-weight: 600; color: white; }
+    }}
+    .summary-card .value {{ font-size: 18px; font-weight: 600; color: white; }}
 
     /* Navigation */
-    .race-nav {
+    .race-nav {{
       position: sticky;
       top: 16px;
       z-index: 50;
@@ -369,11 +388,11 @@ def _render_meeting_html(
       border: 1px solid var(--border);
       border-radius: 16px;
       scrollbar-width: none;
-    }
+    }}
 
-    .race-nav::-webkit-scrollbar { display: none; }
+    .race-nav::-webkit-scrollbar {{ display: none; }}
 
-    .race-nav a {
+    .race-nav a {{
       text-decoration: none;
       white-space: nowrap;
       color: var(--secondary);
@@ -383,15 +402,15 @@ def _render_meeting_html(
       font-size: 14px;
       font-weight: 600;
       transition: all 0.2s;
-    }
+    }}
 
-    .race-nav a:hover {
+    .race-nav a:hover {{
       background: var(--highlight);
       color: var(--primary);
-    }
+    }}
 
     /* Race Cards */
-    .race-card {
+    .race-card {{
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 20px;
@@ -399,67 +418,67 @@ def _render_meeting_html(
       margin-bottom: 32px;
       overflow: hidden;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    }
+    }}
 
-    .race-head {
+    .race-head {{
       padding: 24px 32px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
       background: #fafafa;
-    }
+    }}
 
-    .race-head h2 { margin: 0; font-size: 24px; font-weight: 700; color: var(--primary); }
-    .race-head .top-pick { 
+    .race-head h2 {{ margin: 0; font-size: 24px; font-weight: 700; color: var(--primary); }}
+    .race-head .top-pick {{ 
       font-size: 14px; 
       background: var(--accent-soft); 
       color: var(--accent-dark);
       padding: 6px 14px;
       border-radius: 99px;
       font-weight: 600;
-    }
+    }}
 
     /* Tables */
-    table {
+    table {{
       width: 100%;
       border-collapse: collapse;
-    }
+    }}
 
-    th, td {
+    th, td {{
       padding: 16px 20px;
       text-align: left;
       font-size: 14px;
       border-bottom: 1px solid var(--border);
-    }
+    }}
 
-    th {
+    th {{
       background: white;
       color: var(--secondary);
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-    }
+    }}
 
-    tr:last-child td { border-bottom: none; }
-    tr:hover { background-color: var(--highlight); }
+    tr:last-child td {{ border-bottom: none; }}
+    tr:hover {{ background-color: var(--highlight); }}
 
     /* Special Rows */
-    tr.top-pick-row { background: var(--pick-bg); }
-    tr.top-pick-row:hover { background: #e0f2fe; }
-    tr.result-winner { background: var(--winner-bg); }
+    tr.top-pick-row {{ background: var(--pick-bg); }}
+    tr.top-pick-row:hover {{ background: #e0f2fe; }}
+    tr.result-winner {{ background: var(--winner-bg); }}
 
-    .horse-cell {
+    .horse-cell {{
       display: flex;
       flex-direction: column;
       gap: 2px;
-    }
+    }}
 
-    .horse-cell strong { font-size: 15px; color: var(--primary); }
-    .horse-cell .meta { color: var(--secondary); font-size: 12px; }
+    .horse-cell strong {{ font-size: 15px; color: var(--primary); }}
+    .horse-cell .meta {{ color: var(--secondary); font-size: 12px; }}
 
-    .pill {
+    .pill {{
       display: inline-block;
       margin-top: 4px;
       padding: 2px 8px;
@@ -467,59 +486,59 @@ def _render_meeting_html(
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-    }
-    .pill.pick { background: var(--pick-text); color: white; }
-    .pill.win { background: var(--accent); color: white; }
+    }}
+    .pill.pick {{ background: var(--pick-text); color: white; }}
+    .pill.win {{ background: var(--accent); color: white; }}
 
-    .muted { color: var(--secondary); opacity: 0.5; }
+    .muted {{ color: var(--secondary); opacity: 0.5; }}
 
     /* Mobile Adaptations */
-    @media (max-width: 1024px) {
-      th, td { padding: 12px 10px; font-size: 13px; }
-    }
+    @media (max-width: 1024px) {{
+      th, td {{ padding: 12px 10px; font-size: 13px; }}
+    }}
 
-    @media (max-width: 820px) {
-      .wrap { padding: 20px 10px; }
-      h1 { font-size: 32px; }
-      .hero { padding: 24px; border-radius: 16px; }
+    @media (max-width: 820px) {{
+      .wrap {{ padding: 20px 10px; }}
+      h1 {{ font-size: 32px; }}
+      .hero {{ padding: 24px; border-radius: 16px; }}
       
-      .race-card { border-radius: 12px; }
-      .race-head { padding: 16px; flex-direction: column; align-items: flex-start; gap: 10px; }
+      .race-card {{ border-radius: 12px; }}
+      .race-head {{ padding: 16px; flex-direction: column; align-items: flex-start; gap: 10px; }}
 
-      table, thead, tbody, th, td, tr { display: block; }
-      thead { display: none; }
+      table, thead, tbody, th, td, tr {{ display: block; }}
+      thead {{ display: none; }}
       
-      tr {
+      tr {{
         padding: 16px;
         border-bottom: 4px solid var(--bg);
-      }
+      }}
       
-      td {
+      td {{
         border: 0;
         padding: 4px 0;
         display: flex;
         justify-content: space-between;
         align-items: center;
-      }
+      }}
 
-      td::before {
+      td::before {{
         content: attr(data-label);
         font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
         color: var(--secondary);
-      }
+      }}
 
-      .horse-cell { align-items: flex-end; text-align: right; }
-    }
+      .horse-cell {{ align-items: flex-end; text-align: right; }}
+    }}
   </style>
 </head>
 <body>
   <div class="wrap">
     <section class="hero">
-      <span class="eyebrow">Meeting Viewer</span>
+      <span class="eyebrow">{html.escape(meeting_code)}</span>
       <h1>{html.escape(meeting_title)}</h1>
-      <p class="sub">Light shareable page for score-meeting output and any official results already stored locally.</p>
+      <p class="sub">Harness Racing Model — Fair Odds &amp; Probabilities</p>
       <div class="summary-grid">{summary_html}</div>
     </section>
     <nav class="race-nav">

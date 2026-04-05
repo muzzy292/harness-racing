@@ -19,6 +19,21 @@ TRACK_NAME_MAP = {
     "BATHURST": "Bathurst",
     "GOULBUR": "Goulburn",
     "GOULBURN": "Goulburn",
+    "NEWCAST": "Newcastle",
+    "NEWCASTLE": "Newcastle",
+    "NARRABRI": "Narrabri",
+    "PARKES": "Parkes",
+    "WAGGA": "Wagga",
+    "TAMWRTH": "Tamworth",
+    "TAMWORTH": "Tamworth",
+    "TEMORA": "Temora",
+    "MARBURG": "Marburg",
+    "MARYBRO": "Maryborough",
+    "MARYBORO": "Maryborough",
+    "MELTON": "Melton",
+    "KILMORE": "Kilmore",
+    "HORSHAM": "Horsham",
+    "BENDIGO": "Bendigo",
 }
 
 TRACK_CODE_MAP = {
