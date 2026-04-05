@@ -67,10 +67,15 @@ def score_race_rows(
     field_lead_probs = _softmax(_lead_raw, temperature=1.0)
     field_death_probs = _softmax(_death_raw, temperature=1.0)
 
+    # pace_pressure measures how contested the pace is.
+    # When one horse dominates (high max lead prob) pressure is low → uncontested leader.
+    # When several horses compete (low max lead prob) pressure is high → contested pace.
+    pace_pressure = 1.0 - max(field_lead_probs)
+
     enriched = []
     for i, row in enumerate(race_rows):
         s1 = _stage1_components(row)
-        s2 = _stage2_components(row, field_lead_prob=field_lead_probs[i], field_death_prob=field_death_probs[i])
+        s2 = _stage2_components(row, field_lead_prob=field_lead_probs[i], field_death_prob=field_death_probs[i], pace_pressure=pace_pressure)
         stage1_score = round(sum(s1.values()), 4)
         stage2_score = round(sum(s2.values()), 4)
         enriched.append(
@@ -294,6 +299,7 @@ def _stage2_components(
     row: dict[str, str],
     field_lead_prob: float | None = None,
     field_death_prob: float | None = None,
+    pace_pressure: float = 0.0,
 ) -> dict[str, float]:
     """Stage 2 — Today's race adjustment.
 
@@ -305,9 +311,14 @@ def _stage2_components(
     field so that only one horse can realistically lead.  Weights are scaled up
     (×2.0 / ×1.2) vs the old raw-score weights to preserve a similar contribution
     to the total score despite the probability (0–1) input range.
+
+    pace_pressure = 1.0 - max(field_lead_probs): 0 when one horse clearly leads
+    (uncontested), approaches 1.0 when pace is contested across multiple horses.
+    Used to boost soft-trip horses and restrained backmarkers in contested fields.
     """
     map_soft = _to_float(row.get("map_soft_trip_score"))
     map_wide = _to_float(row.get("map_wide_risk_score"))
+    style_restrained_rate = _to_float(row.get("style_restrained_rate"))
     barrier = row.get("barrier") or ""
     nr_grade_delta = _to_float(row.get("nr_grade_delta"))
     bmr_dist_rge = _to_float(row.get("form_bmr_dist_rge_secs"))
@@ -329,6 +340,14 @@ def _stage2_components(
         # contribution for a typical uncontested leader / single death-seat horse.
         "map_lead":     (field_lead_prob or 0.0) * 2.0,
         "map_soft":     (map_soft or 0.0) * 0.45,
+        # Soft-trip horses get an extra bonus when pace is genuinely contested —
+        # sitting behind a tired, pressured leader is better than an uncontested one.
+        # Only fires when pace_pressure > 0; weight 0.3 keeps total soft influence reasonable.
+        "map_soft_context": (map_soft or 0.0) * pace_pressure * 0.3,
+        # Backmarker bonus when pace is contested — restrained-style horses benefit
+        # from speed duels (fast early, tired late). Only kicks in at pace_pressure > 0.4
+        # to avoid rewarding backmarkers in genuinely uncontested fields.
+        "pace_backmarker": (style_restrained_rate or 0.0) * max(0.0, pace_pressure - 0.4) * 0.6,
         "map_wide":    -(map_wide or 0.0) * 0.5,
         "map_death":   -(field_death_prob or 0.0) * 1.2,
         # BMR at race distance — faster (lower seconds) = better.
