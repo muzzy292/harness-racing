@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python -c \":*)",
-      "WebFetch(domain:www.harness.org.au)"
+      "WebFetch(domain:www.harness.org.au)",
+      "Bash(python -c:*)",
+      "Bash(python -m harness_model.cli score-meeting --csv data/features/runner_features.csv --meeting-code NA050426 --publish)"
     ]
   }
 }
