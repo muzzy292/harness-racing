@@ -186,8 +186,11 @@ def _build_feature_row(
     # happen to have NR data (often the worst-performing ones).
     # The metric is only output when ≥1 line was actually NR-adjusted (otherwise it
     # would be identical to recent_line_avg_adj_margin and add no value).
-    # Capped at 0.0 (a win is a win regardless of grade).
-    class_adj_recent_margins: list[float] = []
+    # For avg: floor at 0.0 so a single standout run doesn't dominate the average.
+    # For ceiling (best): uncapped — a win in a tougher grade should produce a
+    # negative class-adj margin (better than par), which _neg_scale rewards positively.
+    class_adj_recent_margins: list[float] = []       # capped at 0.0 — used for avg
+    class_adj_recent_margins_raw: list[float] = []   # uncapped — used for ceiling
     _class_adj_nr_count = 0
     if race_nr_ceiling is not None:
         for line in valid_recent_lines[:5]:
@@ -197,12 +200,13 @@ def _build_feature_row(
             if margin > 50.0:
                 continue
             if line.get("line_nr_ceiling") is not None:
-                class_adj_recent_margins.append(
-                    max(0.0, margin - (float(line["line_nr_ceiling"]) - race_nr_ceiling) * _NR_MARGIN_FACTOR)
-                )
+                adj = margin - (float(line["line_nr_ceiling"]) - race_nr_ceiling) * _NR_MARGIN_FACTOR
+                class_adj_recent_margins.append(max(0.0, adj))
+                class_adj_recent_margins_raw.append(adj)
                 _class_adj_nr_count += 1
             else:
                 class_adj_recent_margins.append(margin)
+                class_adj_recent_margins_raw.append(margin)
     raw_run_purses = [line["run_purse"] for line in recent_lines if line.get("run_purse") is not None]
     capped_run_purses = _cap_outlier_stakes([float(p) for p in raw_run_purses])
     avg_recent_run_purse = _avg(capped_run_purses[:5])
@@ -296,7 +300,7 @@ def _build_feature_row(
         "avg_recent_nr_ceiling": avg_recent_nr_ceiling,
         "nr_grade_delta": nr_grade_delta,
         "recent_line_avg_class_adj_margin": _avg(class_adj_recent_margins) if (len(class_adj_recent_margins) >= 2 and _class_adj_nr_count >= 1) else None,
-        "recent_line_best_class_adj_margin": min(class_adj_recent_margins) if (_class_adj_nr_count >= 1 and class_adj_recent_margins) else None,
+        "recent_line_best_class_adj_margin": min(class_adj_recent_margins_raw) if (_class_adj_nr_count >= 1 and class_adj_recent_margins_raw) else None,
         "race_purse": race_purse,
         "avg_recent_run_purse": avg_recent_run_purse,
         "class_delta": class_delta,
