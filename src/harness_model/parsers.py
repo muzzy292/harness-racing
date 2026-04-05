@@ -941,8 +941,7 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
 
     raw_purse = results_match.group("purse")
     purse = float(raw_purse.replace(",", "")) if raw_purse else None
-    nr_ceiling_match = re.search(r'NR\s+up\s+to\s+(\d+)', line_html, re.IGNORECASE)
-    line_nr_ceiling = int(nr_ceiling_match.group(1)) if nr_ceiling_match else None
+    line_nr_ceiling = _parse_line_nr_ceiling(line_html)
     return {
         "form_place": form_place_match.group("form_place"),
         "track_code": results_match.group("track"),
@@ -957,6 +956,27 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
         "purse": purse,
         "line_nr_ceiling": line_nr_ceiling,
     }
+
+
+def _parse_line_nr_ceiling(line_html: str) -> int | None:
+    """Extract the NR ceiling from a form-line HTML snippet.
+
+    Handles all three formats used on harness.org.au:
+      NR up to 45     → 45
+      NR 40 to 43     → 43  (banded race, ceiling is upper bound)
+      NR.45           → 45  (LTW format)
+    Returns None for non-NR classes (Maiden, R-grades, etc.).
+    """
+    m = re.search(r'NR\s+up\s+to\s+(\d+)', line_html, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    m = re.search(r'NR\s+(\d+)\s+to\s+(\d+)', line_html, re.IGNORECASE)
+    if m:
+        return int(m.group(2))
+    m = re.search(r'NR\.(\d+)', line_html, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    return None
 
 
 def _normalize_compact_date(value: str) -> str:
