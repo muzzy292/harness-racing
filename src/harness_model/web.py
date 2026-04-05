@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import html
+import json
 import os
 import sqlite3
+import subprocess
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -53,7 +55,7 @@ def build_meeting_site(
         _render_meeting_html(meeting_code, meeting_scores, meeting_meta, result_rows),
         encoding="utf-8",
     )
-    _write_index(out_path)
+    _write_index(out_path, meeting_meta=meeting_meta)
     return page_path
 
 
@@ -102,15 +104,45 @@ def _load_results(conn: sqlite3.Connection, meeting_code: str) -> dict[int, dict
     return results
 
 
-def _write_index(out_dir: Path) -> None:
-    meeting_pages = sorted(path for path in out_dir.glob("*.html") if path.name.lower() != "index.html")
+def _write_index(out_dir: Path, meeting_meta: dict[str, Any] | None = None) -> None:
+    manifest_path = out_dir / "meetings.json"
+    if manifest_path.exists():
+        manifest: list[dict[str, Any]] = json.loads(manifest_path.read_text(encoding="utf-8"))
+    else:
+        manifest = []
+
+    if meeting_meta:
+        code = meeting_meta.get("meeting_code", "")
+        existing = next((m for m in manifest if m.get("meeting_code") == code), None)
+        if existing:
+            existing.update({k: meeting_meta[k] for k in ("track_name", "meeting_date") if meeting_meta.get(k)})
+        else:
+            manifest.append({
+                "meeting_code": code,
+                "track_name": meeting_meta.get("track_name"),
+                "meeting_date": meeting_meta.get("meeting_date"),
+            })
+        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    # Fall back to filesystem scan for any HTML files not yet in manifest
+    known_codes = {m["meeting_code"] for m in manifest}
+    for page in sorted(out_dir.glob("*.html")):
+        if page.stem.upper() in known_codes or page.name.lower() == "index.html":
+            continue
+        manifest.append({"meeting_code": page.stem.upper(), "track_name": None, "meeting_date": None})
+
+    manifest_sorted = sorted(manifest, key=lambda m: m.get("meeting_date") or "", reverse=True)
     cards: list[str] = []
-    for page in meeting_pages:
-        code = page.stem.upper()
+    for m in manifest_sorted:
+        code = m["meeting_code"]
+        track = html.escape(m.get("track_name") or "")
+        date = html.escape(m.get("meeting_date") or "")
+        meta_line = " · ".join(part for part in [date, track] if part)
         cards.append(
             f"""
-            <a class="meeting-card" href="{html.escape(page.name)}">
+            <a class="meeting-card" href="{html.escape(code)}.html">
               <span class="meeting-code">{html.escape(code)}</span>
+              {f'<span class="meeting-meta">{meta_line}</span>' if meta_line else ''}
               <span class="meeting-link">Open meeting page</span>
             </a>
             """
@@ -166,6 +198,7 @@ def _write_index(out_dir: Path) -> None:
       box-shadow: 0 16px 36px rgba(97, 76, 43, 0.14);
     }}
     .meeting-code {{ font-size: 24px; font-weight: 700; letter-spacing: 0.04em; }}
+    .meeting-meta {{ color: var(--muted); font-size: 13px; }}
     .meeting-link {{ color: var(--accent); font-size: 15px; }}
   </style>
 </head>
@@ -458,6 +491,8 @@ def _render_race_section(
               <td data-label="Barrier">{html.escape(str(row.get('barrier') or ''))}</td>
               <td data-label="Prob">{_fmt_prob(row.get('win_probability'))}</td>
               <td data-label="Fair Odds">{_fmt_decimal(row.get('fair_odds'))}</td>
+              <td data-label="S1">{_fmt_signed(row.get('stage1_score'))}</td>
+              <td data-label="S2">{_fmt_signed(row.get('stage2_score'))}</td>
               <td data-label="Score">{_fmt_decimal(row.get('score'), places=4)}</td>
               <td data-label="Rel">{_fmt_signed(row.get('relative_score'))}</td>
               <td data-label="Result">{finish if finish is not None else '<span class="muted">-</span>'}</td>
@@ -483,6 +518,8 @@ def _render_race_section(
             <th>Barrier</th>
             <th>Prob</th>
             <th>Fair Odds</th>
+            <th>S1</th>
+            <th>S2</th>
             <th>Score</th>
             <th>Rel</th>
             <th>Result</th>
@@ -530,3 +567,53 @@ def _fmt_runner_number(value: object) -> str:
 
 def _normalise_name(value: str) -> str:
     return " ".join(value.upper().split())
+
+
+def publish_scored_meeting(
+    meeting_code: str,
+    meeting_scores: dict[int, list[dict[str, object]]],
+    db_path: str | Path = "data/harness.db",
+    docs_dir: str | Path = "docs",
+) -> None:
+    """Write scored meeting HTML to docs/ and push to GitHub Pages.
+
+    Takes already-scored data from score_meeting_rows so there is no
+    double-scoring. Loads meeting metadata and result rows from the DB,
+    generates the HTML, updates the index, then runs git add/commit/push.
+    """
+    repo_root = Path(__file__).parents[2]
+    docs = Path(docs_dir) if Path(docs_dir).is_absolute() else (repo_root / docs_dir)
+    docs.mkdir(parents=True, exist_ok=True)
+
+    conn = connect(db_path)
+    init_db(conn)
+    meeting_meta = _load_meeting_metadata(conn, meeting_code)
+    result_rows = _load_results(conn, meeting_code)
+    conn.close()
+
+    page_path = docs / f"{meeting_code}.html"
+    page_path.write_text(
+        _render_meeting_html(meeting_code, meeting_scores, meeting_meta, result_rows),
+        encoding="utf-8",
+    )
+    _write_index(docs, meeting_meta=meeting_meta)
+
+    print(f"  Written {page_path.relative_to(repo_root)}")
+
+    try:
+        subprocess.run(["git", "add", str(docs)], check=True, cwd=repo_root)
+        commit = subprocess.run(
+            ["git", "commit", "-m", f"Publish {meeting_code} scores"],
+            cwd=repo_root,
+        )
+        if commit.returncode not in (0, 1):
+            print(f"  Warning: git commit exited with code {commit.returncode}")
+            return
+        push = subprocess.run(["git", "push"], cwd=repo_root)
+        if push.returncode == 0:
+            print(f"  Pushed to GitHub. Your page will be live at:")
+            print(f"  https://<your-username>.github.io/<repo-name>/{meeting_code}.html")
+        else:
+            print(f"  Warning: git push failed (exit {push.returncode}). Check remote is configured.")
+    except FileNotFoundError:
+        print("  Warning: git not found on PATH — HTML written but not pushed.")

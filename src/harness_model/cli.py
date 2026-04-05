@@ -34,7 +34,7 @@ from .odds import (
     score_race_rows,
     write_scored_rows_csv,
 )
-from .web import build_meeting_site, serve_site
+from .web import build_meeting_site, publish_scored_meeting, serve_site
 
 
 _DEFAULT_WEIGHTS_PATH = Path("weights.json")
@@ -132,6 +132,8 @@ def main() -> None:
     score_meeting_parser.add_argument("--temperature", type=float, default=None, help="Softmax temperature (overrides weights file)")
     score_meeting_parser.add_argument("--weights", default=None, help="Path to weights JSON file (default: data/weights.json if it exists)")
     score_meeting_parser.add_argument("--out-csv")
+    score_meeting_parser.add_argument("--publish", action="store_true", help="Write HTML to docs/ and push to GitHub Pages")
+    score_meeting_parser.add_argument("--db", default="data/harness.db", help="Database path (used with --publish for meeting metadata)")
 
     calibrate_parser = subparsers.add_parser("calibrate-temperature", help="Sweep softmax temperatures and report log loss against stored results")
     calibrate_parser.add_argument("--csv", default="data/features/runner_features.csv")
@@ -295,6 +297,12 @@ def main() -> None:
             )
             print(f"Saved meeting odds CSV to {out_path}")
         print(render_meeting_odds(scored, args.meeting_code))
+        if getattr(args, "publish", False):
+            publish_scored_meeting(
+                args.meeting_code,
+                scored,
+                db_path=args.db,
+            )
     elif args.command == "scratch-horse":
         conn = connect(args.db)
         scratched = db_scratch_horse(conn, args.meeting_code, args.horse_name, race_number=args.race_number)
