@@ -1116,9 +1116,16 @@ def _parse_recent_line_margin(value: str, finish_position: int | None) -> float 
     plain = _clean_spaces(value).lower()
     if finish_position == 1:
         return 0.0
+    # Explicit numeric margin: "btn 9.9m"
     match = re.search(r"btn\s+([\d\.]+)m", plain)
     if match:
         return float(match.group(1))
+    # Short-head margin codes immediately after "btn" — must be caught before the
+    # fallback regex, which would otherwise match the track distance (e.g. 1980ms).
+    match = re.search(r"btn\s+(shfhd|hfhd|sh|hd)\b", plain)
+    if match:
+        return 0.05 if match.group(1) == "shfhd" else 0.1
+    # Structured line format: "$price, margin, wnr/Nth"
     match = re.search(r"\$\d+(?:\.\d{2})?,\s*([\d\.]+m|hd|hfhd|shfhd|sh)\s*,\s*(?:wnr|\d+(?:st|nd|rd|th))", plain)
     if match:
         plain = match.group(1)
@@ -1126,8 +1133,13 @@ def _parse_recent_line_margin(value: str, finish_position: int | None) -> float 
         return 0.1
     if plain == "shfhd":
         return 0.05
+    # Last-resort fallback — capped at 50m to prevent track distances (e.g. 1609m,
+    # 1980m) from being mistaken for margins when other patterns fail.
     match = re.search(r"([\d\.]+)m", plain)
-    return float(match.group(1)) if match else None
+    if match:
+        val = float(match.group(1))
+        return val if val <= 50.0 else None
+    return None
 
 
 def _is_excluded_race(race_name: str | None) -> bool:

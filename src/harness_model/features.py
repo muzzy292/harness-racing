@@ -112,7 +112,10 @@ def _build_feature_row(
     recent_lines: list[dict[str, object]],
     track_pars: dict | None,
 ) -> dict[str, object]:
-    adjusted = [run["adjusted_margin"] for run in last_runs if run["adjusted_margin"] is not None]
+    # Cap at 50m — values above this are almost always a parser mis-parse
+    # (track distance matching the fallback regex). Legitimate harness margins
+    # rarely exceed 40m; any higher value corrupts averages and floors scores.
+    adjusted = [run["adjusted_margin"] for run in last_runs if run["adjusted_margin"] is not None and run["adjusted_margin"] <= 50.0]
     prices = [run["start_price"] for run in last_runs if run["start_price"] is not None]
     wins = [run for run in last_runs if run["finish_position"] == 1]
     same_driver_runs = [
@@ -131,7 +134,7 @@ def _build_feature_row(
     tempo_flag_count = sum(1 for line in recent_lines if _to_float_local(line.get("tempo_adjustment")) not in (None, 0.0))
     null_line_count = sum(1 for line in recent_lines if _truthy(line.get("null_run")))
     raw_recent_margins = [float(line["raw_margin"]) for line in valid_recent_lines if line.get("raw_margin") not in (None, "")]
-    adj_recent_margins = [float(line["adjusted_margin"]) for line in valid_recent_lines if line.get("adjusted_margin") not in (None, "")]
+    adj_recent_margins = [float(line["adjusted_margin"]) for line in valid_recent_lines if line.get("adjusted_margin") not in (None, "") and float(line["adjusted_margin"]) <= 50.0]
     primary_adj_margins = adjusted if adjusted else adj_recent_margins
     primary_prices = prices
     primary_win_rate_source = wins if last_runs else [line for line in valid_recent_lines if line.get("finish_position") == 1]
