@@ -42,6 +42,21 @@
       "problemMatcher": []
     },
     {
+      "label": "Score and Publish",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "harness_model.cli",
+        "score-meeting",
+        "--csv", "data/features/runner_features.csv",
+        "--meeting-code", "${input:meetingCode}",
+        "--db", "data/harness.db",
+        "--publish"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
       "label": "Fetch Horses",
       "type": "shell",
       "command": "python",
