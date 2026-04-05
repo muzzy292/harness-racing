@@ -10,6 +10,13 @@ from pathlib import Path
 
 from .track_pars import lookup_race_par
 
+# Metres of margin adjustment per NR point of grade difference.
+# A horse that ran in NR43 dropping to NR40 gets each margin reduced by 3 * factor.
+# Calibration starting point — adjust against results once ≥30 grade-drop winners
+# have been observed.
+_NR_MARGIN_FACTOR = 0.5
+
+
 def install_sqlite_helpers(conn: sqlite3.Connection) -> None:
     conn.create_function("_sort_run_date", 1, _sort_run_date)
 
@@ -170,6 +177,32 @@ def _build_feature_row(
     avg_recent_nr_ceiling = _avg(recent_line_nr_ceilings) if len(recent_line_nr_ceilings) >= 2 else None
     # Negative = dropping in grade (today's ceiling lower than recent), positive = rising.
     nr_grade_delta = round(race_nr_ceiling - avg_recent_nr_ceiling, 1) if (race_nr_ceiling is not None and avg_recent_nr_ceiling is not None) else None
+    # Class-adjusted margins — each recent-line margin is shifted by the NR grade
+    # difference between that run and today's race.  A horse that ran 15m back in NR43
+    # competing today in NR40 gets 1.5m reduction (3 pts × 0.5 factor); a horse that
+    # ran 15m back in NR37 now going up to NR40 gets +1.5m added.
+    # Lines WITHOUT line_nr_ceiling are included unadjusted so the full 5-run window
+    # is preserved — excluding them causes selection bias toward the runs where we
+    # happen to have NR data (often the worst-performing ones).
+    # The metric is only output when ≥1 line was actually NR-adjusted (otherwise it
+    # would be identical to recent_line_avg_adj_margin and add no value).
+    # Capped at 0.0 (a win is a win regardless of grade).
+    class_adj_recent_margins: list[float] = []
+    _class_adj_nr_count = 0
+    if race_nr_ceiling is not None:
+        for line in valid_recent_lines[:5]:
+            if line.get("adjusted_margin") in (None, ""):
+                continue
+            margin = float(line["adjusted_margin"])
+            if margin > 50.0:
+                continue
+            if line.get("line_nr_ceiling") is not None:
+                class_adj_recent_margins.append(
+                    max(0.0, margin - (float(line["line_nr_ceiling"]) - race_nr_ceiling) * _NR_MARGIN_FACTOR)
+                )
+                _class_adj_nr_count += 1
+            else:
+                class_adj_recent_margins.append(margin)
     raw_run_purses = [line["run_purse"] for line in recent_lines if line.get("run_purse") is not None]
     capped_run_purses = _cap_outlier_stakes([float(p) for p in raw_run_purses])
     avg_recent_run_purse = _avg(capped_run_purses[:5])
@@ -261,6 +294,8 @@ def _build_feature_row(
         "nr_headroom": nr_headroom,
         "avg_recent_nr_ceiling": avg_recent_nr_ceiling,
         "nr_grade_delta": nr_grade_delta,
+        "recent_line_avg_class_adj_margin": _avg(class_adj_recent_margins) if (len(class_adj_recent_margins) >= 2 and _class_adj_nr_count >= 1) else None,
+        "recent_line_best_class_adj_margin": min(class_adj_recent_margins) if (_class_adj_nr_count >= 1 and class_adj_recent_margins) else None,
         "race_purse": race_purse,
         "avg_recent_run_purse": avg_recent_run_purse,
         "class_delta": class_delta,

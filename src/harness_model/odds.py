@@ -223,6 +223,8 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
     best_adj = _to_float(row.get("last_5_best_adj_margin"))
     recent_line_adj = _to_float(row.get("recent_line_avg_adj_margin"))
     recent_line_best = _to_float(row.get("recent_line_best_adj_margin"))
+    class_adj_margin = _to_float(row.get("recent_line_avg_class_adj_margin"))
+    class_adj_best = _to_float(row.get("recent_line_best_class_adj_margin"))
     avg_sp = _to_float(row.get("last_5_avg_sp"))
     win_rate = _to_float(row.get("last_5_win_rate"))
     top3_rate = _to_float(row.get("last_5_top3_rate"))
@@ -239,11 +241,16 @@ def _stage1_components(row: dict[str, str]) -> dict[str, float]:
     class_delta = _to_float(row.get("class_delta"))
     career_win_rate = _to_float(row.get("career_win_rate"))
 
-    # Horse-page run data takes priority over form-page recent lines —
-    # they should not stack.
+    # Priority for consistency/ceiling:
+    # 1. Class-adjusted recent-line margins — same data as recent_line_adj but each
+    #    margin is shifted by the NR grade difference (run grade vs today's race grade).
+    #    Contains the most information when available (≥2 lines with NR ceiling data).
+    # 2. Horse-page run data — more runs, more reliable, but no per-run grade context.
+    # 3. Form-page recent lines — fallback when no profile has been fetched.
     has_horse_data = last5_adj is not None
-    consistency_adj = last5_adj if has_horse_data else recent_line_adj
-    ceiling_adj     = best_adj  if has_horse_data else recent_line_best
+    has_class_data = class_adj_margin is not None
+    consistency_adj = class_adj_margin if has_class_data else (last5_adj if has_horse_data else recent_line_adj)
+    ceiling_adj     = class_adj_best   if has_class_data else (best_adj  if has_horse_data else recent_line_best)
 
     # Market weight weakens as the horse accumulates starts — for exposed horses
     # the model's own data is more reliable than market history (which risks
