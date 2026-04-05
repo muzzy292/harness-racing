@@ -57,10 +57,9 @@ Historical form — independent of today's race conditions.
 
 | Component | Weight | Source |
 |---|---|---|
-| consistency | 1.8 | last5_adj or recent_line_adj |
-| ceiling | 1.2 | best_adj or recent_line_best |
-| late_speed | 1.4 | last_3_avg_sectional_delta |
-| comment_adj | 0.5 | steward comment adjustments |
+| consistency | 1.8 | class-adj avg margin (recent lines), fallback: last5_adj or form-sync avg |
+| ceiling | 1.2 | class-adj best margin (uncapped, negative = above-grade win), fallback: best_adj |
+| late_speed | 1.4 | last_3_avg_sectional_delta vs track par |
 | tempo_adj | 0.45 | tempo adjustment average |
 | tempo_flags | -0.08 | count of tempo-adjusted runs |
 | null_flags | -0.25 | count of null (excluded) runs |
@@ -68,6 +67,7 @@ Historical form — independent of today's race conditions.
 | win_rate | 0.7 | last 5 win rate |
 | top3_rate | 0.6 | last 5 top-3 finish rate |
 | competitive_rate | 0.5 | last 5 runs within 3m of winner |
+| career_win_rate | 0.6 | career win rate vs 12% centre |
 | nr | 0.25 | NR rating vs centre of 45 |
 | class_pos | 0.15 | NR headroom from race ceiling |
 | stake_class | 0.2 | avg recent stake (outlier-capped) |
@@ -81,10 +81,14 @@ Race-day factors — barrier, map, distance suitability, fitness.
 | barrier | varies | FR/SR position scoring |
 | map_lead | 0.7 | lead rate + barrier bonus |
 | map_soft | 0.45 | soft trip score |
+| map_soft_context | 0.3 | soft trip × pace pressure |
 | map_wide | -0.5 | wide risk penalty |
 | map_death | -0.35 | death seat penalty |
-| bmr_dist_rge | 0.6 | BMR at distance (capped ±1.2) |
-| fitness | graduated | 15-28d: -0.35, 29-42d: -0.60, 43-84d: -0.85, 85+d: -1.10 |
+| pace_backmarker | 0.6 | restrained rate × (pace_pressure − 0.4) |
+| fitness | graduated | 15-28d: -0.35, 29-42d: -0.60, 43-84d: -0.85, 85-99d: -1.10, 100-119d: -1.45, 120-149d: -1.70, 150+d: -2.00 |
+| dist_strike_rate | 0.9 | win rate at distance vs career rate (confidence-scaled, full weight ≥15 starts) |
+| driver_form | 0.6 | season win rate from driver profile page |
+| nr_grade_delta | 0.4 | today's NR ceiling vs avg of last 5 runs (negative = dropping in grade) |
 
 ### Stage 3: Market Calibration
 - Softmax (temperature 2.75) converts scores to probabilities
@@ -95,17 +99,27 @@ Race-day factors — barrier, map, distance suitability, fitness.
 
 ```bash
 python -m harness_model.cli fetch-form --url URL --output PATH
-python -m harness_model.cli fetch-horses --form-html PATH --output-dir PATH
 python -m harness_model.cli ingest-meeting --html PATH --db PATH
+python -m harness_model.cli fetch-driver-stats --meeting-code MC --db PATH [--force-refresh] [--max-age-days N]
 python -m harness_model.cli build-features --db PATH --csv PATH --track-pars PATH
 python -m harness_model.cli score-race --csv PATH --meeting-code MC --race-number N
 python -m harness_model.cli score-meeting --csv PATH --meeting-code MC
 python -m harness_model.cli scratch-horse --meeting-code MC --horse-name NAME --db PATH
 ```
 
+### Web pipeline (meeting code → scored race cards)
+
+```
+ingest-meeting → fetch-driver-stats → build-features → score-meeting
+```
+
+`fetch-horses` is **excluded from the web pipeline** — too slow for on-demand use.
+Driver stats are cached for 7 days; a typical meeting fetches 6–10 driver pages.
+`driver_form` component is replaced by a manual +/−/0 override per horse in the web UI.
+
 ## Database (SQLite)
 
-Tables: `meetings`, `race_runners`, `runner_recent_lines`, `horse_profiles`, `horse_runs`, `race_results`
+Tables: `meetings`, `race_runners`, `runner_recent_lines`, `horse_profiles`, `horse_runs`, `race_results`, `driver_stats`
 
 Auto-migration via `_ensure_columns()` — new columns added non-destructively on connect.
 
