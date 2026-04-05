@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Harness Odds Viewer</title>
+  <style>
+    :root {
+      --bg: #f5efe4;
+      --panel: #fffaf2;
+      --ink: #1f2a37;
+      --muted: #637082;
+      --line: #d8ccb7;
+      --accent: #0f6a73;
+      --accent-soft: #d7ecee;
+      --gold: #c4872f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      background: radial-gradient(circle at top left, #fff7ea, var(--bg));
+      color: var(--ink);
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 40px 20px 60px; }
+    h1 { margin: 0 0 8px; font-size: 44px; }
+    p { color: var(--muted); font-size: 18px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }
+    .meeting-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 20px;
+      text-decoration: none;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 12px 30px rgba(97, 76, 43, 0.08);
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .meeting-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 36px rgba(97, 76, 43, 0.14);
+    }
+    .meeting-code { font-size: 24px; font-weight: 700; letter-spacing: 0.04em; }
+    .meeting-meta { color: var(--muted); font-size: 13px; }
+    .meeting-link { color: var(--accent); font-size: 15px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Harness Odds Viewer</h1>
+    <p>Static meeting pages built from your local score-meeting data. Open a meeting below, or host this folder anywhere static files can be served.</p>
+    <div class="grid">
+      
+            <a class="meeting-card" href="NA050426.html">
+              <span class="meeting-code">NA050426</span>
+              <span class="meeting-meta">5 Apr 2026</span>
+              <span class="meeting-link">Open meeting page</span>
+            </a>
+            
+    </div>
+  </div>
+</body>
+</html>
