@@ -288,6 +288,7 @@ def _build_feature_row(
             runner.get("form_dist_rge_summary"),
             runner.get("career_summary"),
         ),
+        "dist_rge_starts": _summary_part(runner.get("form_dist_rge_summary"), 0),
         "days_since_last_run": days_since_last_run,
         "race_nr_ceiling": race_nr_ceiling,
         "race_nr_floor": race_nr_floor,

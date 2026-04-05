@@ -329,6 +329,7 @@ def _stage2_components(
     barrier = row.get("barrier") or ""
     nr_grade_delta = _to_float(row.get("nr_grade_delta"))
     dist_strike_rate_ratio = _to_float(row.get("dist_strike_rate_ratio"))
+    dist_rge_starts = _to_int(row.get("dist_rge_starts")) or 0
     days_since_last_run = _to_float(row.get("days_since_last_run"))
     driver_win_rate = _to_float(row.get("driver_page_season_win_rate"))
     trainer_change_manual = _to_float(row.get("trainer_change_manual"))
@@ -360,9 +361,12 @@ def _stage2_components(
         # ratio > 1 = horse wins more often at this distance than on average → boost.
         # ratio < 1 = horse wins less often → penalty.
         # Neutral (0) when dist_starts < 2 or no career data.
-        # Capped at ±1.35 — distance preference is a meaningful signal.
+        # Confidence-scaled by sample size: full weight at ≥15 distance starts,
+        # scaling linearly to 0 at 0 starts. Prevents a single win in 5 starts
+        # from capping the signal at ±1.215 (e.g. 7 starts → 47% confidence).
         "dist_strike_rate": (
             max(-1.35, min(1.35, (dist_strike_rate_ratio - 1.0) / 0.4)) * 0.9
+            * min(1.0, dist_rge_starts / 15.0)
             if dist_strike_rate_ratio is not None else 0.0
         ),
         # NR grade delta — today's NR ceiling vs avg ceiling of last 5 runs.
