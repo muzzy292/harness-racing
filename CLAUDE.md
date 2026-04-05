@@ -110,12 +110,11 @@ python -m harness_model.cli scratch-horse --meeting-code MC --horse-name NAME --
 ### Web pipeline (meeting code → scored race cards)
 
 ```
-ingest-meeting → fetch-driver-stats → build-features → score-meeting
+fetch-meeting → ingest-meeting → build-features → score-meeting
 ```
 
-`fetch-horses` is **excluded from the web pipeline** — too slow for on-demand use.
-Driver stats are cached for 7 days; a typical meeting fetches 6–10 driver pages.
-`driver_form` component is replaced by a manual +/−/0 override per horse in the web UI.
+`fetch-horses` and `fetch-driver-stats` are **excluded from the web pipeline**.
+`driver_form` is replaced by a manual +/−/0 button per horse in the web UI — applied at score time, no scraping required.
 
 ## Database (SQLite)
 
