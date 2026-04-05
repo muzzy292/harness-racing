@@ -15,7 +15,9 @@
     "nr": 0.25,
     "class_pos": 0.15,
     "stake_class": 0.2,
-    "class_delta": 0.3
+    "class_delta": 0.3,
+    "sp_class": 0.4,
+    "sp_trend": 0.3
   },
   "stage2": {
     "map_lead": 2.0,

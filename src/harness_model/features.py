@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import re
 import sqlite3
 import statistics
@@ -218,6 +219,19 @@ def _build_feature_row(
     # too noisy a signal (1/2 = 50% and 1/30 = 3% should not be treated equally).
     career_win_rate = round(career_wins / career_starts, 4) if (career_starts is not None and career_starts >= 5 and career_wins is not None) else None
 
+    sp_class_values: list[float] = []
+    sp_values: list[float] = []
+    for line in valid_recent_lines[:5]:
+        sp = _to_float_local(line.get("run_sp"))
+        purse = _to_float_local(line.get("run_purse"))
+        if sp and sp > 0:
+            sp_values.append(sp)
+            if purse and purse > 0:
+                sp_class_values.append(-math.log(sp) * (purse / 8000.0))
+    recent_line_last_sp = sp_values[0] if sp_values else None
+    sp_class_score = _avg(sp_class_values) if sp_class_values else None
+    sp_trend = (sp_values[0] - (_avg(sp_values[1:]) or sp_values[0])) if len(sp_values) >= 2 else None
+
     return {
         "meeting_code": runner["meeting_code"],
         "meeting_date": runner["meeting_date"],
@@ -304,6 +318,9 @@ def _build_feature_row(
         "race_purse": race_purse,
         "avg_recent_run_purse": avg_recent_run_purse,
         "class_delta": class_delta,
+        "recent_line_last_sp": recent_line_last_sp,
+        "recent_line_sp_class_score": sp_class_score,
+        "recent_line_sp_trend": sp_trend,
     }
 
 

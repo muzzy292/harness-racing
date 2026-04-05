@@ -314,6 +314,8 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
     avg_run_purse = _to_float(row.get("avg_recent_run_purse"))
     class_delta = _to_float(row.get("class_delta"))
     career_win_rate = _to_float(row.get("career_win_rate"))
+    sp_class_score = _to_float(row.get("recent_line_sp_class_score"))
+    sp_trend = _to_float(row.get("recent_line_sp_trend"))
 
     # Priority for consistency/ceiling:
     # 1. Class-adjusted recent-line margins — same data as recent_line_adj but each
@@ -376,6 +378,14 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         # country ($6,936) ≈ −0.35, metro ($20k+) capped at +1.2.
         "stake_class": _pos_scale(avg_run_purse, center=8000.0, divisor=3000.0, missing=0.0) * w.get("stake_class", 0.2),
         "class_delta": _pos_scale(class_delta, center=0.0, divisor=-2000.0, missing=0.0) * w.get("class_delta", 0.3),
+        # SP relative to class — was the horse well-backed in quality races?
+        # sp_class_score = avg(-log(SP) × purse/8000); negative scores = outsider,
+        # near-zero = neutral. Capped ±1.5 so a single extreme run doesn't dominate.
+        "sp_class": max(-1.5, min(1.5, sp_class_score or 0.0)) * w.get("sp_class", 0.4),
+        # SP trend — shortening (negative) = market gaining confidence → boost.
+        # Drifting (positive) = market losing confidence → penalty.
+        # divisor=-5.0: $5 of shortening → +1.0 in _pos_scale before weight.
+        "sp_trend": _pos_scale(sp_trend, center=0.0, divisor=-5.0, missing=0.0) * w.get("sp_trend", 0.3),
     }
 
 
