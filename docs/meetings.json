@@ -13,5 +13,10 @@
     "meeting_code": "EY040426",
     "track_name": "Wagga",
     "meeting_date": "4 Apr 2026"
+  },
+  {
+    "meeting_code": "PK040426",
+    "track_name": "Parkes",
+    "meeting_date": "4 Apr 2026"
   }
 ]
