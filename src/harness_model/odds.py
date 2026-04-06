@@ -428,6 +428,7 @@ def _stage2_components(
     trainer_win_rate_90 = _to_float(row.get("trainer_last_90_win_rate"))
     class_delta = _to_float(row.get("class_delta"))
     nr_headroom = _to_float(row.get("nr_headroom"))
+    second_up_improvement = _to_float(row.get("second_up_improvement"))
 
     return {
         "barrier":      _barrier_score(barrier),
@@ -465,6 +466,13 @@ def _stage2_components(
         "nr_grade_delta": max(-1.5, min(1.5, _pos_scale(nr_grade_delta, center=0.0, divisor=-10.0, missing=0.0))) * w.get("nr_grade_delta", 0.4),
         # Fitness — graduated penalty by days since last run.
         "fitness":      _fitness_score(days_since_last_run, fw),
+        # Second-up improvement — horse showed marked form improvement on first run
+        # back from a spell and is now second-up. Scaled by metres of improvement
+        # (15m = full weight). Only fires when conditions are met; zero otherwise.
+        "second_up": (
+            min(second_up_improvement / 15.0, 1.0) * w.get("second_up", 1.5)
+            if second_up_improvement else 0.0
+        ),
         # Driver form — current season win rate from official profile page.
         # Centred at 15% (average NSW win rate). Missing = 0 (no effect).
         "driver_form":  _pos_scale(driver_win_rate, center=0.15, divisor=0.10, missing=0.0) * w.get("driver_form", 0.3),

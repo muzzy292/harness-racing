@@ -32,7 +32,8 @@
     "driver_form": 0.3,
     "trainer_form_page": 0.24,
     "trainer_form_30d": 0.12,
-    "trainer_form_90d": 0.08
+    "trainer_form_90d": 0.08,
+    "second_up": 1.5
   },
   "fitness": {
     "tier_15_28": -0.35,
