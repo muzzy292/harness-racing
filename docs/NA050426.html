@@ -141,13 +141,13 @@
       border: 1px solid var(--border);
       border-radius: 20px;
       padding: 0;
-      margin-bottom: 32px;
+      margin-bottom: 20px;
       overflow: hidden;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
 
     .race-head {
-      padding: 24px 32px;
+      padding: 14px 24px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
@@ -172,7 +172,7 @@
     }
 
     th, td {
-      padding: 16px 20px;
+      padding: 9px 12px;
       text-align: left;
       font-size: 14px;
       border-bottom: 1px solid var(--border);
@@ -218,44 +218,39 @@
 
     .muted { color: var(--secondary); opacity: 0.5; }
 
-    /* Mobile Adaptations */
-    @media (max-width: 1024px) {
-      th, td { padding: 12px 10px; font-size: 13px; }
+    /* ── Portrait mobile ── */
+    @media (max-width: 820px) and (orientation: portrait) {
+      .wrap { padding: 12px 8px; }
+      h1 { font-size: 26px; }
+      .hero { padding: 20px 16px; border-radius: 16px; margin-bottom: 16px; }
+      .summary-grid { display: none; }
+      .race-nav { margin-bottom: 16px; }
+      .race-card { border-radius: 12px; margin-bottom: 16px; overflow-x: auto; }
+      .race-head { padding: 12px 16px; flex-direction: column; align-items: flex-start; gap: 6px; }
+      .race-head h2 { font-size: 18px; }
+      .race-head .top-pick { font-size: 12px; }
+      th, td { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+      .horse-cell .meta { display: none; }
+      .horse-cell strong { font-size: 13px; }
+      th:nth-child(4), td:nth-child(4),
+      th:nth-child(6), td:nth-child(6),
+      th:nth-child(7), td:nth-child(7),
+      th:nth-child(8), td:nth-child(8),
+      th:nth-child(9), td:nth-child(9),
+      th:nth-child(12), td:nth-child(12) { display: none; }
     }
 
-    @media (max-width: 820px) {
-      .wrap { padding: 20px 10px; }
-      h1 { font-size: 32px; }
-      .hero { padding: 24px; border-radius: 16px; }
-      
-      .race-card { border-radius: 12px; }
-      .race-head { padding: 16px; flex-direction: column; align-items: flex-start; gap: 10px; }
-
-      table, thead, tbody, th, td, tr { display: block; }
-      thead { display: none; }
-      
-      tr {
-        padding: 16px;
-        border-bottom: 4px solid var(--bg);
-      }
-      
-      td {
-        border: 0;
-        padding: 4px 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      td::before {
-        content: attr(data-label);
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        color: var(--secondary);
-      }
-
-      .horse-cell { align-items: flex-end; text-align: right; }
+    /* ── Landscape mobile / small tablet ── */
+    @media (max-width: 1024px) and (orientation: landscape) {
+      .wrap { padding: 12px 12px; }
+      .hero { padding: 20px 24px; border-radius: 16px; margin-bottom: 16px; }
+      h1 { font-size: 28px; }
+      .race-card { margin-bottom: 16px; overflow-x: auto; }
+      .race-head { padding: 12px 20px; }
+      .race-head h2 { font-size: 20px; }
+      th, td { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+      .horse-cell .meta { display: none; }
+      table { min-width: 700px; }
     }
   </style>
 </head>
@@ -293,7 +288,7 @@
         
         <div class="summary-card">
           <span class="label">Generated</span>
-          <span class="value">05 Apr 2026 22:45</span>
+          <span class="value">06 Apr 2026 10:19</span>
         </div>
         </div>
     </section>
