@@ -82,7 +82,7 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
             WHERE meeting_code = ?
               AND race_number = ?
               AND horse_id = ?
-            ORDER BY line_index
+            ORDER BY _sort_run_date(run_date) DESC
             """,
             (runner["meeting_code"], runner["race_number"], runner["horse_id"]),
         ).fetchall()
@@ -168,6 +168,7 @@ def _build_feature_row(
         or _parse_bmr_secs(runner.get("form_bmr_dist_rge"))
     )
     days_since_last_run = _days_since_last_run(recent_lines, runner.get("meeting_date"))
+    second_up_improvement = _second_up_improvement(days_since_last_run, recent_lines)
     race_nr_ceiling = _parse_race_nr_ceiling(runner.get("class_name"))
     race_nr_floor = _parse_race_nr_floor(runner.get("class_name"))
     nr_rating = runner["nr_rating"]
@@ -311,6 +312,7 @@ def _build_feature_row(
         ),
         "dist_rge_starts": _summary_part(runner.get("form_dist_rge_summary"), 0),
         "days_since_last_run": days_since_last_run,
+        "second_up_improvement": second_up_improvement,
         "race_nr_ceiling": race_nr_ceiling,
         "race_nr_floor": race_nr_floor,
         "nr_headroom": nr_headroom,
@@ -722,6 +724,51 @@ def _parse_bmr_secs(bmr: object) -> float | None:
     seconds = int(match.group(2))
     tenths = int(match.group(3))
     return round(minutes * 60 + seconds + tenths / 10, 1)
+
+
+def _parse_run_date(text: object) -> "date | None":
+    _MONTHS = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+               "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
+    parts = str(text or "").split()
+    if len(parts) != 3:
+        return None
+    try:
+        return date(int(parts[2]), _MONTHS[parts[1].title()], int(parts[0]))
+    except (ValueError, KeyError):
+        return None
+
+
+def _second_up_improvement(days_since_last_run: int | None, recent_lines: list[dict]) -> float | None:
+    """Positive metres of improvement when today is second-up after a first-up spell run.
+
+    Fires when:
+      - days_since_last_run <= 28 (ran within the last month)
+      - gap between recent_lines[0] and recent_lines[1] >= 43d (first run back was after a spell)
+      - recent_lines[0] adj_margin was better than average of prior 1-3 lines
+
+    Returns the improvement in metres, or None if conditions aren't met.
+    """
+    if days_since_last_run is None or days_since_last_run > 28:
+        return None
+    if len(recent_lines) < 2:
+        return None
+    d0 = _parse_run_date(recent_lines[0].get("run_date"))
+    d1 = _parse_run_date(recent_lines[1].get("run_date"))
+    if d0 is None or d1 is None:
+        return None
+    if abs((d0 - d1).days) < 43:
+        return None
+    # Most recent run was first-up — compare its margin to prior form
+    first_up_adj = float(recent_lines[0].get("adjusted_margin") or 0.0)
+    prior_margins = [
+        float(line["adjusted_margin"])
+        for line in recent_lines[1:4]
+        if line.get("adjusted_margin") not in (None, "")
+    ]
+    if not prior_margins:
+        return None
+    improvement = round(sum(prior_margins) / len(prior_margins) - first_up_adj, 2)
+    return improvement if improvement > 0 else None
 
 
 def _days_since_last_run(recent_lines: list[dict[str, object]], meeting_date: object) -> int | None:

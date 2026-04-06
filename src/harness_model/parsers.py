@@ -1132,7 +1132,11 @@ def _apply_form_line_text_rules(
 
     if "locked wheels" in comment:
         null_run = True
-    if "checked and broke" in comment or "broke in score up" in comment or "broke" in comment:
+    if (
+        "checked and broke" in comment
+        or "broke in score up" in comment
+        or ("broke" in comment and "broke gear" not in comment and "broken gear" not in comment)
+    ):
         null_run = True
 
     if first_half is not None and last_half is not None and abs(first_half - last_half) <= 2.0:
