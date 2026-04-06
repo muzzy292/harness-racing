@@ -922,6 +922,7 @@ def _extract_recent_lines_from_horse_block(
                 raw_margin=raw_margin,
                 run_purse=parsed.get("purse"),
                 line_nr_ceiling=parsed.get("line_nr_ceiling"),
+                line_race_age=parsed.get("line_race_age"),
                 run_sp=parsed.get("run_sp"),
                 comment_adjustment=comment_adjustment,
                 tempo_adjustment=tempo_adjustment,
@@ -960,6 +961,8 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
     line_nr_ceiling = _parse_line_nr_ceiling(line_html)
     sp_match = re.search(r'</a>\s*\$(\d+\.?\d*)(?:\s+fav)?[,\s]', line_html, re.IGNORECASE)
     run_sp = float(sp_match.group(1)) if sp_match else None
+    age_match = re.search(r'(\d)yo', line_html, re.IGNORECASE)
+    line_race_age = f"{age_match.group(1)}yo" if age_match else None
     return {
         "form_place": form_place_match.group("form_place"),
         "track_code": results_match.group("track"),
@@ -973,6 +976,7 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
         "line_text": plain,
         "purse": purse,
         "line_nr_ceiling": line_nr_ceiling,
+        "line_race_age": line_race_age,
         "run_sp": run_sp,
     }
 

@@ -197,7 +197,17 @@ def _build_feature_row(
     class_adj_recent_margins: list[float] = []       # capped at 0.0 — used for avg
     class_adj_recent_margins_raw: list[float] = []   # uncapped — used for ceiling
     _class_adj_nr_count = 0
-    if race_nr_ceiling is not None:
+    # When today's race has no NR ceiling (NMT1W, age-restricted, No NR), fall back
+    # to the horse's own NR rating as the class reference.  This allows prior No NR
+    # runs (Breeders Challenge, Carnival series) to be grade-calibrated against the
+    # horse's current level even when the race itself has no formal NR grade.
+    _class_ref_nr: float | None = race_nr_ceiling
+    if _class_ref_nr is None and nr_rating is not None:
+        try:
+            _class_ref_nr = float(nr_rating)
+        except (TypeError, ValueError):
+            pass
+    if _class_ref_nr is not None:
         for line in valid_recent_lines[:5]:
             if line.get("adjusted_margin") in (None, ""):
                 continue
@@ -205,13 +215,27 @@ def _build_feature_row(
             if margin > 50.0:
                 continue
             if line.get("line_nr_ceiling") is not None:
-                adj = margin - (float(line["line_nr_ceiling"]) - race_nr_ceiling) * _NR_MARGIN_FACTOR
+                adj = margin - (float(line["line_nr_ceiling"]) - _class_ref_nr) * _NR_MARGIN_FACTOR
                 class_adj_recent_margins.append(max(0.0, adj))
                 class_adj_recent_margins_raw.append(adj)
                 _class_adj_nr_count += 1
             else:
-                class_adj_recent_margins.append(margin)
-                class_adj_recent_margins_raw.append(margin)
+                # No NR race — estimate grade from purse and age category.
+                # Reliability < 1.0 reflects the higher variance in juvenile/restricted
+                # fields vs open NR company where ability is anchored to a rating.
+                proxy = _no_nr_proxy(
+                    _to_float_local(line.get("run_purse")),
+                    line.get("line_race_age"),
+                )
+                if proxy is not None:
+                    proxy_nr, reliability = proxy
+                    adj = margin - (proxy_nr - _class_ref_nr) * _NR_MARGIN_FACTOR * reliability
+                    class_adj_recent_margins.append(max(0.0, adj))
+                    class_adj_recent_margins_raw.append(adj)
+                    _class_adj_nr_count += 1
+                else:
+                    class_adj_recent_margins.append(margin)
+                    class_adj_recent_margins_raw.append(margin)
     # Ceiling support rate and best-run index — mirror the priority logic in odds.py
     # so both columns align with whichever margin list ceiling_adj is drawn from.
     _ceiling_margins: list[float] = (
@@ -655,6 +679,52 @@ def _map_signals(recent_lines: list[dict[str, object]], barrier: object) -> dict
         "map_soft_trip_score": round((lead_rate * 0.6) - (restrained_rate * 0.15) + _barrier_map_bonus(barrier, "soft"), 4),
         "map_wide_risk_score": round((wide_rate * 1.1) + (death_rate * 0.35) + _barrier_map_bonus(barrier, "wide"), 4),
     }
+
+
+def _no_nr_proxy(purse: float | None, age: str | None) -> tuple[float, float] | None:
+    """Return (proxy_nr_ceiling, reliability) for a No NR race line.
+
+    No NR races (Breeders Challenge, Carnival series, elite restricted) don't carry
+    an NR ceiling, so we estimate the grade equivalent from prize money and age
+    restriction.  Reliability discounts reflect the higher variance in juvenile and
+    restricted fields compared to open NR races where ability is anchored to a rating.
+
+    Age tiers scale upward from 2yo → 3yo → 4yo/open as form becomes more exposed
+    and ratings more meaningful.  Returns None when purse is not available.
+    """
+    if purse is None or purse <= 0:
+        return None
+
+    if age == "2yo":
+        if purse >= 100_000:
+            return (78.0, 0.55)
+        if purse >= 25_000:
+            return (70.0, 0.60)
+        if purse >= 10_000:
+            return (63.0, 0.65)
+        if purse >= 5_000:
+            return (54.0, 0.70)
+        return (46.0, 0.75)
+
+    if age == "3yo":
+        if purse >= 50_000:
+            return (80.0, 0.65)
+        if purse >= 20_000:
+            return (72.0, 0.70)
+        if purse >= 10_000:
+            return (65.0, 0.72)
+        if purse >= 5_000:
+            return (55.0, 0.75)
+        return (47.0, 0.78)
+
+    # 4yo or no age tag — more exposed form, lower variance
+    if purse >= 30_000:
+        return (76.0, 0.75)
+    if purse >= 10_000:
+        return (66.0, 0.78)
+    if purse >= 5_000:
+        return (56.0, 0.80)
+    return (46.0, 0.82)
 
 
 def _parse_barrier_num(barrier: object) -> int | None:
