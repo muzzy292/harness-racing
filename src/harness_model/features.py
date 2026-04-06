@@ -9,7 +9,7 @@ import statistics
 from datetime import date
 from pathlib import Path
 
-from .track_pars import lookup_race_par
+from .track_pars import _nr_to_grade_band, lookup_race_par
 
 # Metres of margin adjustment per NR point of grade difference.
 # A horse that ran in NR43 dropping to NR40 gets each margin reduced by 3 * factor.
@@ -134,7 +134,10 @@ def _build_feature_row(
 
     driver_stats = _rolling_person_stats(conn, "driver_name", runner["nominated_driver"])
     trainer_stats = _rolling_person_stats(conn, "trainer_name", runner["nominated_trainer"])
-    race_par = lookup_race_par(track_pars, runner["track_name"], runner["race_distance"])
+    race_par = lookup_race_par(
+        track_pars, runner["track_name"], runner["race_distance"],
+        nr_ceiling=_parse_race_nr_ceiling(runner.get("class_name")),
+    )
     sectional_deltas = _sectional_deltas_vs_par(recent_lines, track_pars)
     valid_recent_lines = [line for line in recent_lines if not _truthy(line.get("null_run"))]
     line_comment_adjustments = [float(line["comment_adjustment"]) for line in valid_recent_lines if line.get("comment_adjustment") not in (None, "")]
@@ -513,7 +516,11 @@ def _sectional_deltas_vs_par(recent_lines: list[dict[str, object]], track_pars: 
             continue
         if line.get("last_half") is None:
             continue
-        par = lookup_race_par(track_pars, line.get("track_name"), line.get("distance"), str(line.get("condition") or "Good"))
+        par = lookup_race_par(
+            track_pars, line.get("track_name"), line.get("distance"),
+            str(line.get("condition") or "Good"),
+            nr_ceiling=line.get("line_nr_ceiling"),
+        )
         par_last_half = par.get("par_last_half")
         if par_last_half is None:
             continue
@@ -852,7 +859,7 @@ def generate_track_pars_from_db(conn: sqlite3.Connection) -> dict:
     # Sanity bounds: harness last-half times are almost always 52–68 seconds.
     rows = conn.execute(
         """
-        SELECT track_name, distance, condition, last_half
+        SELECT track_name, distance, condition, last_half, line_nr_ceiling
         FROM runner_recent_lines
         WHERE last_half IS NOT NULL
           AND last_half BETWEEN 52.0 AND 68.0
@@ -863,12 +870,28 @@ def generate_track_pars_from_db(conn: sqlite3.Connection) -> dict:
     ).fetchall()
 
     # Group into {track_name: {distance: {condition: [times]}}}
+    # and grade bands: {track_name: {distance: {condition: {band: [times]}}}}
     grouped: dict[str, dict[int, dict[str, list[float]]]] = {}
+    grade_grouped: dict[str, dict[int, dict[str, dict[str, list[float]]]]] = {}
     for row in rows:
         track = str(row["track_name"])
         dist = int(row["distance"])
         cond = str(row["condition"] or "Good")
-        grouped.setdefault(track, {}).setdefault(dist, {}).setdefault(cond, []).append(float(row["last_half"]))
+        lh = float(row["last_half"])
+        grouped.setdefault(track, {}).setdefault(dist, {}).setdefault(cond, []).append(lh)
+        band = _nr_to_grade_band(row["line_nr_ceiling"])
+        if band:
+            grade_grouped.setdefault(track, {}).setdefault(dist, {}).setdefault(cond, {}).setdefault(band, []).append(lh)
+
+    def _trimmed_par(times: list[float]) -> dict[str, object]:
+        sorted_times = sorted(times)
+        trim = max(1, len(sorted_times) // 20)
+        trimmed = sorted_times[trim:-trim] if len(sorted_times) > 20 else sorted_times
+        return {
+            "par": round(statistics.median(trimmed), 2),
+            "std": round(statistics.stdev(trimmed), 2) if len(trimmed) > 1 else 0.0,
+            "n": len(times),
+        }
 
     pars: dict[str, dict[str, dict[str, dict[str, object]]]] = {}
     total_cells = 0
@@ -884,13 +907,22 @@ def generate_track_pars_from_db(conn: sqlite3.Connection) -> dict:
                 trimmed = sorted_times[trim:-trim] if len(sorted_times) > 20 else sorted_times
                 par = round(statistics.median(trimmed), 2)
                 std = round(statistics.stdev(trimmed), 2) if len(trimmed) > 1 else 0.0
-                pars[track][str(dist)][cond] = {
+                cell: dict[str, object] = {
                     "par": par,
                     "std": std,
                     "n": len(times),
                     "min": round(min(trimmed), 2),
                     "max": round(max(trimmed), 2),
                 }
+                # Grade-banded pars — stored for all bands regardless of n;
+                # the lookup function applies _MIN_GRADE_N at query time.
+                band_data = grade_grouped.get(track, {}).get(dist, {}).get(cond, {})
+                if band_data:
+                    cell["grades"] = {
+                        band_key: _trimmed_par(band_times)
+                        for band_key, band_times in sorted(band_data.items())
+                    }
+                pars[track][str(dist)][cond] = cell
                 total_cells += 1
 
     return {
