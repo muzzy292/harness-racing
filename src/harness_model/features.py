@@ -241,11 +241,13 @@ def _build_feature_row(
 
     sp_class_values: list[float] = []
     sp_values: list[float] = []
+    sp_nr_values: list[float | None] = []
     for line in valid_recent_lines[:5]:
         sp = _to_float_local(line.get("run_sp"))
         purse = _to_float_local(line.get("run_purse"))
         if sp and sp > 0:
             sp_values.append(sp)
+            sp_nr_values.append(_to_float_local(line.get("line_nr_ceiling")))
             if purse and purse > 0:
                 sp_class_values.append(-math.log(sp) * (purse / 8000.0))
     recent_line_last_sp = sp_values[0] if sp_values else None
@@ -254,10 +256,23 @@ def _build_feature_row(
     # moves ($81→$31) produce a tiny signal while genuine shortening into
     # competitive prices ($31→$5) produces a meaningful one.
     # Positive = shortening (market gaining confidence), negative = drifting.
+    # Each prior SP is weighted by grade context: an SP earned in a tougher race
+    # (higher line_nr_ceiling) than today is more informative (weight > 1.0);
+    # an SP earned in an easier race is less informative (weight < 1.0).
     if len(sp_values) >= 2:
         last_prob = 1.0 / sp_values[0]
-        prior_avg_prob = _avg([1.0 / s for s in sp_values[1:]])
-        sp_trend = (last_prob - prior_avg_prob) if prior_avg_prob else None
+        prior_probs = [1.0 / s for s in sp_values[1:]]
+        prior_nrs = sp_nr_values[1:]
+        if race_nr_ceiling is not None and any(n is not None for n in prior_nrs):
+            prior_weights = [
+                max(0.5, min(2.0, 1.0 + (n - race_nr_ceiling) / 20.0)) if n is not None else 1.0
+                for n in prior_nrs
+            ]
+            total_w = sum(prior_weights)
+            prior_avg = sum(p * w for p, w in zip(prior_probs, prior_weights)) / total_w
+        else:
+            prior_avg = _avg(prior_probs) or 0.0
+        sp_trend = last_prob - prior_avg if prior_avg else None
     else:
         sp_trend = None
 
