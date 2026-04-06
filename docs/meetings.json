@@ -18,5 +18,10 @@
     "meeting_code": "PK040426",
     "track_name": "Parkes",
     "meeting_date": "4 Apr 2026"
+  },
+  {
+    "meeting_code": "TM060426",
+    "track_name": "Temora",
+    "meeting_date": "6 Apr 2026"
   }
 ]
