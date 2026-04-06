@@ -611,8 +611,12 @@ def _map_signals(recent_lines: list[dict[str, object]], barrier: object) -> dict
         # A Fr1 horse that leads 70% is worth more than Fr1 + 70% summed separately —
         # the draw makes the tendency more likely to be realised, and realising it is
         # disproportionately valuable.  Only fires when real form-line rates are available.
+        # Lead rate is discounted by barrier via _barrier_commitment_scale: a 60% leader
+        # earns that rate from inside draws and is unlikely to lead from Fr6; a 90%+ horse
+        # gets minimal discount as it will find the front from almost anywhere, but even
+        # fully committed front-runners face a marginal penalty from wide draws.
         "map_lead_score": round(
-            (lead_rate * 1.2)
+            (lead_rate * _barrier_commitment_scale(_parse_barrier_num(barrier) or 1, lead_rate) * 1.2)
             + (forward_rate * 0.6)
             + _barrier_map_bonus(barrier, "lead")
             + _barrier_lead_interaction(barrier, lead_rate, forward_rate),
@@ -622,6 +626,32 @@ def _map_signals(recent_lines: list[dict[str, object]], barrier: object) -> dict
         "map_soft_trip_score": round((lead_rate * 0.6) - (restrained_rate * 0.15) + _barrier_map_bonus(barrier, "soft"), 4),
         "map_wide_risk_score": round((wide_rate * 1.1) + (death_rate * 0.35) + _barrier_map_bonus(barrier, "wide"), 4),
     }
+
+
+def _parse_barrier_num(barrier: object) -> int | None:
+    text = str(barrier or "").upper().strip()
+    if text.startswith("FR"):
+        try:
+            return int(text[2:])
+        except ValueError:
+            return None
+    return None
+
+
+def _barrier_commitment_scale(barrier_num: int, lead_rate: float) -> float:
+    """Effective scale for the lead_rate contribution to map_lead_score.
+
+    Blends between a non-committed scale (full barrier penalty) and a committed
+    front-runner scale (minimal penalty) based on how consistently the horse leads.
+    Even fully committed horses face a marginal discount from wide draws —
+    they need to do more work to cross from barrier 8 than barrier 1.
+    """
+    commitment = max(0.0, (lead_rate - 0.30) / 0.70)  # 0.0 at ≤30%, 1.0 at 100%
+    _base = {1: 1.00, 2: 0.90, 3: 0.78, 4: 0.65, 5: 0.52, 6: 0.38, 7: 0.25, 8: 0.15}
+    _max  = {1: 1.00, 2: 0.98, 3: 0.96, 4: 0.93, 5: 0.90, 6: 0.87, 7: 0.84, 8: 0.82}
+    base_scale = _base.get(barrier_num, 0.15)
+    max_scale  = _max.get(barrier_num, 0.80)
+    return base_scale + commitment * (max_scale - base_scale)
 
 
 def _barrier_map_bonus(barrier: object, mode: str) -> float:

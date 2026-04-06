@@ -86,7 +86,7 @@ Race-day factors — barrier, map, distance suitability, fitness.
 | map_death | -0.35 | death seat penalty |
 | pace_backmarker | 0.6 | restrained rate × (pace_pressure − 0.4) |
 | fitness | graduated | 15-28d: -0.35, 29-42d: -0.60, 43-84d: -0.85, 85-99d: -1.10, 100-119d: -1.45, 120-149d: -1.70, 150+d: -2.00 |
-| dist_strike_rate | 0.9 | win rate at distance vs career rate (confidence-scaled, full weight ≥15 starts) |
+| dist_strike_rate | 0.9 | penalty-only: win rate at distance vs career avg — penalises poor distance record, no boost for good (confidence-scaled, full weight ≥15 starts) |
 | driver_form | 0.6 | season win rate from driver profile page |
 | nr_grade_delta | 0.4 | today's NR ceiling vs avg of last 5 runs (negative = dropping in grade) |
 
