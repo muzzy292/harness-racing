@@ -382,10 +382,10 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         # sp_class_score = avg(-log(SP) × purse/8000); negative scores = outsider,
         # near-zero = neutral. Capped ±1.5 so a single extreme run doesn't dominate.
         "sp_class": max(-1.5, min(1.5, sp_class_score or 0.0)) * w.get("sp_class", 0.4),
-        # SP trend — shortening (negative) = market gaining confidence → boost.
-        # Drifting (positive) = market losing confidence → penalty.
-        # divisor=-5.0: $5 of shortening → +1.0 in _pos_scale before weight.
-        "sp_trend": _pos_scale(sp_trend, center=0.0, divisor=-5.0, missing=0.0) * w.get("sp_trend", 0.3),
+        # SP trend in implied-probability space (positive = shortening).
+        # divisor=0.05: 5pp shortening in implied prob → +1.0 in _pos_scale before weight.
+        # $31→$5 ≈ +16.8pp → strong; $81→$31 ≈ +2.0pp → minimal.
+        "sp_trend": _pos_scale(sp_trend, center=0.0, divisor=0.05, missing=0.0) * w.get("sp_trend", 0.3),
     }
 
 

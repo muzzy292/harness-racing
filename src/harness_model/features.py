@@ -234,7 +234,16 @@ def _build_feature_row(
                 sp_class_values.append(-math.log(sp) * (purse / 8000.0))
     recent_line_last_sp = sp_values[0] if sp_values else None
     sp_class_score = _avg(sp_class_values) if sp_class_values else None
-    sp_trend = (sp_values[0] - (_avg(sp_values[1:]) or sp_values[0])) if len(sp_values) >= 2 else None
+    # Compute SP trend in implied-probability space so that longshot-to-longshot
+    # moves ($81→$31) produce a tiny signal while genuine shortening into
+    # competitive prices ($31→$5) produces a meaningful one.
+    # Positive = shortening (market gaining confidence), negative = drifting.
+    if len(sp_values) >= 2:
+        last_prob = 1.0 / sp_values[0]
+        prior_avg_prob = _avg([1.0 / s for s in sp_values[1:]])
+        sp_trend = (last_prob - prior_avg_prob) if prior_avg_prob else None
+    else:
+        sp_trend = None
 
     return {
         "meeting_code": runner["meeting_code"],
