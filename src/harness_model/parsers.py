@@ -1114,7 +1114,10 @@ def _apply_form_line_text_rules(
     if "3 wide no cover" in comment or "three wide no cover" in comment:
         comment_adjustment -= 10.0
     if "checked" in comment or "inconvenienced" in comment:
-        comment_adjustment -= 10.0
+        if raw_margin is not None and raw_margin > 20.0:
+            null_run = True
+        else:
+            comment_adjustment -= 10.0
     if "three wide early" in comment or "three wide middle" in comment or "3 wide early" in comment or "3 wide middle" in comment:
         comment_adjustment -= 5.0
     if "1 out 4 back" in comment or "1 out 5 back" in comment or "1 out 6 back" in comment:
