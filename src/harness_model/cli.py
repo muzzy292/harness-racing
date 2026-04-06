@@ -7,6 +7,7 @@ from .storage import connect, scratch_horse as db_scratch_horse, set_trainer_cha
 from .pipeline import (
     build_feature_dataset,
     build_track_par_database,
+    calibrate_nr_factor,
     calibrate_temperature,
     fetch_driver_stats_for_meeting,
     fetch_horse_pages_from_meeting_html,
@@ -134,6 +135,10 @@ def main() -> None:
     score_meeting_parser.add_argument("--out-csv")
     score_meeting_parser.add_argument("--publish", action="store_true", help="Write HTML to docs/ and push to GitHub Pages")
     score_meeting_parser.add_argument("--db", default="data/harness.db", help="Database path (used with --publish for meeting metadata)")
+
+    calibrate_nr_parser = subparsers.add_parser("calibrate-nr-factor", help="Estimate the margin-per-NR-point factor from within-horse grade comparisons")
+    calibrate_nr_parser.add_argument("--db", default="data/harness.db")
+    calibrate_nr_parser.add_argument("--min-grade-spread", type=int, default=5)
 
     calibrate_parser = subparsers.add_parser("calibrate-temperature", help="Sweep softmax temperatures and report log loss against stored results")
     calibrate_parser.add_argument("--csv", default="data/features/runner_features.csv")
@@ -375,6 +380,15 @@ def main() -> None:
         print(f"Built meeting site page at {page_path}")
     elif args.command == "serve-site":
         serve_site(args.site_dir, host=args.host, port=args.port)
+    elif args.command == "calibrate-nr-factor":
+        from .features import _NR_MARGIN_FACTOR
+        r = calibrate_nr_factor(args.db)
+        print("\nNR margin factor calibration")
+        print(f"  Horses contributing (grade spread >={args.min_grade_spread}): {r['horses']}")
+        print(f"  Median slope: {r['median']:.2f} m/NR point")
+        print(f"  Mean slope:   {r['mean']:.2f} m/NR point")
+        print(f"  Current _NR_MARGIN_FACTOR: {r['current']}")
+        print(f"  Suggested value: {r['suggested']:.2f} (rounded to nearest 0.25)")
     elif args.command == "calibrate-temperature":
         meeting_codes = [m.strip() for m in (args.meetings or "").split(",") if m.strip()] or None
         temperatures = [float(t.strip()) for t in (args.temperatures or "").split(",") if t.strip()] or None

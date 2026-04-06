@@ -724,6 +724,16 @@ def build_track_par_database(db_path: str | Path, output_path: str | Path) -> Pa
     return out
 
 
+def calibrate_nr_factor(db_path: str | Path) -> dict:
+    """Run within-horse NR margin factor calibration and return the result dict."""
+    from .features import calibrate_nr_margin_factor
+    conn = connect(db_path)
+    init_db(conn)
+    result = calibrate_nr_margin_factor(conn)
+    conn.close()
+    return result
+
+
 def build_feature_dataset(db_path: str | Path, csv_path: str | Path, track_pars_path: str | Path | None = None) -> Path:
     conn = connect(db_path)
     init_db(conn)

@@ -981,6 +981,75 @@ def generate_track_pars_from_db(conn: sqlite3.Connection) -> dict:
     }
 
 
+def calibrate_nr_margin_factor(conn: sqlite3.Connection, min_grade_spread: int = 5) -> dict:
+    """Estimate the margin-per-NR-point effect from within-horse grade comparisons.
+
+    For each horse with runs at ≥2 NR ceiling values spanning ≥min_grade_spread
+    points, computes pairwise slopes (Δmargin / ΔNR) and returns the median
+    and mean across all contributing horses.
+
+    Uses within-horse comparisons to avoid selection bias (better horses tend
+    to run in higher grades, masking the true grade effect in pooled data).
+    """
+    rows = conn.execute(
+        """
+        SELECT horse_id, line_nr_ceiling, AVG(adjusted_margin) AS avg_margin, COUNT(*) AS n
+        FROM runner_recent_lines
+        WHERE line_nr_ceiling IS NOT NULL
+          AND adjusted_margin IS NOT NULL
+          AND null_run = 0
+          AND adjusted_margin <= 50
+        GROUP BY horse_id, line_nr_ceiling
+        """
+    ).fetchall()
+
+    # Group into {horse_id: {nr_ceiling: avg_margin}}
+    by_horse: dict[int, dict[int, float]] = {}
+    for row in rows:
+        by_horse.setdefault(row["horse_id"], {})[int(row["line_nr_ceiling"])] = float(row["avg_margin"])
+
+    slopes: list[float] = []
+    horses_used = 0
+    for horse_id, grade_map in by_horse.items():
+        nrs = sorted(grade_map.keys())
+        if max(nrs) - min(nrs) < min_grade_spread:
+            continue
+        # All pairwise slopes where the NR spread meets the minimum
+        horse_slopes: list[float] = []
+        for i, nr_lo in enumerate(nrs):
+            for nr_hi in nrs[i + 1:]:
+                if nr_hi - nr_lo < min_grade_spread:
+                    continue
+                delta_margin = grade_map[nr_hi] - grade_map[nr_lo]
+                delta_nr = nr_hi - nr_lo
+                horse_slopes.append(delta_margin / delta_nr)
+        if horse_slopes:
+            slopes.append(sum(horse_slopes) / len(horse_slopes))
+            horses_used += 1
+
+    if not slopes:
+        return {"horses": 0, "median": None, "mean": None, "suggested": _NR_MARGIN_FACTOR}
+
+    slopes_sorted = sorted(slopes)
+    n = len(slopes_sorted)
+    median = (
+        slopes_sorted[n // 2] if n % 2
+        else (slopes_sorted[n // 2 - 1] + slopes_sorted[n // 2]) / 2
+    )
+    mean = sum(slopes_sorted) / n
+    # Round to nearest 0.25 for interpretability
+    suggested = round(round(median / 0.25) * 0.25, 2)
+
+    return {
+        "horses": horses_used,
+        "median": round(median, 3),
+        "mean": round(mean, 3),
+        "suggested": suggested,
+        "current": _NR_MARGIN_FACTOR,
+        "min_grade_spread": min_grade_spread,
+    }
+
+
 def write_track_pars(track_pars: dict, output_path: str | Path) -> Path:
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
