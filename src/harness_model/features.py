@@ -259,10 +259,24 @@ def _build_feature_row(
     # Each prior SP is weighted by grade context: an SP earned in a tougher race
     # (higher line_nr_ceiling) than today is more informative (weight > 1.0);
     # an SP earned in an easier race is less informative (weight < 1.0).
-    if len(sp_values) >= 2:
-        last_prob = 1.0 / sp_values[0]
-        prior_probs = [1.0 / s for s in sp_values[1:]]
-        prior_nrs = sp_nr_values[1:]
+    #
+    # When today's race has an NR ceiling, only NR-graded prior runs (those with
+    # line_nr_ceiling set) are used for the trend. No NR runs (Breeders Challenge,
+    # trials, elite restricted series) are on a different grade scale — mixing
+    # them produces false drift signals (e.g. heat $1.50 → G1 final $18 looks
+    # like a drift but is normal intra-series price movement).
+    if race_nr_ceiling is not None:
+        nr_pairs = [(sp, nr) for sp, nr in zip(sp_values, sp_nr_values) if nr is not None]
+        trend_sps = [sp for sp, _ in nr_pairs]
+        trend_nrs = [nr for _, nr in nr_pairs]
+    else:
+        trend_sps = sp_values
+        trend_nrs = sp_nr_values
+
+    if len(trend_sps) >= 2:
+        last_prob = 1.0 / trend_sps[0]
+        prior_probs = [1.0 / s for s in trend_sps[1:]]
+        prior_nrs = trend_nrs[1:]
         if race_nr_ceiling is not None and any(n is not None for n in prior_nrs):
             prior_weights = [
                 max(0.5, min(2.0, 1.0 + (n - race_nr_ceiling) / 20.0)) if n is not None else 1.0
@@ -844,10 +858,12 @@ def _second_up_improvement(days_since_last_run: int | None, recent_lines: list[d
 
 
 def _days_since_last_run(recent_lines: list[dict[str, object]], meeting_date: object) -> int | None:
-    """Return days between the most recent valid recent-line run_date and meeting_date.
+    """Return days between the most recent run_date and meeting_date.
 
+    Uses ALL recent lines including null_runs — a horse that broke or was
+    checked still physically raced and its fitness window starts from that date.
     Both dates are expected in 'D Mon YYYY' format (e.g. '29 Mar 2026').
-    Returns None if either date cannot be parsed or no valid lines exist.
+    Returns None if either date cannot be parsed or no lines exist.
     """
     MONTHS = {
         "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
@@ -870,8 +886,6 @@ def _days_since_last_run(recent_lines: list[dict[str, object]], meeting_date: ob
 
     latest = None
     for line in recent_lines:
-        if _truthy(line.get("null_run")):
-            continue
         d = _parse(line.get("run_date"))
         if d is None:
             continue
