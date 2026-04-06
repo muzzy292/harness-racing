@@ -341,9 +341,24 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         step = (market_max - market_min) / 10.0
         market_wt = round(market_max - step * (career_starts - 5), 2)
 
+    # --- ceiling (multi-step: soft cap + reliability + recency) ---
+    _ceiling_support_rate = _to_float(row.get("ceiling_support_rate"))
+    _ceiling_best_run_index = _to_int(row.get("ceiling_best_run_index"))
+    _raw_ceiling = _neg_scale(ceiling_adj, divisor=10.0, floor=-3.5, missing=0.0)
+    # Soft cap: compress upside above 1.0 so one freak run can't dominate
+    if _raw_ceiling > 1.0:
+        _raw_ceiling = 1.0 + (_raw_ceiling - 1.0) * 0.4
+    # Reliability: how often does the horse run within 6m of its ceiling?
+    # Floor at 35% so explosive horses aren't completely ignored.
+    _ceiling_reliability = (0.35 + 0.65 * _ceiling_support_rate) if _ceiling_support_rate is not None else 1.0
+    # Recency: mild decay — map/tempo can distort recent results so don't over-punish older ceiling
+    _recency_table = {0: 1.00, 1: 0.92, 2: 0.84, 3: 0.76}
+    _ceiling_recency = _recency_table.get(_ceiling_best_run_index, 0.68) if _ceiling_best_run_index is not None else 1.0
+    ceiling_score = _raw_ceiling * _ceiling_reliability * _ceiling_recency * w.get("ceiling", 1.2)
+
     return {
         "consistency": _neg_scale(consistency_adj, divisor=12.0, floor=-4.0, missing=0.0) * w.get("consistency", 1.8),
-        "ceiling":     _neg_scale(ceiling_adj,     divisor=10.0, floor=-3.5, missing=0.0) * w.get("ceiling", 1.2),
+        "ceiling":     ceiling_score,
         "late_speed":  _neg_scale(sec3,            divisor=1.2,  floor=-2.5, missing=0.0) * w.get("late_speed", 1.4),
         # comment_adj removed — the margin adjustments in adjusted_margin already
         # capture positional/trouble credit. Using it as a separate feature

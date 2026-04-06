@@ -212,6 +212,22 @@ def _build_feature_row(
             else:
                 class_adj_recent_margins.append(margin)
                 class_adj_recent_margins_raw.append(margin)
+    # Ceiling support rate and best-run index — mirror the priority logic in odds.py
+    # so both columns align with whichever margin list ceiling_adj is drawn from.
+    _ceiling_margins: list[float] = (
+        class_adj_recent_margins_raw if (_class_adj_nr_count >= 1 and class_adj_recent_margins_raw)
+        else (primary_adj_margins[:5] if primary_adj_margins else adj_recent_margins)
+    )
+    if _ceiling_margins:
+        _ceiling_val = min(_ceiling_margins)
+        ceiling_support_rate: float | None = round(
+            sum(1 for m in _ceiling_margins if m <= _ceiling_val + 6.0) / len(_ceiling_margins), 4
+        )
+        ceiling_best_run_index: int | None = _ceiling_margins.index(_ceiling_val)
+    else:
+        ceiling_support_rate = None
+        ceiling_best_run_index = None
+
     raw_run_purses = [line["run_purse"] for line in recent_lines if line.get("run_purse") is not None]
     capped_run_purses = _cap_outlier_stakes([float(p) for p in raw_run_purses])
     avg_recent_run_purse = _avg(capped_run_purses[:5])
@@ -329,6 +345,8 @@ def _build_feature_row(
         "nr_grade_delta": nr_grade_delta,
         "recent_line_avg_class_adj_margin": _avg(class_adj_recent_margins) if (len(class_adj_recent_margins) >= 2 and _class_adj_nr_count >= 1) else None,
         "recent_line_best_class_adj_margin": min(class_adj_recent_margins_raw) if (_class_adj_nr_count >= 1 and class_adj_recent_margins_raw) else None,
+        "ceiling_support_rate": ceiling_support_rate,
+        "ceiling_best_run_index": ceiling_best_run_index,
         "race_purse": race_purse,
         "avg_recent_run_purse": avg_recent_run_purse,
         "class_delta": class_delta,
