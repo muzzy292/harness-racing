@@ -28,7 +28,9 @@
   {
     "meeting_code": "TM060426",
     "track_name": "Temora",
-    "meeting_date": "6 Apr 2026"
+    "meeting_date": "6 Apr 2026",
+    "races": 8,
+    "winners": 9
   },
   {
     "meeting_code": "PC070426",
