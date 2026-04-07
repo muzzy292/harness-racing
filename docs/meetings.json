@@ -9,7 +9,9 @@
   {
     "meeting_code": "NR060426",
     "track_name": "Newcastle",
-    "meeting_date": "6 Apr 2026"
+    "meeting_date": "6 Apr 2026",
+    "races": 6,
+    "winners": 6
   },
   {
     "meeting_code": "EY040426",
