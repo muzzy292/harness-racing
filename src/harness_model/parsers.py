@@ -150,7 +150,7 @@ def parse_results_html(html: str, meeting_code: str) -> list[ResultRunner]:
     )
     row_pattern = re.compile(
         r"<tr>\s*"
-        r'<td class="horse_number">\s*(?P<place>\d+)?\s*</td>.*?'
+        r'<td class="horse_number">\s*(?P<place>\*?\d+)?\s*</td>.*?'
         r'<a href="[^"]*horseId=(?P<horse_id>\d+)" class="horse_name_link">(?P<horse_name>[^<]+)</a>.*?'
         r'<td class="margin">\s*(?P<margin>[^<]*)</td>.*?'
         r'<td class="starting_price[^"]*">\s*(?P<starting_price>.*?)</td>',
@@ -171,7 +171,7 @@ def parse_results_html(html: str, meeting_code: str) -> list[ResultRunner]:
 
         table_html = table_match.group("table")
         for row_match in row_pattern.finditer(table_html):
-            place_text = (row_match.group("place") or "").strip()
+            place_text = (row_match.group("place") or "").strip().lstrip("*")
             margin_text = _clean_spaces(row_match.group("margin") or "")
             odds_text = _clean_spaces(re.sub(r"<[^>]+>", " ", row_match.group("starting_price") or ""))
             margin = 0.0 if place_text == "1" else (_parse_results_margin(margin_text) if margin_text else None)
