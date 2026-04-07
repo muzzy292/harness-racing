@@ -2,7 +2,9 @@
   {
     "meeting_code": "NA050426",
     "track_name": "Narrabri",
-    "meeting_date": "5 Apr 2026"
+    "meeting_date": "5 Apr 2026",
+    "races": 7,
+    "winners": 7
   },
   {
     "meeting_code": "NR060426",
