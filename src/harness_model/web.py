@@ -51,11 +51,7 @@ def build_meeting_site(
     conn.close()
 
     races_scored = sum(1 for rows in meeting_scores.values() if rows)
-    winners_count = sum(
-        1 for race_results in result_rows.values()
-        for r in race_results.values()
-        if r.get("finish_position") == 1
-    )
+    winners_count = _count_top_pick_winners(meeting_scores, result_rows)
     page_path = out_path / f"{meeting_code}.html"
     page_path.write_text(
         _render_meeting_html(meeting_code, meeting_scores, meeting_meta, result_rows),
@@ -109,6 +105,26 @@ def _load_meeting_metadata(conn: sqlite3.Connection, meeting_code: str) -> dict[
     if not result.get("track_name"):
         result["track_name"] = _track_from_raw_title(result.get("raw_title"))
     return result
+
+
+def _count_top_pick_winners(
+    meeting_scores: dict[int, list[dict[str, object]]],
+    result_rows: dict[int, dict[str, dict[str, Any]]],
+) -> int:
+    """Count races where the model's top pick (highest win_probability) finished first."""
+    count = 0
+    for race_number, rows in meeting_scores.items():
+        if not rows:
+            continue
+        race_results = result_rows.get(race_number, {})
+        if not race_results:
+            continue
+        top_pick = max(rows, key=lambda r: float(r.get("win_probability") or 0.0))
+        top_pick_key = _normalise_name(str(top_pick.get("horse_name") or ""))
+        result = race_results.get(top_pick_key)
+        if result and result.get("finish_position") == 1:
+            count += 1
+    return count
 
 
 def _load_results(conn: sqlite3.Connection, meeting_code: str) -> dict[int, dict[str, dict[str, Any]]]:
@@ -292,11 +308,7 @@ def _render_meeting_html(
     )
 
     races_scored = sum(1 for rows in meeting_scores.values() if rows)
-    winners_count = sum(
-        1 for race_results in result_rows.values()
-        for r in race_results.values()
-        if r.get("finish_position") == 1
-    )
+    winners_count = _count_top_pick_winners(meeting_scores, result_rows)
     summary_cards = [
         ("Meeting", meeting_code),
         ("Track", meeting_meta.get("track_name") or "Unknown"),
@@ -746,11 +758,7 @@ def publish_scored_meeting(
     conn.close()
 
     races_scored = sum(1 for rows in meeting_scores.values() if rows)
-    winners_count = sum(
-        1 for race_results in result_rows.values()
-        for r in race_results.values()
-        if r.get("finish_position") == 1
-    )
+    winners_count = _count_top_pick_winners(meeting_scores, result_rows)
     page_path = docs / f"{meeting_code}.html"
     page_path.write_text(
         _render_meeting_html(meeting_code, meeting_scores, meeting_meta, result_rows),
