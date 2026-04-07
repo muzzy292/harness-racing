@@ -1136,6 +1136,9 @@ def _apply_form_line_text_rules(
             null_run = True
         else:
             comment_adjustment -= 7.5
+    if "out of position at start" in comment:
+        if raw_margin is not None and raw_margin > 20.0:
+            null_run = True
 
     if "locked wheels" in comment:
         null_run = True
