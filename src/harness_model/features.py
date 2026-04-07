@@ -298,7 +298,24 @@ def _build_feature_row(
         trend_nrs = sp_nr_values
 
     if len(trend_sps) >= 2:
-        last_prob = 1.0 / trend_sps[0]
+        # Grade-discount the last SP when the most recent run was at an easier
+        # grade than today.  A $2.10 win in NR52 company overstates the shortening
+        # signal when today's race is NR56+ — the market backed the horse against
+        # weaker opposition, not against today's field.  Discount last_prob by the
+        # same grade-factor formula used for prior weights, capped at 1.0 so we
+        # never inflate the signal for a horse rising in grade (that's already
+        # captured by down-weighting the easier prior SPs).
+        _sp_ref_nr: float | None = race_nr_ceiling if race_nr_ceiling is not None else (
+            _to_float_local(nr_rating) if nr_rating is not None else None
+        )
+        last_sp_nr = trend_nrs[0]
+        last_prob_raw = 1.0 / trend_sps[0]
+        if _sp_ref_nr is not None and last_sp_nr is not None:
+            grade_factor = max(0.5, min(1.0, 1.0 + (last_sp_nr - _sp_ref_nr) / 20.0))
+            last_prob = last_prob_raw * grade_factor
+        else:
+            last_prob = last_prob_raw
+
         prior_probs = [1.0 / s for s in trend_sps[1:]]
         prior_nrs = trend_nrs[1:]
         if race_nr_ceiling is not None and any(n is not None for n in prior_nrs):
