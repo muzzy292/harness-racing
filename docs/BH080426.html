@@ -1,0 +1,2143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bathurst — 8 Apr 2026</title>
+  <style>
+    :root {
+      /* Modern Deep & Crisp Palette */
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --primary: #0f172a;    /* Slate 900 */
+      --secondary: #64748b;  /* Slate 500 */
+      --accent: #10b981;     /* Emerald 500 */
+      --accent-dark: #059669;
+      --accent-soft: #ecfdf5;
+      --border: #e2e8f0;     /* Slate 200 */
+      --pick-bg: #f0f9ff;    /* Sky 50 */
+      --pick-text: #0369a1;  /* Sky 700 */
+      --winner-bg: #f0fdf4;
+      --highlight: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--primary);
+      background-color: var(--bg);
+      line-height: 1.5;
+    }
+
+    .wrap { 
+      max-width: 1200px; 
+      margin: 0 auto; 
+      padding: 40px 20px; 
+    }
+
+    /* Hero Section */
+    .hero {
+      background: var(--primary);
+      color: white;
+      border-radius: 24px;
+      padding: 40px;
+      margin-bottom: 32px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      top: 0; right: 0;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.1);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    h1 { margin: 0; font-size: 42px; font-weight: 800; letter-spacing: -0.02em; }
+    .sub { color: var(--secondary); font-size: 16px; margin-top: 8px; font-weight: 400; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-top: 32px;
+    }
+
+    .summary-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .summary-card .label { 
+      display: block;
+      font-size: 11px; 
+      color: var(--secondary); 
+      text-transform: uppercase; 
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .summary-card .value { font-size: 18px; font-weight: 600; color: white; }
+
+    /* Navigation */
+    .race-nav {
+      position: sticky;
+      top: 16px;
+      z-index: 50;
+      margin-bottom: 32px;
+      padding: 8px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      scrollbar-width: none;
+    }
+
+    .race-nav::-webkit-scrollbar { display: none; }
+
+    .race-nav a {
+      text-decoration: none;
+      white-space: nowrap;
+      color: var(--secondary);
+      background: transparent;
+      border-radius: 10px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .race-nav a:hover {
+      background: var(--highlight);
+      color: var(--primary);
+    }
+
+    /* Race Cards */
+    .race-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 0;
+      margin-bottom: 20px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .race-head {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fafafa;
+    }
+
+    .race-head h2 { margin: 0; font-size: 24px; font-weight: 700; color: var(--primary); }
+    .race-head .top-pick { 
+      font-size: 14px; 
+      background: var(--accent-soft); 
+      color: var(--accent-dark);
+      padding: 6px 14px;
+      border-radius: 99px;
+      font-weight: 600;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 9px 12px;
+      text-align: left;
+      font-size: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: white;
+      color: var(--secondary);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background-color: var(--highlight); }
+
+    /* Special Rows */
+    tr.top-pick-row { background: var(--pick-bg); }
+    tr.top-pick-row:hover { background: #e0f2fe; }
+    tr.result-winner { background: var(--winner-bg); }
+
+    .horse-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .horse-cell strong { font-size: 15px; color: var(--primary); }
+    .horse-cell .meta { color: var(--secondary); font-size: 12px; }
+
+    .pill {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .pill.pick { background: var(--pick-text); color: white; }
+    .pill.win { background: var(--accent); color: white; }
+
+    .muted { color: var(--secondary); opacity: 0.5; }
+
+    /* ── Portrait mobile ── */
+    @media (max-width: 820px) and (orientation: portrait) {
+      .wrap { padding: 12px 8px; }
+      h1 { font-size: 26px; }
+      .hero { padding: 20px 16px; border-radius: 16px; margin-bottom: 16px; }
+      .summary-grid { display: none; }
+      .race-nav { margin-bottom: 16px; }
+      .race-card { border-radius: 12px; margin-bottom: 16px; overflow-x: auto; }
+      .race-head { padding: 12px 16px; flex-direction: column; align-items: flex-start; gap: 6px; }
+      .race-head h2 { font-size: 18px; }
+      .race-head .top-pick { font-size: 12px; }
+      th, td { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+      .horse-cell .meta { display: none; }
+      .horse-cell strong { font-size: 13px; }
+      th:nth-child(4), td:nth-child(4),
+      th:nth-child(6), td:nth-child(6),
+      th:nth-child(7), td:nth-child(7),
+      th:nth-child(8), td:nth-child(8),
+      th:nth-child(9), td:nth-child(9),
+      th:nth-child(12), td:nth-child(12) { display: none; }
+    }
+
+    /* ── Landscape mobile / small tablet ── */
+    @media (max-width: 1024px) and (orientation: landscape) {
+      .wrap { padding: 12px 12px; }
+      .hero { padding: 20px 24px; border-radius: 16px; margin-bottom: 16px; }
+      h1 { font-size: 28px; }
+      .race-card { margin-bottom: 16px; overflow-x: auto; }
+      .race-head { padding: 12px 20px; }
+      .race-head h2 { font-size: 20px; }
+      th, td { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+      .horse-cell .meta { display: none; }
+      table { min-width: 700px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <span class="eyebrow">BH080426</span>
+      <h1>Bathurst — 8 Apr 2026</h1>
+      <p class="sub">Harness Racing Model — Fair Odds &amp; Probabilities</p>
+      <div class="summary-grid">
+        <div class="summary-card">
+          <span class="label">Meeting</span>
+          <span class="value">BH080426</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Track</span>
+          <span class="value">Bathurst</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Date</span>
+          <span class="value">8 Apr 2026</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Races</span>
+          <span class="value">8</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Results Loaded</span>
+          <span class="value">0</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Generated</span>
+          <span class="value">07 Apr 2026 13:05</span>
+        </div>
+        </div>
+    </section>
+    <nav class="race-nav">
+      <a href="index.html">All meetings</a>
+      <a href="#race-1">Race 1</a><a href="#race-2">Race 2</a><a href="#race-3">Race 3</a><a href="#race-4">Race 4</a><a href="#race-5">Race 5</a><a href="#race-6">Race 6</a><a href="#race-7">Race 7</a><a href="#race-8">Race 8</a>
+    </nav>
+    
+    <section id="race-1" class="race-card">
+      <div class="race-head">
+        <h2>Race 1</h2>
+        <div class="top-pick">Top pick: <strong>LUCKY PUNT</strong> at 0.2826</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Horse</th>
+            <th>Barrier</th>
+            <th>Prob</th>
+            <th>Fair Odds</th>
+            <th>S1</th>
+            <th>S2</th>
+            <th>Score</th>
+            <th>Rel</th>
+            <th>Result</th>
+            <th>SP</th>
+            <th>Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td data-label="No">1</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>GET UP BETTY</strong>
+                  <span class="meta">JOSH TURNBULL / AMANDA TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr1</td>
+              <td data-label="Prob">0.0410</td>
+              <td data-label="Fair Odds">24.39</td>
+              <td data-label="S1">-4.730</td>
+              <td data-label="S2">+0.987</td>
+              <td data-label="Score">-3.7434</td>
+              <td data-label="Rel">-1.032</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">2</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>RIVIERE</strong>
+                  <span class="meta">AARON WILLIAMS / CHARLI MASOTTI</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr2</td>
+              <td data-label="Prob">0.0525</td>
+              <td data-label="Fair Odds">19.03</td>
+              <td data-label="S1">-2.864</td>
+              <td data-label="S2">-0.384</td>
+              <td data-label="Score">-3.2475</td>
+              <td data-label="Rel">-0.536</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">3</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>STUDLEIGH SUNRISE</strong>
+                  <span class="meta">JAKE DAVIS / JAKE DAVIS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr3</td>
+              <td data-label="Prob">0.0410</td>
+              <td data-label="Fair Odds">24.39</td>
+              <td data-label="S1">-4.055</td>
+              <td data-label="S2">+0.311</td>
+              <td data-label="Score">-3.7440</td>
+              <td data-label="Rel">-1.033</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">4</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>IZACHEAPEE NZ</strong>
+                  <span class="meta">MITCH TURNBULL / WILL RIXON</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr4</td>
+              <td data-label="Prob">0.2175</td>
+              <td data-label="Fair Odds">4.60</td>
+              <td data-label="S1">-0.302</td>
+              <td data-label="S2">-0.105</td>
+              <td data-label="Score">-0.4069</td>
+              <td data-label="Rel">+2.304</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr class="top-pick-row">
+              <td data-label="No">5</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>LUCKY PUNT</strong>
+                  <span class="meta">JOSH TURNBULL / ELLA TURNBULL</span>
+                  <span><span class="pill pick">Top Pick</span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr5</td>
+              <td data-label="Prob">0.2826</td>
+              <td data-label="Fair Odds">3.54</td>
+              <td data-label="S1">-0.254</td>
+              <td data-label="S2">+0.371</td>
+              <td data-label="Score">0.1174</td>
+              <td data-label="Rel">+2.829</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">6</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>LAYLA SHANNON</strong>
+                  <span class="meta">PETER BULLOCK / TRAVIS BULLOCK</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr6</td>
+              <td data-label="Prob">0.1672</td>
+              <td data-label="Fair Odds">5.98</td>
+              <td data-label="S1">-1.952</td>
+              <td data-label="S2">+1.019</td>
+              <td data-label="Score">-0.9324</td>
+              <td data-label="Rel">+1.779</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">7</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>MAJOR JEWEL</strong>
+                  <span class="meta">GREGORY RUE / JOHN O&#x27;SHEA</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr7</td>
+              <td data-label="Prob">0.0614</td>
+              <td data-label="Fair Odds">16.29</td>
+              <td data-label="S1">-2.465</td>
+              <td data-label="S2">-0.471</td>
+              <td data-label="Score">-2.9360</td>
+              <td data-label="Rel">-0.225</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">8</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>DEAR DARLING</strong>
+                  <span class="meta">STEVE TURNBULL / JETT TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr8</td>
+              <td data-label="Prob">0.0108</td>
+              <td data-label="Fair Odds">92.28</td>
+              <td data-label="S1">-5.896</td>
+              <td data-label="S2">-0.509</td>
+              <td data-label="Score">-6.4049</td>
+              <td data-label="Rel">-3.693</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">9</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>SMOOTH CHAKRA</strong>
+                  <span class="meta">MAT RUE / MAT RUE</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr1</td>
+              <td data-label="Prob">0.0724</td>
+              <td data-label="Fair Odds">13.81</td>
+              <td data-label="S1">-2.221</td>
+              <td data-label="S2">-0.384</td>
+              <td data-label="Score">-2.6058</td>
+              <td data-label="Rel">+0.106</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">10</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>THE ROGUE I AM</strong>
+                  <span class="meta">NATHAN HURST / BLAKE MEDLYN</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr2</td>
+              <td data-label="Prob">0.0535</td>
+              <td data-label="Fair Odds">18.69</td>
+              <td data-label="S1">-1.463</td>
+              <td data-label="S2">-1.748</td>
+              <td data-label="Score">-3.2109</td>
+              <td data-label="Rel">-0.499</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+        </tbody>
+      </table>
+    </section>
+    
+    <section id="race-2" class="race-card">
+      <div class="race-head">
+        <h2>Race 2</h2>
+        <div class="top-pick">Top pick: <strong>TASBMIKI</strong> at 0.4412</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Horse</th>
+            <th>Barrier</th>
+            <th>Prob</th>
+            <th>Fair Odds</th>
+            <th>S1</th>
+            <th>S2</th>
+            <th>Score</th>
+            <th>Rel</th>
+            <th>Result</th>
+            <th>SP</th>
+            <th>Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td data-label="No">1</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ITS DOWN TO DIGGER</strong>
+                  <span class="meta">NATHAN TURNBULL / JETT TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr1</td>
+              <td data-label="Prob">0.0225</td>
+              <td data-label="Fair Odds">44.45</td>
+              <td data-label="S1">-2.500</td>
+              <td data-label="S2">+0.134</td>
+              <td data-label="Score">-2.3659</td>
+              <td data-label="Rel">-1.957</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">2</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>CARBAGANOOSH</strong>
+                  <span class="meta">DARRELL DWYER / ERIKA DWYER</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr2</td>
+              <td data-label="Prob">0.2116</td>
+              <td data-label="Fair Odds">4.73</td>
+              <td data-label="S1">+2.142</td>
+              <td data-label="S2">-0.025</td>
+              <td data-label="Score">2.1165</td>
+              <td data-label="Rel">+2.525</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr class="top-pick-row">
+              <td data-label="No">3</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>TASBMIKI</strong>
+                  <span class="meta">AARON WILLIAMS / MAT RUE</span>
+                  <span><span class="pill pick">Top Pick</span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr3</td>
+              <td data-label="Prob">0.4412</td>
+              <td data-label="Fair Odds">2.27</td>
+              <td data-label="S1">+3.242</td>
+              <td data-label="S2">+0.345</td>
+              <td data-label="Score">3.5865</td>
+              <td data-label="Rel">+3.995</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">4</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ROCKIN IN PARADISE</strong>
+                  <span class="meta">ANTHONY FRISBY / ANTHONY FRISBY</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr4</td>
+              <td data-label="Prob">0.0358</td>
+              <td data-label="Fair Odds">27.96</td>
+              <td data-label="S1">-2.232</td>
+              <td data-label="S2">+0.794</td>
+              <td data-label="Score">-1.4384</td>
+              <td data-label="Rel">-1.030</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">5</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>STUDLEIGH MELISE</strong>
+                  <span class="meta">JAKE DAVIS / BLAKE MEDLYN</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr5</td>
+              <td data-label="Prob">0.0581</td>
+              <td data-label="Fair Odds">17.20</td>
+              <td data-label="S1">-0.935</td>
+              <td data-label="S2">+0.467</td>
+              <td data-label="Score">-0.4675</td>
+              <td data-label="Rel">-0.059</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">6</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>TAKE OUT</strong>
+                  <span class="meta">AMANDA TURNBULL / AMANDA TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr6</td>
+              <td data-label="Prob">0.0707</td>
+              <td data-label="Fair Odds">14.14</td>
+              <td data-label="S1">-0.725</td>
+              <td data-label="S2">+0.650</td>
+              <td data-label="Score">-0.0747</td>
+              <td data-label="Rel">+0.334</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">7</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>BETTOR KEPPEL</strong>
+                  <span class="meta">MITCH TURNBULL / ELLA TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr7</td>
+              <td data-label="Prob">0.0400</td>
+              <td data-label="Fair Odds">25.03</td>
+              <td data-label="S1">-0.272</td>
+              <td data-label="S2">-0.945</td>
+              <td data-label="Score">-1.2171</td>
+              <td data-label="Rel">-0.808</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">8</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>VAMOS</strong>
+                  <span class="meta">BRETT DAVIS / OLIVIA FRISBY</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr8</td>
+              <td data-label="Prob">0.0552</td>
+              <td data-label="Fair Odds">18.12</td>
+              <td data-label="S1">+0.282</td>
+              <td data-label="S2">-0.853</td>
+              <td data-label="Score">-0.5712</td>
+              <td data-label="Rel">-0.163</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">9</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>FLIPTOP BOTTLESHOP</strong>
+                  <span class="meta">NATHAN TURNBULL / CHARLI MASOTTI</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr1</td>
+              <td data-label="Prob">0.0188</td>
+              <td data-label="Fair Odds">53.08</td>
+              <td data-label="S1">-1.986</td>
+              <td data-label="S2">-0.735</td>
+              <td data-label="Score">-2.7209</td>
+              <td data-label="Rel">-2.312</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">10</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>HELLO I TEA</strong>
+                  <span class="meta">NATHAN TURNBULL / MATTHEW ATKINSON</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr2</td>
+              <td data-label="Prob">0.0461</td>
+              <td data-label="Fair Odds">21.71</td>
+              <td data-label="S1">+0.391</td>
+              <td data-label="S2">-1.324</td>
+              <td data-label="Score">-0.9331</td>
+              <td data-label="Rel">-0.524</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+        </tbody>
+      </table>
+    </section>
+    
+    <section id="race-3" class="race-card">
+      <div class="race-head">
+        <h2>Race 3</h2>
+        <div class="top-pick">Top pick: <strong>COLLECT A DIME</strong> at 0.1934</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Horse</th>
+            <th>Barrier</th>
+            <th>Prob</th>
+            <th>Fair Odds</th>
+            <th>S1</th>
+            <th>S2</th>
+            <th>Score</th>
+            <th>Rel</th>
+            <th>Result</th>
+            <th>SP</th>
+            <th>Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td data-label="No">1</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>NICELY SPOKEN</strong>
+                  <span class="meta">NATHAN TURNBULL / JETT TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr1</td>
+              <td data-label="Prob">0.1046</td>
+              <td data-label="Fair Odds">9.56</td>
+              <td data-label="S1">-0.998</td>
+              <td data-label="S2">+1.068</td>
+              <td data-label="Score">0.0698</td>
+              <td data-label="Rel">+0.258</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">2</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>GO WITHOUT</strong>
+                  <span class="meta">NATHAN TURNBULL / TRAVIS BULLOCK</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr2</td>
+              <td data-label="Prob">0.0755</td>
+              <td data-label="Fair Odds">13.25</td>
+              <td data-label="S1">-0.633</td>
+              <td data-label="S2">+0.050</td>
+              <td data-label="Score">-0.5833</td>
+              <td data-label="Rel">-0.395</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr class="top-pick-row">
+              <td data-label="No">3</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>COLLECT A DIME</strong>
+                  <span class="meta">JOSH TURNBULL / ELLA TURNBULL</span>
+                  <span><span class="pill pick">Top Pick</span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr3</td>
+              <td data-label="Prob">0.1934</td>
+              <td data-label="Fair Odds">5.17</td>
+              <td data-label="S1">+0.369</td>
+              <td data-label="S2">+0.929</td>
+              <td data-label="Score">1.2990</td>
+              <td data-label="Rel">+1.488</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">4</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ALWAYSBMYPONY</strong>
+                  <span class="meta">STEVE TURNBULL / OLIVIA FRISBY</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr4</td>
+              <td data-label="Prob">0.1187</td>
+              <td data-label="Fair Odds">8.42</td>
+              <td data-label="S1">+0.811</td>
+              <td data-label="S2">-0.488</td>
+              <td data-label="Score">0.3231</td>
+              <td data-label="Rel">+0.512</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">5</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>BORROWED TIME</strong>
+                  <span class="meta">NATHAN TURNBULL / MATTHEW ATKINSON</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr5</td>
+              <td data-label="Prob">0.0701</td>
+              <td data-label="Fair Odds">14.26</td>
+              <td data-label="S1">-0.514</td>
+              <td data-label="S2">-0.215</td>
+              <td data-label="Score">-0.7294</td>
+              <td data-label="Rel">-0.541</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">6</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>INDASKY NZ</strong>
+                  <span class="meta">NATHAN TURNBULL / DECLAN MURPHY</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr6</td>
+              <td data-label="Prob">0.0594</td>
+              <td data-label="Fair Odds">16.84</td>
+              <td data-label="S1">-0.570</td>
+              <td data-label="S2">-0.492</td>
+              <td data-label="Score">-1.0623</td>
+              <td data-label="Rel">-0.874</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">7</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ART OF TERROR</strong>
+                  <span class="meta">NATHAN TURNBULL / AMANDA TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr7</td>
+              <td data-label="Prob">0.0484</td>
+              <td data-label="Fair Odds">20.66</td>
+              <td data-label="S1">-1.292</td>
+              <td data-label="S2">-0.179</td>
+              <td data-label="Score">-1.4710</td>
+              <td data-label="Rel">-1.282</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">8</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>NOSAER</strong>
+                  <span class="meta">NATHAN TURNBULL / CHARLI MASOTTI</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr8</td>
+              <td data-label="Prob">0.1481</td>
+              <td data-label="Fair Odds">6.75</td>
+              <td data-label="S1">+1.135</td>
+              <td data-label="S2">-0.369</td>
+              <td data-label="Score">0.7658</td>
+              <td data-label="Rel">+0.954</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">9</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>BETTING RANGER</strong>
+                  <span class="meta">ADAM BELLACH / ANGELA HURST</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr1</td>
+              <td data-label="Prob">0.0736</td>
+              <td data-label="Fair Odds">13.58</td>
+              <td data-label="S1">+1.390</td>
+              <td data-label="S2">-2.022</td>
+              <td data-label="Score">-0.6325</td>
+              <td data-label="Rel">-0.444</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">10</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>TAPAGANOOSH</strong>
+                  <span class="meta">DARRELL DWYER / BLAKE MEDLYN</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr2</td>
+              <td data-label="Prob">0.1081</td>
+              <td data-label="Fair Odds">9.25</td>
+              <td data-label="S1">+0.974</td>
+              <td data-label="S2">-0.839</td>
+              <td data-label="Score">0.1354</td>
+              <td data-label="Rel">+0.324</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+        </tbody>
+      </table>
+    </section>
+    
+    <section id="race-4" class="race-card">
+      <div class="race-head">
+        <h2>Race 4</h2>
+        <div class="top-pick">Top pick: <strong>JORGE STREET</strong> at 0.5284</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Horse</th>
+            <th>Barrier</th>
+            <th>Prob</th>
+            <th>Fair Odds</th>
+            <th>S1</th>
+            <th>S2</th>
+            <th>Score</th>
+            <th>Rel</th>
+            <th>Result</th>
+            <th>SP</th>
+            <th>Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td data-label="No">1</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>GRAYSON RED</strong>
+                  <span class="meta">MAT RUE / MAT RUE</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr1</td>
+              <td data-label="Prob">0.0254</td>
+              <td data-label="Fair Odds">39.32</td>
+              <td data-label="S1">-0.714</td>
+              <td data-label="S2">-0.512</td>
+              <td data-label="Score">-1.2262</td>
+              <td data-label="Rel">-1.478</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">2</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>SAINT VERAN</strong>
+                  <span class="meta">MITCH TURNBULL / WILL RIXON</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr2</td>
+              <td data-label="Prob">0.1121</td>
+              <td data-label="Fair Odds">8.92</td>
+              <td data-label="S1">+2.132</td>
+              <td data-label="S2">-0.391</td>
+              <td data-label="Score">1.7411</td>
+              <td data-label="Rel">+1.489</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">3</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ALLSTARZZZ FRANKIE</strong>
+                  <span class="meta">STEVE TURNBULL / OLIVIA FRISBY</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr3</td>
+              <td data-label="Prob">0.0693</td>
+              <td data-label="Fair Odds">14.42</td>
+              <td data-label="S1">+1.405</td>
+              <td data-label="S2">-0.625</td>
+              <td data-label="Score">0.7797</td>
+              <td data-label="Rel">+0.528</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">4</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>HOLY CAMP DILLON</strong>
+                  <span class="meta">JOSH TURNBULL / ELLA TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr4</td>
+              <td data-label="Prob">0.0226</td>
+              <td data-label="Fair Odds">44.29</td>
+              <td data-label="S1">-1.428</td>
+              <td data-label="S2">-0.036</td>
+              <td data-label="Score">-1.4643</td>
+              <td data-label="Rel">-1.716</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">5</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>OUR GEORGE BOSTON</strong>
+                  <span class="meta">NATHAN TURNBULL / MATTHEW ATKINSON</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr5</td>
+              <td data-label="Prob">0.0298</td>
+              <td data-label="Fair Odds">33.50</td>
+              <td data-label="S1">-1.038</td>
+              <td data-label="S2">+0.132</td>
+              <td data-label="Score">-0.9060</td>
+              <td data-label="Rel">-1.158</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">6</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>FIRESTORM RED</strong>
+                  <span class="meta">STEVE TURNBULL / AMANDA TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr6</td>
+              <td data-label="Prob">0.0118</td>
+              <td data-label="Fair Odds">84.49</td>
+              <td data-label="S1">-2.172</td>
+              <td data-label="S2">-0.584</td>
+              <td data-label="Score">-2.7560</td>
+              <td data-label="Rel">-3.008</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">7</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>THE METAL FLYER</strong>
+                  <span class="meta">KERRYANN MORRIS / ROBERT MORRIS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr7</td>
+              <td data-label="Prob">0.0392</td>
+              <td data-label="Fair Odds">25.49</td>
+              <td data-label="S1">-0.184</td>
+              <td data-label="S2">-0.176</td>
+              <td data-label="Score">-0.3596</td>
+              <td data-label="Rel">-0.612</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">8</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>REBOUNDER</strong>
+                  <span class="meta">JOHN O&#x27;SHEA / JOHN O&#x27;SHEA</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr8</td>
+              <td data-label="Prob">0.1103</td>
+              <td data-label="Fair Odds">9.06</td>
+              <td data-label="S1">+2.526</td>
+              <td data-label="S2">-0.818</td>
+              <td data-label="Score">1.7086</td>
+              <td data-label="Rel">+1.456</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">9</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>HUNTER SHANNON</strong>
+                  <span class="meta">PETER BULLOCK / TRAVIS BULLOCK</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr1</td>
+              <td data-label="Prob">0.0509</td>
+              <td data-label="Fair Odds">19.64</td>
+              <td data-label="S1">+0.106</td>
+              <td data-label="S2">+0.056</td>
+              <td data-label="Score">0.1620</td>
+              <td data-label="Rel">-0.090</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr class="top-pick-row">
+              <td data-label="No">10</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>JORGE STREET</strong>
+                  <span class="meta">NATHAN TURNBULL / DECLAN MURPHY</span>
+                  <span><span class="pill pick">Top Pick</span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr2</td>
+              <td data-label="Prob">0.5284</td>
+              <td data-label="Fair Odds">1.89</td>
+              <td data-label="S1">+5.759</td>
+              <td data-label="S2">-0.918</td>
+              <td data-label="Score">4.8413</td>
+              <td data-label="Rel">+4.589</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+        </tbody>
+      </table>
+    </section>
+    
+    <section id="race-5" class="race-card">
+      <div class="race-head">
+        <h2>Race 5</h2>
+        <div class="top-pick">Top pick: <strong>RED BULL BERNIE</strong> at 0.2361</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Horse</th>
+            <th>Barrier</th>
+            <th>Prob</th>
+            <th>Fair Odds</th>
+            <th>S1</th>
+            <th>S2</th>
+            <th>Score</th>
+            <th>Rel</th>
+            <th>Result</th>
+            <th>SP</th>
+            <th>Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td data-label="No">1</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>LOCHINVAR MARCELLO</strong>
+                  <span class="meta">KERRYANN MORRIS / ROBERT MORRIS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr1</td>
+              <td data-label="Prob">0.1951</td>
+              <td data-label="Fair Odds">5.12</td>
+              <td data-label="S1">+0.942</td>
+              <td data-label="S2">+0.452</td>
+              <td data-label="Score">1.3938</td>
+              <td data-label="Rel">+1.665</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">2</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>CHEVAL JULIA</strong>
+                  <span class="meta">STEVE TURNBULL / JETT TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr2</td>
+              <td data-label="Prob">0.0400</td>
+              <td data-label="Fair Odds">24.98</td>
+              <td data-label="S1">-2.403</td>
+              <td data-label="S2">+0.629</td>
+              <td data-label="Score">-1.7741</td>
+              <td data-label="Rel">-1.503</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">3</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>BILLS SWAN SONG</strong>
+                  <span class="meta">DAVID REYNOLDS / JUSTIN REYNOLDS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr3</td>
+              <td data-label="Prob">0.0279</td>
+              <td data-label="Fair Odds">35.80</td>
+              <td data-label="S1">-1.834</td>
+              <td data-label="S2">-0.660</td>
+              <td data-label="Score">-2.4937</td>
+              <td data-label="Rel">-2.223</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">4</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>AURORA MIGHTY ROB</strong>
+                  <span class="meta">AMANDA TURNBULL / AMANDA TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr4</td>
+              <td data-label="Prob">0.1869</td>
+              <td data-label="Fair Odds">5.35</td>
+              <td data-label="S1">+0.508</td>
+              <td data-label="S2">+0.799</td>
+              <td data-label="Score">1.3077</td>
+              <td data-label="Rel">+1.579</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">5</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>COWBOY CULTURE</strong>
+                  <span class="meta">MITCH TURNBULL / WILL RIXON</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr5</td>
+              <td data-label="Prob">0.1358</td>
+              <td data-label="Fair Odds">7.36</td>
+              <td data-label="S1">+1.277</td>
+              <td data-label="S2">-0.608</td>
+              <td data-label="Score">0.6695</td>
+              <td data-label="Rel">+0.940</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr class="top-pick-row">
+              <td data-label="No">6</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>RED BULL BERNIE</strong>
+                  <span class="meta">BERNIE HEWITT / BERNIE HEWITT</span>
+                  <span><span class="pill pick">Top Pick</span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr6</td>
+              <td data-label="Prob">0.2361</td>
+              <td data-label="Fair Odds">4.24</td>
+              <td data-label="S1">+1.533</td>
+              <td data-label="S2">+0.242</td>
+              <td data-label="Score">1.7750</td>
+              <td data-label="Rel">+2.046</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">7</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>IN LEXYS WORDS</strong>
+                  <span class="meta">BERNIE HEWITT / JASON HEWITT</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr7</td>
+              <td data-label="Prob">0.0533</td>
+              <td data-label="Fair Odds">18.76</td>
+              <td data-label="S1">-0.840</td>
+              <td data-label="S2">-0.362</td>
+              <td data-label="Score">-1.2019</td>
+              <td data-label="Rel">-0.931</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">8</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>SMOOTH BUCKAROO</strong>
+                  <span class="meta">STEVE TURNBULL / ISOBEL ROSS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr8</td>
+              <td data-label="Prob">0.0870</td>
+              <td data-label="Fair Odds">11.49</td>
+              <td data-label="S1">+0.199</td>
+              <td data-label="S2">-0.419</td>
+              <td data-label="Score">-0.2209</td>
+              <td data-label="Rel">+0.050</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">9</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>STUDLEIGH FURY</strong>
+                  <span class="meta">JAKE DAVIS / JAKE DAVIS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr1</td>
+              <td data-label="Prob">0.0377</td>
+              <td data-label="Fair Odds">26.52</td>
+              <td data-label="S1">-1.462</td>
+              <td data-label="S2">-0.432</td>
+              <td data-label="Score">-1.8939</td>
+              <td data-label="Rel">-1.623</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+        </tbody>
+      </table>
+    </section>
+    
+    <section id="race-6" class="race-card">
+      <div class="race-head">
+        <h2>Race 6</h2>
+        <div class="top-pick">Top pick: <strong>YOU ARE MY WISH</strong> at 0.6434</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Horse</th>
+            <th>Barrier</th>
+            <th>Prob</th>
+            <th>Fair Odds</th>
+            <th>S1</th>
+            <th>S2</th>
+            <th>Score</th>
+            <th>Rel</th>
+            <th>Result</th>
+            <th>SP</th>
+            <th>Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td data-label="No">1</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ROCKNROLL BLING</strong>
+                  <span class="meta">GRAHAM BETTS / GRAHAM BETTS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr1</td>
+              <td data-label="Prob">0.0420</td>
+              <td data-label="Fair Odds">23.84</td>
+              <td data-label="S1">-4.150</td>
+              <td data-label="S2">+0.266</td>
+              <td data-label="Score">-3.8839</td>
+              <td data-label="Rel">-0.073</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr class="top-pick-row">
+              <td data-label="No">2</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>YOU ARE MY WISH</strong>
+                  <span class="meta">KERRYANN MORRIS / ROBERT MORRIS</span>
+                  <span><span class="pill pick">Top Pick</span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr2</td>
+              <td data-label="Prob">0.6434</td>
+              <td data-label="Fair Odds">1.55</td>
+              <td data-label="S1">+1.026</td>
+              <td data-label="S2">+0.551</td>
+              <td data-label="Score">1.5767</td>
+              <td data-label="Rel">+5.387</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">3</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>TALK TO LEXY</strong>
+                  <span class="meta">BERNIE HEWITT / JASON HEWITT</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr3</td>
+              <td data-label="Prob">0.0367</td>
+              <td data-label="Fair Odds">27.24</td>
+              <td data-label="S1">-4.887</td>
+              <td data-label="S2">+0.736</td>
+              <td data-label="Score">-4.1510</td>
+              <td data-label="Rel">-0.340</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">4</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>REDEMPTION MISS</strong>
+                  <span class="meta">BERNIE HEWITT / BERNIE HEWITT</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr4</td>
+              <td data-label="Prob">0.0033</td>
+              <td data-label="Fair Odds">303.73</td>
+              <td data-label="S1">-9.544</td>
+              <td data-label="S2">+0.571</td>
+              <td data-label="Score">-8.9737</td>
+              <td data-label="Rel">-5.163</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">5</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ROCKY ROAD STAR</strong>
+                  <span class="meta">STEPHEN CONROY / DECLAN MURPHY</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr5</td>
+              <td data-label="Prob">0.0813</td>
+              <td data-label="Fair Odds">12.29</td>
+              <td data-label="S1">-2.530</td>
+              <td data-label="S2">-0.029</td>
+              <td data-label="Score">-2.5598</td>
+              <td data-label="Rel">+1.251</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">6</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>SMOOTH JESSIE</strong>
+                  <span class="meta">STEVE TURNBULL / ISOBEL ROSS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr6</td>
+              <td data-label="Prob">0.1357</td>
+              <td data-label="Fair Odds">7.37</td>
+              <td data-label="S1">-1.991</td>
+              <td data-label="S2">+0.454</td>
+              <td data-label="Score">-1.5365</td>
+              <td data-label="Rel">+2.274</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">7</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>CHEVAL TIGER</strong>
+                  <span class="meta">STEVE TURNBULL / AMANDA TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr7</td>
+              <td data-label="Prob">0.0505</td>
+              <td data-label="Fair Odds">19.78</td>
+              <td data-label="S1">-2.891</td>
+              <td data-label="S2">-0.620</td>
+              <td data-label="Score">-3.5112</td>
+              <td data-label="Rel">+0.299</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">8</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>BOPPER</strong>
+                  <span class="meta">AARON WILLIAMS / TOM PAY</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr8</td>
+              <td data-label="Prob">0.0071</td>
+              <td data-label="Fair Odds">141.49</td>
+              <td data-label="S1">-7.194</td>
+              <td data-label="S2">-0.252</td>
+              <td data-label="Score">-7.4459</td>
+              <td data-label="Rel">-3.635</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+        </tbody>
+      </table>
+    </section>
+    
+    <section id="race-7" class="race-card">
+      <div class="race-head">
+        <h2>Race 7</h2>
+        <div class="top-pick">Top pick: <strong>LUCKY ZARA</strong> at 0.4277</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Horse</th>
+            <th>Barrier</th>
+            <th>Prob</th>
+            <th>Fair Odds</th>
+            <th>S1</th>
+            <th>S2</th>
+            <th>Score</th>
+            <th>Rel</th>
+            <th>Result</th>
+            <th>SP</th>
+            <th>Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td data-label="No">1</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ROCK THE NATION NZ</strong>
+                  <span class="meta">DAVID MICALLEF / HARRISON ROSS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr1</td>
+              <td data-label="Prob">0.1701</td>
+              <td data-label="Fair Odds">5.88</td>
+              <td data-label="S1">-0.136</td>
+              <td data-label="S2">+0.253</td>
+              <td data-label="Score">0.1171</td>
+              <td data-label="Rel">+1.969</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">2</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ABSOLUTE WEAPON</strong>
+                  <span class="meta">KELVIN WINNELL / ANTHONY WINNELL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr2</td>
+              <td data-label="Prob">0.1011</td>
+              <td data-label="Fair Odds">9.89</td>
+              <td data-label="S1">-0.861</td>
+              <td data-label="S2">-0.063</td>
+              <td data-label="Score">-0.9246</td>
+              <td data-label="Rel">+0.927</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">3</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ALTA DOWNS</strong>
+                  <span class="meta">GEOFF LAWSON / TRAVIS BULLOCK</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr3</td>
+              <td data-label="Prob">0.0381</td>
+              <td data-label="Fair Odds">26.24</td>
+              <td data-label="S1">-2.711</td>
+              <td data-label="S2">-0.164</td>
+              <td data-label="Score">-2.8754</td>
+              <td data-label="Rel">-1.023</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">4</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>MOVES LIKE MIKI</strong>
+                  <span class="meta">ANDREW HALL / OLIVIA FRISBY</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr4</td>
+              <td data-label="Prob">0.0699</td>
+              <td data-label="Fair Odds">14.30</td>
+              <td data-label="S1">-1.295</td>
+              <td data-label="S2">-0.366</td>
+              <td data-label="Score">-1.6610</td>
+              <td data-label="Rel">+0.191</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr class="top-pick-row">
+              <td data-label="No">5</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>LUCKY ZARA</strong>
+                  <span class="meta">JOHN O&#x27;SHEA / JOHN O&#x27;SHEA</span>
+                  <span><span class="pill pick">Top Pick</span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr5</td>
+              <td data-label="Prob">0.4277</td>
+              <td data-label="Fair Odds">2.34</td>
+              <td data-label="S1">+2.178</td>
+              <td data-label="S2">-0.217</td>
+              <td data-label="Score">1.9605</td>
+              <td data-label="Rel">+3.813</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">6</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>FURIOUS BART</strong>
+                  <span class="meta">WAYNE WHITE / BLAKE MEDLYN</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr6</td>
+              <td data-label="Prob">0.0296</td>
+              <td data-label="Fair Odds">33.80</td>
+              <td data-label="S1">-3.101</td>
+              <td data-label="S2">-0.281</td>
+              <td data-label="Score">-3.3815</td>
+              <td data-label="Rel">-1.529</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">7</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>PHANTOM STAR</strong>
+                  <span class="meta">RUSSELL REYNOLDS / JUSTIN REYNOLDS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr7</td>
+              <td data-label="Prob">0.0406</td>
+              <td data-label="Fair Odds">24.66</td>
+              <td data-label="S1">-2.875</td>
+              <td data-label="S2">+0.125</td>
+              <td data-label="Score">-2.7506</td>
+              <td data-label="Rel">-0.898</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">8</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>WARIEDA BOY</strong>
+                  <span class="meta">DAVID MICALLEF / ELLA TURNBULL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr8</td>
+              <td data-label="Prob">0.0535</td>
+              <td data-label="Fair Odds">18.70</td>
+              <td data-label="S1">-1.941</td>
+              <td data-label="S2">-0.257</td>
+              <td data-label="Score">-2.1978</td>
+              <td data-label="Rel">-0.346</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">9</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>HALL MOST AN ANGEL</strong>
+                  <span class="meta">ANDREW HALL / MAT RUE</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr1</td>
+              <td data-label="Prob">0.0535</td>
+              <td data-label="Fair Odds">18.70</td>
+              <td data-label="S1">-0.922</td>
+              <td data-label="S2">-1.276</td>
+              <td data-label="Score">-2.1974</td>
+              <td data-label="Rel">-0.345</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">10</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ULTIMATE EQUUS</strong>
+                  <span class="meta">BILLY KITT / PHOEBE BETTS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr2</td>
+              <td data-label="Prob">0.0160</td>
+              <td data-label="Fair Odds">62.47</td>
+              <td data-label="S1">-1.941</td>
+              <td data-label="S2">-2.669</td>
+              <td data-label="Score">-4.6101</td>
+              <td data-label="Rel">-2.758</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+        </tbody>
+      </table>
+    </section>
+    
+    <section id="race-8" class="race-card">
+      <div class="race-head">
+        <h2>Race 8</h2>
+        <div class="top-pick">Top pick: <strong>GUARDED PROGNOSIS</strong> at 0.4819</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Horse</th>
+            <th>Barrier</th>
+            <th>Prob</th>
+            <th>Fair Odds</th>
+            <th>S1</th>
+            <th>S2</th>
+            <th>Score</th>
+            <th>Rel</th>
+            <th>Result</th>
+            <th>SP</th>
+            <th>Margin</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td data-label="No">1</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>BRAMANTE</strong>
+                  <span class="meta">KELVIN WINNELL / ANTHONY WINNELL</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr1</td>
+              <td data-label="Prob">0.0312</td>
+              <td data-label="Fair Odds">32.00</td>
+              <td data-label="S1">-5.182</td>
+              <td data-label="S2">+0.011</td>
+              <td data-label="Score">-5.1716</td>
+              <td data-label="Rel">-1.047</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">2</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>FOGWATCH</strong>
+                  <span class="meta">PETER DAVIS / NATHAN HURST</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr2</td>
+              <td data-label="Prob">0.0437</td>
+              <td data-label="Fair Odds">22.87</td>
+              <td data-label="S1">-4.778</td>
+              <td data-label="S2">+0.279</td>
+              <td data-label="Score">-4.4993</td>
+              <td data-label="Rel">-0.375</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">3</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>ULTIMATE WAHINI</strong>
+                  <span class="meta">BILLY KITT / PHOEBE BETTS</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr3</td>
+              <td data-label="Prob">0.0619</td>
+              <td data-label="Fair Odds">16.15</td>
+              <td data-label="S1">-3.970</td>
+              <td data-label="S2">+0.166</td>
+              <td data-label="Score">-3.8041</td>
+              <td data-label="Rel">+0.321</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">4</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>STUCKINAFENCE</strong>
+                  <span class="meta">THOMAS WARD / ANDREW WARD</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr4</td>
+              <td data-label="Prob">0.0707</td>
+              <td data-label="Fair Odds">14.15</td>
+              <td data-label="S1">-3.276</td>
+              <td data-label="S2">-0.263</td>
+              <td data-label="Score">-3.5397</td>
+              <td data-label="Rel">+0.585</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">5</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>HARVEYS TOOTH</strong>
+                  <span class="meta">GRAHAM BULLOCK / WILL RIXON</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr5</td>
+              <td data-label="Prob">0.0082</td>
+              <td data-label="Fair Odds">122.08</td>
+              <td data-label="S1">-7.399</td>
+              <td data-label="S2">-0.450</td>
+              <td data-label="Score">-7.8493</td>
+              <td data-label="Rel">-3.725</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr class="top-pick-row">
+              <td data-label="No">6</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>GUARDED PROGNOSIS</strong>
+                  <span class="meta">OLIVIA FRISBY / JUSTIN REYNOLDS</span>
+                  <span><span class="pill pick">Top Pick</span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr6</td>
+              <td data-label="Prob">0.4819</td>
+              <td data-label="Fair Odds">2.08</td>
+              <td data-label="S1">+0.156</td>
+              <td data-label="S2">+0.144</td>
+              <td data-label="Score">0.3000</td>
+              <td data-label="Rel">+4.425</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">7</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>JUDAH RED</strong>
+                  <span class="meta">OLIVIA FRISBY / OLIVIA FRISBY</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr7</td>
+              <td data-label="Prob">0.1093</td>
+              <td data-label="Fair Odds">9.15</td>
+              <td data-label="S1">-0.262</td>
+              <td data-label="S2">-2.405</td>
+              <td data-label="Score">-2.6672</td>
+              <td data-label="Rel">+1.457</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">8</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>AARON MINT</strong>
+                  <span class="meta">PETER WOOD / MICHAEL WOOD</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Fr8</td>
+              <td data-label="Prob">0.0434</td>
+              <td data-label="Fair Odds">23.03</td>
+              <td data-label="S1">-3.437</td>
+              <td data-label="S2">-1.077</td>
+              <td data-label="Score">-4.5136</td>
+              <td data-label="Rel">-0.389</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">9</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>BOOMER SHANNON</strong>
+                  <span class="meta">PETER BULLOCK / TRAVIS BULLOCK</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr1</td>
+              <td data-label="Prob">0.1389</td>
+              <td data-label="Fair Odds">7.20</td>
+              <td data-label="S1">-2.335</td>
+              <td data-label="S2">+0.147</td>
+              <td data-label="Score">-2.1879</td>
+              <td data-label="Rel">+1.937</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+            <tr>
+              <td data-label="No">10</td>
+              <td data-label="Horse">
+                <div class="horse-cell">
+                  <strong>SWEETNSTORMY NZ</strong>
+                  <span class="meta">MAT RUE / MAT RUE</span>
+                  <span></span>
+                </div>
+              </td>
+              <td data-label="Barrier">Sr2</td>
+              <td data-label="Prob">0.0107</td>
+              <td data-label="Fair Odds">93.37</td>
+              <td data-label="S1">-8.181</td>
+              <td data-label="S2">+0.868</td>
+              <td data-label="Score">-7.3132</td>
+              <td data-label="Rel">-3.189</td>
+              <td data-label="Result"><span class="muted">-</span></td>
+              <td data-label="SP"><span class="muted">-</span></td>
+              <td data-label="Margin"><span class="muted">-</span></td>
+            </tr>
+            
+        </tbody>
+      </table>
+    </section>
+    
+  </div>
+</body>
+</html>
