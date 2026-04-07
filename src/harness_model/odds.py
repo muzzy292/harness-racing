@@ -156,6 +156,7 @@ def score_race_rows(
                 "barrier": row.get("barrier"),
                 "nominated_driver": row.get("nominated_driver"),
                 "nominated_trainer": row.get("nominated_trainer"),
+                "career_starts": _to_int(row.get("career_starts")),
                 "stage1_score": stage1_score,
                 "stage2_score": stage2_score,
                 "score": round(stage1_score + stage2_score, 4),
@@ -247,10 +248,12 @@ def render_race_odds_table(scored_rows: list[dict[str, object]]) -> str:
         s2 = f"{row.get('stage2_score', 0.0):>6.3f}"
         rel = row.get("relative_score")
         rel_str = f"{rel:>+7.3f}" if rel is not None else f"{'':>7}"
+        fs_tag = " (FS)" if row.get("career_starts") == 0 else ""
+        name_display = str(row['horse_name'])[:20 - len(fs_tag)] + fs_tag
         if has_market:
             lines.append(
                 f"{str(row['runner_number'] or ''):<3}  "
-                f"{str(row['horse_name'])[:20]:<20}  "
+                f"{name_display:<20}  "
                 f"{str(row['barrier'] or ''):<7}  "
                 f"{row['win_probability']:.4f}  "
                 f"{float(row['adjusted_probability']):.4f}  "
@@ -262,7 +265,7 @@ def render_race_odds_table(scored_rows: list[dict[str, object]]) -> str:
         else:
             lines.append(
                 f"{str(row['runner_number'] or ''):<3}  "
-                f"{str(row['horse_name'])[:20]:<20}  "
+                f"{name_display:<20}  "
                 f"{str(row['barrier'] or ''):<7}  "
                 f"{row['win_probability']:.4f}  "
                 f"{row['fair_odds']:<9}  "

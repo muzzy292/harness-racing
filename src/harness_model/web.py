@@ -505,6 +505,7 @@ def _render_meeting_html(
     }}
     .pill.pick {{ background: var(--pick-text); color: white; }}
     .pill.win {{ background: var(--accent); color: white; }}
+    .pill.fs {{ background: #7c3aed; color: white; }}
 
     .muted {{ color: var(--secondary); opacity: 0.5; }}
 
@@ -594,6 +595,8 @@ def _render_race_section(
             badges.append('<span class="pill pick">Top Pick</span>')
         if finish == 1:
             badges.append('<span class="pill win">Winner</span>')
+        if row.get("career_starts") == 0:
+            badges.append('<span class="pill fs">FS</span>')
         body_rows.append(
             f"""
             <tr{class_attr}>
