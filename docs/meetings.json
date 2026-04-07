@@ -37,7 +37,9 @@
   {
     "meeting_code": "PC070426",
     "track_name": "Menangle",
-    "meeting_date": "7 Apr 2026"
+    "meeting_date": "7 Apr 2026",
+    "races": 6,
+    "winners": 6
   },
   {
     "meeting_code": "AP070426",
