@@ -393,9 +393,12 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         # not prize money won (which is position-dependent and unreliable as a
         # class proxy). Centred at $8,000 (between the two most common NSW purses
         # of $6,936 and $9,792). Divisor $3,000 gives meaningful spread:
-        # country ($6,936) ≈ −0.35, metro ($20k+) capped at +1.2.
-        "stake_class": _pos_scale(avg_run_purse, center=8000.0, divisor=3000.0, missing=0.0) * w.get("stake_class", 0.2),
-        "class_delta": _pos_scale(class_delta, center=0.0, divisor=-2000.0, missing=0.0) * w.get("class_delta", 0.3),
+        # country ($6,936) ≈ −0.35, metro ($20k+) ≈ +1.2. Capped ±1.5 so a
+        # horse coming out of BC/G1 races doesn't dominate the score.
+        "stake_class": max(-1.5, min(1.5, _pos_scale(avg_run_purse, center=8000.0, divisor=3000.0, missing=0.0))) * w.get("stake_class", 0.2),
+        # Capped ±2.0 — a large class drop is a positive signal but should not
+        # overwhelm the form-based components.
+        "class_delta": max(-2.0, min(2.0, _pos_scale(class_delta, center=0.0, divisor=-2000.0, missing=0.0))) * w.get("class_delta", 0.3),
         # SP relative to class — was the horse well-backed in quality races?
         # sp_class_score = avg(-log(SP) × purse/8000); negative scores = outsider,
         # near-zero = neutral. Capped ±1.5 so a single extreme run doesn't dominate.
