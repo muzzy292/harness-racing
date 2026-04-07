@@ -49,6 +49,8 @@
   {
     "meeting_code": "BH080426",
     "track_name": "Bathurst",
-    "meeting_date": "8 Apr 2026"
+    "meeting_date": "8 Apr 2026",
+    "races": 8,
+    "winners": 0
   }
 ]
