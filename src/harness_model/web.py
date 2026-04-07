@@ -50,12 +50,18 @@ def build_meeting_site(
     result_rows = _load_results(conn, meeting_code)
     conn.close()
 
+    races_scored = sum(1 for rows in meeting_scores.values() if rows)
+    winners_count = sum(
+        1 for race_results in result_rows.values()
+        for r in race_results.values()
+        if r.get("finish_position") == 1
+    )
     page_path = out_path / f"{meeting_code}.html"
     page_path.write_text(
         _render_meeting_html(meeting_code, meeting_scores, meeting_meta, result_rows),
         encoding="utf-8",
     )
-    _write_index(out_path, meeting_meta=meeting_meta)
+    _write_index(out_path, meeting_meta=meeting_meta, races=races_scored, winners=winners_count)
     return page_path
 
 
@@ -123,7 +129,12 @@ def _load_results(conn: sqlite3.Connection, meeting_code: str) -> dict[int, dict
     return results
 
 
-def _write_index(out_dir: Path, meeting_meta: dict[str, Any] | None = None) -> None:
+def _write_index(
+    out_dir: Path,
+    meeting_meta: dict[str, Any] | None = None,
+    races: int | None = None,
+    winners: int | None = None,
+) -> None:
     manifest_path = out_dir / "meetings.json"
     if manifest_path.exists():
         manifest: list[dict[str, Any]] = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -135,11 +146,17 @@ def _write_index(out_dir: Path, meeting_meta: dict[str, Any] | None = None) -> N
         existing = next((m for m in manifest if m.get("meeting_code") == code), None)
         if existing:
             existing.update({k: meeting_meta[k] for k in ("track_name", "meeting_date") if meeting_meta.get(k)})
+            if races is not None:
+                existing["races"] = races
+            if winners is not None:
+                existing["winners"] = winners
         else:
             manifest.append({
                 "meeting_code": code,
                 "track_name": meeting_meta.get("track_name"),
                 "meeting_date": meeting_meta.get("meeting_date"),
+                "races": races,
+                "winners": winners,
             })
         manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
@@ -157,11 +174,20 @@ def _write_index(out_dir: Path, meeting_meta: dict[str, Any] | None = None) -> N
         track = html.escape(m.get("track_name") or "")
         date = html.escape(m.get("meeting_date") or "")
         meta_line = " · ".join(part for part in [date, track] if part)
+        races_val = m.get("races")
+        winners_val = m.get("winners")
+        stats_parts = []
+        if races_val is not None:
+            stats_parts.append(f"{races_val} races")
+        if winners_val is not None:
+            stats_parts.append(f"{winners_val} winners")
+        stats_html = f'<span class="meeting-stats">{html.escape(" · ".join(stats_parts))}</span>' if stats_parts else ""
         cards.append(
             f"""
             <a class="meeting-card" href="{html.escape(code)}.html">
               <span class="meeting-code">{html.escape(code)}</span>
               {f'<span class="meeting-meta">{meta_line}</span>' if meta_line else ''}
+              {stats_html}
               <span class="meeting-link">Open meeting page</span>
             </a>
             """
@@ -232,6 +258,7 @@ def _write_index(out_dir: Path, meeting_meta: dict[str, Any] | None = None) -> N
     }}
     .meeting-code {{ font-size: 20px; font-weight: 700; color: var(--primary); letter-spacing: 0.02em; }}
     .meeting-meta {{ color: var(--secondary); font-size: 13px; }}
+    .meeting-stats {{ color: var(--primary); font-size: 13px; font-weight: 600; }}
     .meeting-link {{ margin-top: 6px; color: var(--accent-dark); font-size: 14px; font-weight: 600; }}
   </style>
 </head>
@@ -264,12 +291,19 @@ def _render_meeting_html(
         for race_number, rows in meeting_scores.items() if rows
     )
 
+    races_scored = sum(1 for rows in meeting_scores.values() if rows)
+    winners_count = sum(
+        1 for race_results in result_rows.values()
+        for r in race_results.values()
+        if r.get("finish_position") == 1
+    )
     summary_cards = [
         ("Meeting", meeting_code),
         ("Track", meeting_meta.get("track_name") or "Unknown"),
         ("Date", meeting_meta.get("meeting_date") or "Unknown"),
-        ("Races", str(sum(1 for rows in meeting_scores.values() if rows))),
+        ("Races", str(races_scored)),
         ("Results Loaded", str(len(result_rows))),
+        ("Winners", str(winners_count) if result_rows else "—"),
         ("Generated", generated),
     ]
     summary_html = "".join(
@@ -711,12 +745,18 @@ def publish_scored_meeting(
     result_rows = _load_results(conn, meeting_code)
     conn.close()
 
+    races_scored = sum(1 for rows in meeting_scores.values() if rows)
+    winners_count = sum(
+        1 for race_results in result_rows.values()
+        for r in race_results.values()
+        if r.get("finish_position") == 1
+    )
     page_path = docs / f"{meeting_code}.html"
     page_path.write_text(
         _render_meeting_html(meeting_code, meeting_scores, meeting_meta, result_rows),
         encoding="utf-8",
     )
-    _write_index(docs, meeting_meta=meeting_meta)
+    _write_index(docs, meeting_meta=meeting_meta, races=races_scored, winners=winners_count)
 
     print(f"  Written {page_path.relative_to(repo_root)}")
 
