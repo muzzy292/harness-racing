@@ -298,44 +298,44 @@ def _build_feature_row(
         trend_nrs = sp_nr_values
 
     if len(trend_sps) >= 2:
-        # When today's race is No NR AND the most recent prior run is also No NR
-        # (line_nr_ceiling = None), the trend anchor point can't be grade-
-        # contextualized.  Intra-series No NR pricing (BC heat $1.50 → BC final
-        # $18) reflects field strength within that series, not form direction.
-        # Treat sp_trend as unknown rather than produce a misleading drift signal.
-        if race_nr_ceiling is None and trend_nrs[0] is None:
-            sp_trend = None
+        # Grade-discount the last SP when the most recent run was at an easier
+        # grade than today.  A $2.10 win in NR52 company overstates the shortening
+        # signal when today's race is NR56+ — the market backed the horse against
+        # weaker opposition, not against today's field.  Discount last_prob by the
+        # same grade-factor formula used for prior weights, capped at 1.0 so we
+        # never inflate the signal for a horse rising in grade (that's already
+        # captured by down-weighting the easier prior SPs).
+        _sp_ref_nr: float | None = race_nr_ceiling if race_nr_ceiling is not None else (
+            _to_float_local(nr_rating) if nr_rating is not None else None
+        )
+        last_sp_nr = trend_nrs[0]
+        last_prob_raw = 1.0 / trend_sps[0]
+        if _sp_ref_nr is not None and last_sp_nr is not None:
+            grade_factor = max(0.5, min(1.0, 1.0 + (last_sp_nr - _sp_ref_nr) / 20.0))
+            last_prob = last_prob_raw * grade_factor
         else:
-            # Grade-discount the last SP when the most recent run was at an easier
-            # grade than today.  A $2.10 win in NR52 company overstates the shortening
-            # signal when today's race is NR56+ — the market backed the horse against
-            # weaker opposition, not against today's field.  Discount last_prob by the
-            # same grade-factor formula used for prior weights, capped at 1.0 so we
-            # never inflate the signal for a horse rising in grade (that's already
-            # captured by down-weighting the easier prior SPs).
-            _sp_ref_nr: float | None = race_nr_ceiling if race_nr_ceiling is not None else (
-                _to_float_local(nr_rating) if nr_rating is not None else None
-            )
-            last_sp_nr = trend_nrs[0]
-            last_prob_raw = 1.0 / trend_sps[0]
-            if _sp_ref_nr is not None and last_sp_nr is not None:
-                grade_factor = max(0.5, min(1.0, 1.0 + (last_sp_nr - _sp_ref_nr) / 20.0))
-                last_prob = last_prob_raw * grade_factor
-            else:
-                last_prob = last_prob_raw
+            last_prob = last_prob_raw
 
-            prior_probs = [1.0 / s for s in trend_sps[1:]]
-            prior_nrs = trend_nrs[1:]
-            if race_nr_ceiling is not None and any(n is not None for n in prior_nrs):
-                prior_weights = [
-                    max(0.5, min(2.0, 1.0 + (n - race_nr_ceiling) / 20.0)) if n is not None else 1.0
-                    for n in prior_nrs
-                ]
-                total_w = sum(prior_weights)
-                prior_avg = sum(p * w for p, w in zip(prior_probs, prior_weights)) / total_w
-            else:
-                prior_avg = _avg(prior_probs) or 0.0
-            sp_trend = last_prob - prior_avg if prior_avg else None
+        prior_probs = [1.0 / s for s in trend_sps[1:]]
+        prior_nrs = trend_nrs[1:]
+        if race_nr_ceiling is not None and any(n is not None for n in prior_nrs):
+            prior_weights = [
+                max(0.5, min(2.0, 1.0 + (n - race_nr_ceiling) / 20.0)) if n is not None else 1.0
+                for n in prior_nrs
+            ]
+            total_w = sum(prior_weights)
+            prior_avg = sum(p * w for p, w in zip(prior_probs, prior_weights)) / total_w
+        else:
+            prior_avg = _avg(prior_probs) or 0.0
+        sp_trend = last_prob - prior_avg if prior_avg else None
+
+        # When today's race is No NR AND the most recent prior run is also No NR,
+        # intra-series pricing (BC heat $1.50 → BC final $18) reflects field
+        # strength within the series, not form direction.  Suppress drift signals
+        # only — shortening in this context (e.g. $101 → $1.25 last-start winner)
+        # is still informative.
+        if race_nr_ceiling is None and trend_nrs[0] is None and sp_trend is not None and sp_trend < 0:
+            sp_trend = None
     else:
         sp_trend = None
 
