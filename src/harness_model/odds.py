@@ -401,6 +401,11 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         # divisor=0.05: 5pp shortening in implied prob → +1.0 in _pos_scale before weight.
         # $31→$5 ≈ +16.8pp → strong; $81→$31 ≈ +2.0pp → minimal.
         "sp_trend": _pos_scale(sp_trend, center=0.0, divisor=0.05, missing=0.0) * w.get("sp_trend", 0.3),
+        # First-starter penalty: all form components default to missing=0.0, which
+        # in a field of poor-performing maidens produces a falsely dominant score.
+        # Apply a fixed S1 penalty for debut runners so they sit near the field
+        # mean rather than above every horse with actual (negative) form history.
+        "debut_adj": -1.0 * w.get("debut_adj", 2.0) if career_starts == 0 else 0.0,
     }
 
 
