@@ -47,5 +47,12 @@
     "meeting_date": "8 Apr 2026",
     "races": 8,
     "winners": 2
+  },
+  {
+    "meeting_code": "PE090426",
+    "track_name": "Penrith",
+    "meeting_date": "9 Apr 2026",
+    "races": 8,
+    "winners": 0
   }
 ]
