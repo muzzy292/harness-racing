@@ -68,5 +68,12 @@
     "meeting_date": "10 Apr 2026",
     "races": 9,
     "winners": 0
+  },
+  {
+    "meeting_code": "DU100426",
+    "track_name": "Dubbo",
+    "meeting_date": "10 Apr 2026",
+    "races": 6,
+    "winners": 0
   }
 ]
