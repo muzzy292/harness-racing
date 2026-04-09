@@ -183,7 +183,13 @@ def _write_index(
             continue
         manifest.append({"meeting_code": page.stem.upper(), "track_name": None, "meeting_date": None})
 
-    manifest_sorted = sorted(manifest, key=lambda m: m.get("meeting_date") or "", reverse=True)
+    def _date_sort_key(m: dict) -> datetime:
+        try:
+            return datetime.strptime(m.get("meeting_date") or "", "%d %b %Y")
+        except ValueError:
+            return datetime.min
+
+    manifest_sorted = sorted(manifest, key=_date_sort_key, reverse=True)
     cards: list[str] = []
     for m in manifest_sorted:
         code = m["meeting_code"]
