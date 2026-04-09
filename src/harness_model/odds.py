@@ -48,7 +48,7 @@ _DEFAULT_WEIGHTS: dict = {
         "tier_150_plus": -2.00,
     },
     "softmax": {
-        "temperature": 2.0,
+        "temperature": 1.5,
         "model_weight": 0.45,
         "market_weight": 0.55,
     },
