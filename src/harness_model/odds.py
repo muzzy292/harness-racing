@@ -36,9 +36,7 @@ _DEFAULT_WEIGHTS: dict = {
         "dist_strike_rate": 0.9,
         "nr_grade_delta": 0.4,
         "driver_form": 0.3,
-        "trainer_form_page": 0.24,
-        "trainer_form_30d": 0.12,
-        "trainer_form_90d": 0.08,
+        "trainer_form_manual": 0.6,
     },
     "fitness": {
         "tier_15_28": -0.35,
@@ -449,9 +447,7 @@ def _stage2_components(
     days_since_last_run = _to_float(row.get("days_since_last_run"))
     driver_win_rate = _to_float(row.get("driver_page_season_win_rate"))
     trainer_change_manual = _to_float(row.get("trainer_change_manual"))
-    trainer_page_win_rate = _to_float(row.get("trainer_page_season_win_rate"))
-    trainer_win_rate_30 = _to_float(row.get("trainer_last_30_win_rate"))
-    trainer_win_rate_90 = _to_float(row.get("trainer_last_90_win_rate"))
+    trainer_form_manual = _to_int(row.get("trainer_form_manual")) or 0
     class_delta = _to_float(row.get("class_delta"))
     nr_headroom = _to_float(row.get("nr_headroom"))
     second_up_improvement = _to_float(row.get("second_up_improvement"))
@@ -502,9 +498,9 @@ def _stage2_components(
         # Driver form — current season win rate from official profile page.
         # Centred at 15% (average NSW win rate). Missing = 0 (no effect).
         "driver_form":  _pos_scale(driver_win_rate, center=0.15, divisor=0.10, missing=0.0) * w.get("driver_form", 0.3),
-        # Trainer form and stable-change are excluded from automated scoring.
-        # To be implemented as manual web UI inputs once the website is built.
-        "trainer_form": 0.0,
+        # Trainer form — manual input only (+1 good form / 0 neutral / -1 poor form).
+        # Set via set-trainer-form CLI or web UI button. No automated scraping.
+        "trainer_form": trainer_form_manual * w.get("trainer_form_manual", 0.6),
         "stable_change": 0.0,
     }
 

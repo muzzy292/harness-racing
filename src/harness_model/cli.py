@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .storage import connect, scratch_horse as db_scratch_horse, set_trainer_change_manual as db_set_trainer_change
+from .storage import connect, scratch_horse as db_scratch_horse, set_trainer_change_manual as db_set_trainer_change, set_trainer_form_manual as db_set_trainer_form
 from .pipeline import (
     build_feature_dataset,
     build_track_par_database,
@@ -151,6 +151,13 @@ def main() -> None:
     scratch_parser.add_argument("--horse-name", required=True, help="Horse name (case-insensitive partial match)")
     scratch_parser.add_argument("--race-number", type=int, help="Limit to a specific race number (optional)")
     scratch_parser.add_argument("--db", default="data/harness.db")
+
+    set_trainer_form_parser = subparsers.add_parser("set-trainer-form", help="Manually set trainer form for a horse (+1 good / 0 neutral / -1 poor)")
+    set_trainer_form_parser.add_argument("--meeting-code", required=True)
+    set_trainer_form_parser.add_argument("--horse-name", required=True, help="Horse name (case-insensitive partial match)")
+    set_trainer_form_parser.add_argument("--value", type=int, choices=[-1, 0, 1], default=1, help="+1 good form, 0 neutral/clear, -1 poor form")
+    set_trainer_form_parser.add_argument("--race-number", type=int, help="Limit to a specific race number (optional)")
+    set_trainer_form_parser.add_argument("--db", default="data/harness.db")
 
     flag_trainer_parser = subparsers.add_parser("flag-trainer-change", help="Manually flag a trainer change for a horse before scoring")
     flag_trainer_parser.add_argument("--meeting-code", required=True)
@@ -315,6 +322,16 @@ def main() -> None:
         if scratched:
             for name, race in scratched:
                 print(f"Scratched: {name}  (Race {race})")
+        else:
+            print(f"No matching horse found for '{args.horse_name}' in meeting {args.meeting_code}")
+    elif args.command == "set-trainer-form":
+        conn = connect(args.db)
+        updated = db_set_trainer_form(conn, args.meeting_code, args.horse_name, value=args.value, race_number=args.race_number)
+        conn.close()
+        label = {1: "Good form (+1)", 0: "Neutral (0)", -1: "Poor form (-1)"}.get(args.value, str(args.value))
+        if updated:
+            for name, race in updated:
+                print(f"Set trainer form [{label}]: {name}  (Race {race})")
         else:
             print(f"No matching horse found for '{args.horse_name}' in meeting {args.meeting_code}")
     elif args.command == "flag-trainer-change":

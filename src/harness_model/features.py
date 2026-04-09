@@ -48,6 +48,7 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
             rr.form_bmr_dist_rge,
             rr.form_dist_rge_summary,
             rr.trainer_change_manual,
+            rr.trainer_form_manual,
             rr.race_purse
         FROM race_runners rr
         LEFT JOIN meetings m ON m.meeting_code = rr.meeting_code
@@ -406,6 +407,7 @@ def _build_feature_row(
         "trainer_last_90_win_rate": trainer_stats["win_rate_90"],
         "trainer_page_season_win_rate": _trainer_page_win_rate(conn, runner["nominated_trainer"]),
         "trainer_change_manual": int(runner["trainer_change_manual"]) if runner.get("trainer_change_manual") is not None else 0,
+        "trainer_form_manual": int(runner["trainer_form_manual"]) if runner.get("trainer_form_manual") is not None else 0,
         "driver_page_season_win_rate": _driver_page_win_rate(conn, runner["nominated_driver"]),
         "form_bmr_secs": bmr_secs,
         "form_bmr_dist_rge_secs": bmr_dist_rge_secs,

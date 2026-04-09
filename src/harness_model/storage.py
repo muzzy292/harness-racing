@@ -155,6 +155,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         {
             "form_nr": "INTEGER",
             "trainer_change_manual": "INTEGER",
+            "trainer_form_manual": "INTEGER",
             "form_career_summary": "TEXT",
             "form_this_season_summary": "TEXT",
             "form_last_season_summary": "TEXT",
@@ -820,6 +821,50 @@ def set_trainer_change_manual(
     update_query = """
         UPDATE race_runners
         SET trainer_change_manual = ?
+        WHERE meeting_code = ?
+          AND UPPER(horse_name) LIKE UPPER(?)
+    """
+    update_params: list = [value, meeting_code, f"%{horse_name}%"]
+    if race_number is not None:
+        update_query += " AND race_number = ?"
+        update_params.append(race_number)
+
+    conn.execute(update_query, update_params)
+    conn.commit()
+    return [(row["horse_name"], row["race_number"]) for row in rows]
+
+
+def set_trainer_form_manual(
+    conn: sqlite3.Connection,
+    meeting_code: str,
+    horse_name: str,
+    value: int = 1,
+    race_number: int | None = None,
+) -> list[tuple[str, int]]:
+    """Set trainer_form_manual on race_runners by case-insensitive partial name match.
+
+    value=1 (good form), value=0 (neutral/clear), value=-1 (poor form).
+    Returns a list of (horse_name, race_number) tuples for every row updated.
+    """
+    select_query = """
+        SELECT horse_name, race_number
+        FROM race_runners
+        WHERE meeting_code = ?
+          AND UPPER(horse_name) LIKE UPPER(?)
+          AND COALESCE(scratched, 0) = 0
+    """
+    select_params: list = [meeting_code, f"%{horse_name}%"]
+    if race_number is not None:
+        select_query += " AND race_number = ?"
+        select_params.append(race_number)
+
+    rows = conn.execute(select_query, select_params).fetchall()
+    if not rows:
+        return []
+
+    update_query = """
+        UPDATE race_runners
+        SET trainer_form_manual = ?
         WHERE meeting_code = ?
           AND UPPER(horse_name) LIKE UPPER(?)
     """
