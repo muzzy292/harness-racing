@@ -502,16 +502,10 @@ def _stage2_components(
         # Driver form — current season win rate from official profile page.
         # Centred at 15% (average NSW win rate). Missing = 0 (no effect).
         "driver_form":  _pos_scale(driver_win_rate, center=0.15, divisor=0.10, missing=0.0) * w.get("driver_form", 0.3),
-        # Trainer form and stable-change overlay.
-        # We keep this measured: genuine trainer changes matter, but they should
-        # not drown out the horse's core profile.
-        "trainer_form": _trainer_form_score(trainer_page_win_rate, trainer_win_rate_30, trainer_win_rate_90, w),
-        "stable_change": _stable_change_score(
-            trainer_change_manual,
-            days_since_last_run,
-            class_delta,
-            nr_headroom,
-        ),
+        # Trainer form and stable-change are excluded from automated scoring.
+        # To be implemented as manual web UI inputs once the website is built.
+        "trainer_form": 0.0,
+        "stable_change": 0.0,
     }
 
 
