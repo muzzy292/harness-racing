@@ -618,12 +618,20 @@ def _runs_before_meeting(last_runs: list[dict[str, object]], meeting_date: objec
     return [run for run in last_runs if _sort_run_date(run.get("run_date")) < meeting_key]
 
 
+_SECTIONAL_MARGIN_THRESHOLD = 12.0  # metres — runs further off the pace than this
+# use the race-level sectional (all horses share the same time), not the horse's
+# own pace. Discarding these prevents uncompetitive runs from inflating late_speed.
+
+
 def _sectional_deltas_vs_par(recent_lines: list[dict[str, object]], track_pars: dict | None) -> list[float]:
     deltas: list[float] = []
     for line in recent_lines:
         if _truthy(line.get("null_run")):
             continue
         if line.get("last_half") is None:
+            continue
+        margin = _to_float_local(line.get("adjusted_margin"))
+        if margin is not None and margin > _SECTIONAL_MARGIN_THRESHOLD:
             continue
         par = lookup_race_par(
             track_pars, line.get("track_name"), line.get("distance"),
