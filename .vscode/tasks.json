@@ -57,6 +57,45 @@
       "problemMatcher": []
     },
     {
+      "label": "Fetch Meeting",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "harness_model.cli",
+        "fetch-meeting",
+        "--meeting-code", "${input:meetingCode}",
+        "--out", "data/raw"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Fetch Results",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "harness_model.cli",
+        "fetch-results",
+        "--meeting-code", "${input:meetingCode}",
+        "--out", "data/raw"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Ingest Results",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "harness_model.cli",
+        "ingest-results",
+        "--html", "data/raw/results_${input:meetingCode}.html",
+        "--db", "data/harness.db"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
       "label": "Fetch Horses",
       "type": "shell",
       "command": "python",
