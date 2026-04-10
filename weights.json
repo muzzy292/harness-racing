@@ -30,9 +30,7 @@
     "dist_strike_rate": 0.9,
     "nr_grade_delta": 0.4,
     "driver_form": 0.3,
-    "trainer_form_page": 0.24,
-    "trainer_form_30d": 0.12,
-    "trainer_form_90d": 0.08,
+    "trainer_form_manual": 0.6,
     "second_up": 1.5
   },
   "fitness": {
@@ -45,7 +43,7 @@
     "tier_150_plus": -2.00
   },
   "softmax": {
-    "temperature": 2.0,
+    "temperature": 1.5,
     "model_weight": 0.45,
     "market_weight": 0.55
   }
