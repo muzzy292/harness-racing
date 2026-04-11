@@ -340,6 +340,8 @@ def _build_feature_row(
     else:
         sp_trend = None
 
+    sp_features = _sp_features(valid_recent_lines, race_nr_ceiling)
+
     return {
         "meeting_code": runner["meeting_code"],
         "meeting_date": runner["meeting_date"],
@@ -433,6 +435,84 @@ def _build_feature_row(
         "recent_line_last_sp": recent_line_last_sp,
         "recent_line_sp_class_score": sp_class_score,
         "recent_line_sp_trend": sp_trend,
+        "sp_avg_prob_last3": sp_features["sp_avg_prob_last3"],
+        "sp_avg_prob_last5": sp_features["sp_avg_prob_last5"],
+        "sp_best_prob_last5": sp_features["sp_best_prob_last5"],
+        "sp_best_prob_last10": sp_features["sp_best_prob_last10"],
+        "sp_best_prob_at_class": sp_features["sp_best_prob_at_class"],
+        "sp_short_count_last10": sp_features["sp_short_count_last10"],
+        "sp_reliability_rate": sp_features["sp_reliability_rate"],
+    }
+
+
+def _sp_features(lines: list[dict], race_nr_ceiling: float | None) -> dict[str, object]:
+    _EMPTY: dict[str, object] = {
+        "sp_avg_prob_last3": None, "sp_avg_prob_last5": None,
+        "sp_best_prob_last5": None, "sp_best_prob_last10": None,
+        "sp_best_prob_at_class": None,
+        "sp_short_count_last10": None, "sp_reliability_rate": None,
+    }
+    # Deduplicate by (run_date, track_code, distance) — same run can be written
+    # multiple times when a horse appears across more than one ingested meeting.
+    seen: set[tuple] = set()
+    deduped: list[dict] = []
+    for line in lines:
+        key = (line.get("run_date"), line.get("track_code"), line.get("distance"))
+        if key not in seen:
+            seen.add(key)
+            deduped.append(line)
+
+    # Build per-run records: (implied_prob, line_nr_ceiling, finish_position)
+    run_data: list[tuple[float, float | None, int | None]] = []
+    for line in deduped:
+        sp = _to_float_local(line.get("run_sp"))
+        if sp is None or sp <= 0:
+            continue
+        implied_prob = 1.0 / sp
+        nr_ceil = _to_float_local(line.get("line_nr_ceiling"))
+        raw_pos = line.get("finish_position")
+        pos = int(raw_pos) if raw_pos not in (None, "") else None
+        run_data.append((implied_prob, nr_ceil, pos))
+
+    if not run_data:
+        return _EMPTY
+
+    probs = [p for p, _, _ in run_data]
+
+    # Avg implied probability (recency market respect)
+    avg3 = _avg(probs[:3])
+    avg5 = _avg(probs[:5])
+
+    # Best implied probability (peak market respect)
+    best5  = max(probs[:5])  if probs[:5]  else None
+    best10 = max(probs[:10]) if probs[:10] else None
+
+    # Class-gated: best implied prob where run class >= today's race class.
+    # When today is a no-NR race, all runs are included (no meaningful gate).
+    if race_nr_ceiling is not None:
+        at_class = [p for p, nr, _ in run_data[:10] if nr is not None and nr >= race_nr_ceiling]
+    else:
+        at_class = probs[:10]
+    best_at_class = max(at_class) if at_class else None
+
+    # Short-price count and reliability (SP < $4 = implied prob > 0.25)
+    _SHORT = 0.25
+    short_runs = [(p, pos) for p, _, pos in run_data[:10] if p >= _SHORT]
+    short_count = len(short_runs)
+    if short_runs:
+        top3_when_short = sum(1 for _, pos in short_runs if pos is not None and pos <= 3)
+        reliability = round(top3_when_short / len(short_runs), 4)
+    else:
+        reliability = None
+
+    return {
+        "sp_avg_prob_last3":    round(avg3,          4) if avg3          is not None else None,
+        "sp_avg_prob_last5":    round(avg5,          4) if avg5          is not None else None,
+        "sp_best_prob_last5":   round(best5,         4) if best5         is not None else None,
+        "sp_best_prob_last10":  round(best10,        4) if best10        is not None else None,
+        "sp_best_prob_at_class":round(best_at_class, 4) if best_at_class is not None else None,
+        "sp_short_count_last10": short_count,
+        "sp_reliability_rate":  reliability,
     }
 
 

@@ -17,7 +17,11 @@
     "stake_class": 0.2,
     "class_delta": 0.3,
     "sp_class": 0.0,
-    "sp_trend": 0.0
+    "sp_trend": 0.0,
+    "sp_market_ceiling": 0.35,
+    "sp_class_ceiling": 0.45,
+    "sp_avg_market": 0.25,
+    "sp_reliability": 0.25
   },
   "stage2": {
     "map_lead": 2.0,
