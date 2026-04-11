@@ -316,6 +316,7 @@ def _build_feature_row(
         sp_trend = None
 
     sp_features = _sp_features(valid_recent_lines, race_nr_ceiling)
+    _last10_wr, _last10_starts = _form_string_stats(runner.get("horse_lifetime_form"))
 
     return {
         "meeting_code": runner["meeting_code"],
@@ -366,7 +367,8 @@ def _build_feature_row(
         "last_5_best_adj_margin": min(primary_adj_margins[:5]) if primary_adj_margins[:5] else None,
         "last_5_avg_sp": _avg(primary_prices[:5]),
         "last_5_win_rate": round(len([r for r in primary_source_5 if r.get("finish_position") == 1]) / len(primary_source_5), 4) if primary_source_5 else None,
-        "last_10_win_rate": _form_string_win_rate(runner.get("horse_lifetime_form")),
+        "last_10_win_rate": _last10_wr,
+        "last_10_starts": _last10_starts,
         "last_5_top3_rate": last_5_top3_rate,
         "last_5_competitive_rate": last_5_competitive_rate,
         "same_driver_avg_adj_margin": None,
@@ -628,20 +630,21 @@ def _summary_part(summary_text: object, idx: int) -> int | None:
         return None
 
 
-def _form_string_win_rate(form_str: object, n: int = 10) -> float | None:
-    """Parse harness.org.au lifetime form string → win rate over last n results.
+def _form_string_stats(form_str: object, n: int = 10) -> tuple[float | None, int | None]:
+    """Parse harness.org.au lifetime form string → (win_rate, starts) over last n results.
 
-    Format: '{this_season} - {last_season}', chars: 1-9=position, 0=10th+, s=spell.
+    Format: '{last_season} - {this_season}', chars: 1-9=position, 0=10th+, s=spell.
     Newest result is the rightmost character. Spells are skipped (not race results).
+    Returns (None, None) if the string is absent or contains no race results.
     """
     if not form_str:
-        return None
+        return None, None
     combined = str(form_str).replace(" - ", "").replace("-", "")
     results = [c for c in combined if c != "s"]
     window = results[-n:]
     if not window:
-        return None
-    return round(sum(1 for c in window if c == "1") / len(window), 4)
+        return None, None
+    return round(sum(1 for c in window if c == "1") / len(window), 4), len(window)
 
 
 def _avg(values: list[float]) -> float | None:

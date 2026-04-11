@@ -10,7 +10,6 @@
     "market_max": 0.0,
     "win_rate": 0.7,
     "career_win_rate": 0.6,
-    "last_10_win_rate": 0.4,
     "top3_rate": 0.6,
     "competitive_rate": 0.5,
     "nr": 0.25,
