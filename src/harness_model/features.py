@@ -129,7 +129,6 @@ def _build_feature_row(
     # via _ensure_columns. runner_recent_lines is the single source of truth for form:
     # it updates on every ingest-meeting without requiring a separate fetch-horses run.
     prices = [float(line["run_sp"]) for line in valid_recent_lines if _to_float_local(line.get("run_sp"))]
-    wins = [line for line in valid_recent_lines if line.get("finish_position") == 1]
     primary_adj_margins = adj_recent_margins
     primary_prices = prices
     primary_source_5 = valid_recent_lines[:5]
@@ -365,7 +364,7 @@ def _build_feature_row(
         "last_10_avg_adj_margin": _avg(primary_adj_margins[:10]),
         "last_5_best_adj_margin": min(primary_adj_margins[:5]) if primary_adj_margins[:5] else None,
         "last_5_avg_sp": _avg(primary_prices[:5]),
-        "last_5_win_rate": round(len(wins[:5]) / min(len(valid_recent_lines[:5]), 5), 4) if valid_recent_lines[:5] else None,
+        "last_5_win_rate": round(len([r for r in primary_source_5 if r.get("finish_position") == 1]) / len(primary_source_5), 4) if primary_source_5 else None,
         "last_5_top3_rate": last_5_top3_rate,
         "last_5_competitive_rate": last_5_competitive_rate,
         "same_driver_avg_adj_margin": None,
