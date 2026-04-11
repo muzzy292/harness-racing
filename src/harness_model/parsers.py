@@ -427,6 +427,7 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
             form_horse_nr = _extract_form_horse_nr(horse_block)
             form_bmr = _extract_form_bmr(horse_block)
             form_bmr_dist_rge = _extract_form_bmr_dist_rge(horse_block)
+            horse_lifetime_form = _extract_horse_lifetime_form(horse_block)
             # Only check for scratching markers in the horse's own header area,
             # not in the full block — the horseScratched div for horse N+1 can
             # appear before that horse's horse_name_td and bleed into horse N's block.
@@ -462,6 +463,7 @@ def _parse_form_guide_races(html: str, meeting_code: str) -> list[RunnerInfo]:
                     form_nr=form_horse_nr,
                     form_bmr=form_bmr,
                     form_bmr_dist_rge=form_bmr_dist_rge,
+                    horse_lifetime_form=horse_lifetime_form,
                     race_purse=race_purse,
                     recent_lines=recent_lines,
                 )
@@ -1063,6 +1065,19 @@ def _extract_form_bmr_dist_rge(horse_block: str) -> str | None:
         horse_block,
         re.IGNORECASE,
     )
+    return _clean_spaces(match.group(1)) if match else None
+
+
+def _extract_horse_lifetime_form(horse_block: str) -> str | None:
+    """Extract the lifetime form string from a form page horse block.
+
+    The HTML looks like:
+      <div class="horse_lifetime_form">s714635661103248 - s796</div>
+
+    Format: '{this_season} - {last_season}', chars: 1-9=position, 0=10th+, s=spell.
+    Newest result is the rightmost character. Returns the raw string or None if absent.
+    """
+    match = re.search(r'class="horse_lifetime_form"[^>]*>(.*?)</div>', horse_block, re.DOTALL)
     return _clean_spaces(match.group(1)) if match else None
 
 

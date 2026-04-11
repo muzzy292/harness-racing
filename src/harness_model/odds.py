@@ -319,6 +319,7 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
     avg_run_purse = _to_float(row.get("avg_recent_run_purse"))
     class_delta = _to_float(row.get("class_delta"))
     career_win_rate = _to_float(row.get("career_win_rate"))
+    last_10_win_rate = _to_float(row.get("last_10_win_rate"))
     sp_class_score = _to_float(row.get("recent_line_sp_class_score"))
     sp_trend = _to_float(row.get("recent_line_sp_trend"))
     sp_best_prob_last10 = _to_float(row.get("sp_best_prob_last10"))
@@ -389,6 +390,10 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         # Centred at 12% (typical NSW win rate), capped ±1.5 before applying weight
         # so no single extreme case dominates. Requires ≥5 career starts (None → 0).
         "career_win_rate": max(-1.5, min(1.5, _pos_scale(career_win_rate, center=0.12, divisor=0.08, missing=0.0))) * w.get("career_win_rate", 0.6),
+        # 2-season rolling win rate parsed from HTML form string — independent of DB form data.
+        # Centred at 12%, same baseline as career_win_rate. Weight 0.4 — lower than
+        # win_rate (0.7) until calibrated. None → 0.0 (treated as missing, no penalty).
+        "last_10_win_rate": max(-1.5, min(1.5, _pos_scale(last_10_win_rate, center=0.12, divisor=0.1, missing=0.0))) * w.get("last_10_win_rate", 0.4),
         "top3_rate":     (top3_rate or 0.0) * w.get("top3_rate", 0.6),
         "competitive_rate": (competitive_rate or 0.0) * w.get("competitive_rate", 0.5),
         "nr":          _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * w.get("nr", 0.25),

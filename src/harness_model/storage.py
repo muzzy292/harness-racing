@@ -165,6 +165,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             "race_purse": "REAL",
             "driver_link": "TEXT",
             "trainer_link": "TEXT",
+            "horse_lifetime_form": "TEXT",
         },
     )
     _ensure_columns(
@@ -225,9 +226,9 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             barrier, driver_name, driver_link, trainer_name, trainer_link, scratched, race_name,
             race_distance, race_type, class_name, raw_price,
             form_nr, form_career_summary, form_this_season_summary, form_last_season_summary,
-            form_dist_rge_summary, form_bmr, form_bmr_dist_rge, race_purse
+            form_dist_rge_summary, form_bmr, form_bmr_dist_rge, horse_lifetime_form, race_purse
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(meeting_code, race_number, horse_id) DO UPDATE SET
             runner_number = excluded.runner_number,
             horse_name = excluded.horse_name,
@@ -249,6 +250,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             form_dist_rge_summary = excluded.form_dist_rge_summary,
             form_bmr = excluded.form_bmr,
             form_bmr_dist_rge = excluded.form_bmr_dist_rge,
+            horse_lifetime_form = excluded.horse_lifetime_form,
             race_purse = excluded.race_purse
         """,
         [
@@ -276,6 +278,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
                 _summary_to_text(runner.form_dist_rge_summary),
                 runner.form_bmr,
                 runner.form_bmr_dist_rge,
+                runner.horse_lifetime_form,
                 runner.race_purse,
             )
             for runner in runners

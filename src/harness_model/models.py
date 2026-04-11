@@ -37,6 +37,7 @@ class RunnerInfo:
     form_dist_rge_summary: tuple[int, int, int, int] | None = None
     form_bmr: str | None = None
     form_bmr_dist_rge: str | None = None
+    horse_lifetime_form: str | None = None
     race_purse: float | None = None
     recent_lines: list["RunnerRecentLine"] = field(default_factory=list)
 
