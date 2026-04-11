@@ -6,8 +6,8 @@
     "tempo_adj": 0.45,
     "tempo_flags": 0.08,
     "null_flags": 0.25,
-    "market_min": 0.3,
-    "market_max": 0.6,
+    "market_min": 0.0,
+    "market_max": 0.0,
     "win_rate": 0.7,
     "career_win_rate": 0.6,
     "top3_rate": 0.6,
@@ -16,8 +16,8 @@
     "class_pos": 0.15,
     "stake_class": 0.2,
     "class_delta": 0.3,
-    "sp_class": 0.4,
-    "sp_trend": 0.3
+    "sp_class": 0.0,
+    "sp_trend": 0.0
   },
   "stage2": {
     "map_lead": 2.0,
