@@ -49,6 +49,7 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
             rr.form_dist_rge_summary,
             rr.trainer_change_manual,
             rr.trainer_form_manual,
+            rr.horse_lifetime_form,
             rr.race_purse
         FROM race_runners rr
         LEFT JOIN meetings m ON m.meeting_code = rr.meeting_code
