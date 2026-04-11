@@ -60,40 +60,31 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
 
     rows: list[dict[str, object]] = []
     for runner in runners:
-        all_last_runs = conn.execute(
-            """
-            SELECT *
-            FROM horse_runs
-            WHERE horse_id = ?
-              AND COALESCE(race_type, 'RACE') <> 'TRIAL'
-              AND COALESCE(null_run, 0) = 0
-            ORDER BY _sort_run_date(run_date) DESC
-            LIMIT 20
-            """,
-            (runner["horse_id"],),
-        ).fetchall()
-        last_runs = _runs_before_meeting(
-            [dict(row) for row in all_last_runs],
-            runner["meeting_date"],
-        )[:10]
-        recent_lines = conn.execute(
+        all_recent_lines = conn.execute(
             """
             SELECT *
             FROM runner_recent_lines
-            WHERE meeting_code = ?
-              AND race_number = ?
-              AND horse_id = ?
+            WHERE horse_id = ?
             ORDER BY _sort_run_date(run_date) DESC
             """,
-            (runner["meeting_code"], runner["race_number"], runner["horse_id"]),
+            (runner["horse_id"],),
         ).fetchall()
+        # Deduplicate by (run_date, track_code, distance) — the same run is written
+        # each time the horse appears in an ingested meeting, so without dedup the
+        # same start is counted multiple times in averages and rate calculations.
+        seen: set[tuple] = set()
+        recent_lines: list[dict] = []
+        for line in [dict(row) for row in all_recent_lines]:
+            key = (line.get("run_date"), line.get("track_code"), line.get("distance"))
+            if key not in seen:
+                seen.add(key)
+                recent_lines.append(line)
 
         rows.append(
             _build_feature_row(
                 conn,
                 dict(runner),
-                last_runs,
-                [dict(row) for row in recent_lines],
+                recent_lines,
                 track_pars,
             )
         )
@@ -117,22 +108,9 @@ def write_feature_csv(rows: list[dict[str, object]], output_path: str | Path) ->
 def _build_feature_row(
     conn: sqlite3.Connection,
     runner: dict[str, object],
-    last_runs: list[dict[str, object]],
     recent_lines: list[dict[str, object]],
     track_pars: dict | None,
 ) -> dict[str, object]:
-    # Cap at 50m — values above this are almost always a parser mis-parse
-    # (track distance matching the fallback regex). Legitimate harness margins
-    # rarely exceed 40m; any higher value corrupts averages and floors scores.
-    adjusted = [run["adjusted_margin"] for run in last_runs if run["adjusted_margin"] is not None and run["adjusted_margin"] <= 50.0]
-    prices = [run["start_price"] for run in last_runs if run["start_price"] is not None]
-    wins = [run for run in last_runs if run["finish_position"] == 1]
-    same_driver_runs = [
-        run for run in last_runs
-        if run["driver_name"] and runner["nominated_driver"]
-        and _normalize_name(run["driver_name"]) == _normalize_name(str(runner["nominated_driver"]))
-    ]
-
     driver_stats = _rolling_person_stats(conn, "driver_name", runner["nominated_driver"])
     trainer_stats = _rolling_person_stats(conn, "trainer_name", runner["nominated_trainer"])
     race_par = lookup_race_par(
@@ -147,11 +125,14 @@ def _build_feature_row(
     null_line_count = sum(1 for line in recent_lines if _truthy(line.get("null_run")))
     raw_recent_margins = [float(line["raw_margin"]) for line in valid_recent_lines if line.get("raw_margin") not in (None, "")]
     adj_recent_margins = [float(line["adjusted_margin"]) for line in valid_recent_lines if line.get("adjusted_margin") not in (None, "") and float(line["adjusted_margin"]) <= 50.0]
-    primary_adj_margins = adjusted if adjusted else adj_recent_margins
+    # SP and win signals derived from runner_recent_lines — run_sp is stored per line
+    # via _ensure_columns. runner_recent_lines is the single source of truth for form:
+    # it updates on every ingest-meeting without requiring a separate fetch-horses run.
+    prices = [float(line["run_sp"]) for line in valid_recent_lines if _to_float_local(line.get("run_sp"))]
+    wins = [line for line in valid_recent_lines if line.get("finish_position") == 1]
+    primary_adj_margins = adj_recent_margins
     primary_prices = prices
-    primary_win_rate_source = wins if last_runs else [line for line in valid_recent_lines if line.get("finish_position") == 1]
-    primary_source = last_runs if last_runs else valid_recent_lines
-    primary_source_5 = primary_source[:5]
+    primary_source_5 = valid_recent_lines[:5]
     top3_in_5 = [run for run in primary_source_5 if run.get("finish_position") in (1, 2, 3)]
     competitive_in_5 = [
         run for run in primary_source_5
@@ -161,13 +142,7 @@ def _build_feature_row(
     last_5_competitive_rate = round(len(competitive_in_5) / len(primary_source_5), 4) if primary_source_5 else None
     map_signals = _map_signals(valid_recent_lines, runner.get("barrier"))
     bmr_secs = _parse_bmr_secs(runner.get("form_bmr"))
-    # Avg of best 3 runs at today's distance from profile data — more reliable than
-    # the single form-page best.  Falls back to the form-page value when no profile
-    # data exists at this distance (new horse or different distance range).
-    bmr_dist_rge_secs = (
-        _compute_bmr_avg_top3(last_runs, runner.get("race_distance"))
-        or _parse_bmr_secs(runner.get("form_bmr_dist_rge"))
-    )
+    bmr_dist_rge_secs = _parse_bmr_secs(runner.get("form_bmr_dist_rge"))
     days_since_last_run = _days_since_last_run(recent_lines, runner.get("meeting_date"))
     second_up_improvement = _second_up_improvement(days_since_last_run, recent_lines)
     race_nr_ceiling = _parse_race_nr_ceiling(runner.get("class_name"))
@@ -390,11 +365,11 @@ def _build_feature_row(
         "last_10_avg_adj_margin": _avg(primary_adj_margins[:10]),
         "last_5_best_adj_margin": min(primary_adj_margins[:5]) if primary_adj_margins[:5] else None,
         "last_5_avg_sp": _avg(primary_prices[:5]),
-        "last_5_win_rate": round(len(primary_win_rate_source[:5]) / min(len((last_runs or valid_recent_lines)[:5]), 5), 4) if (last_runs or valid_recent_lines)[:5] else None,
+        "last_5_win_rate": round(len(wins[:5]) / min(len(valid_recent_lines[:5]), 5), 4) if valid_recent_lines[:5] else None,
         "last_5_top3_rate": last_5_top3_rate,
         "last_5_competitive_rate": last_5_competitive_rate,
-        "same_driver_avg_adj_margin": _avg([run["adjusted_margin"] for run in same_driver_runs if run["adjusted_margin"] is not None]),
-        "same_driver_starts": len(same_driver_runs),
+        "same_driver_avg_adj_margin": None,
+        "same_driver_starts": None,
         "driver_last_30_starts": driver_stats["starts_30"],
         "driver_last_30_wins": driver_stats["wins_30"],
         "driver_last_30_win_rate": driver_stats["win_rate_30"],
