@@ -32,6 +32,16 @@ def _nr_to_grade_band(nr_ceiling: int | float | None) -> str | None:
     return None
 
 
+_TRACK_NAME_ALIASES: dict[str, str] = {
+    "Bathurst": "Bthurst",
+}
+
+
+def _normalise_track_name(name: object) -> str:
+    s = str(name)
+    return _TRACK_NAME_ALIASES.get(s, s)
+
+
 def load_track_pars(path: str | Path) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
@@ -48,7 +58,7 @@ def lookup_race_par(
         return empty
 
     pars = track_pars.get("pars", {})
-    track_data = pars.get(str(track_name))
+    track_data = pars.get(_normalise_track_name(track_name))
     if not track_data:
         return empty
 
