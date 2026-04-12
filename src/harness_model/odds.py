@@ -489,6 +489,7 @@ def _stage2_components(
     style_restrained_rate = _to_float(row.get("style_restrained_rate"))
     barrier = row.get("barrier") or ""
     lead_rate = _to_float(row.get("style_lead_rate"))
+    barrier_relief = _to_float(row.get("barrier_relief_score"))
     nr_grade_delta = _to_float(row.get("nr_grade_delta"))
     dist_strike_rate_ratio = _to_float(row.get("dist_strike_rate_ratio"))
     dist_rge_starts = _to_int(row.get("dist_rge_starts")) or 0
@@ -502,6 +503,9 @@ def _stage2_components(
 
     return {
         "barrier":      _barrier_score(barrier, lead_rate) * w.get("barrier", 1.0),
+        # Bonus when today's barrier is better than horse's recent average.
+        # Clip at 0 — only reward improvement; worsening is covered by the static score.
+        "barrier_relief": max(0.0, barrier_relief or 0.0) * w.get("barrier_relief", 0.4),
         # Lead and death use field-normalised probabilities (sum to 1.0 across the
         # race) so contested pace automatically reduces the lead bonus.
         # Weight ×2.0 for lead, ×1.2 for death — scaled to match old raw-score

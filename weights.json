@@ -35,7 +35,8 @@
     "nr_grade_delta": 0.4,
     "driver_form": 0.3,
     "trainer_form_manual": 0.6,
-    "second_up": 1.5
+    "second_up": 1.5,
+    "barrier_relief": 0.4
   },
   "fitness": {
     "tier_15_28": -0.35,

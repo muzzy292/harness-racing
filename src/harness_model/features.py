@@ -59,6 +59,13 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
         """
     ).fetchall()
 
+    field_sizes: dict[tuple, int] = {}
+    for row in conn.execute(
+        "SELECT meeting_code, race_number, COUNT(*) AS n FROM race_runners "
+        "WHERE COALESCE(scratched, 0) = 0 GROUP BY meeting_code, race_number"
+    ).fetchall():
+        field_sizes[(row["meeting_code"], row["race_number"])] = row["n"]
+
     rows: list[dict[str, object]] = []
     for runner in runners:
         all_recent_lines = conn.execute(
@@ -81,12 +88,14 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
                 seen.add(key)
                 recent_lines.append(line)
 
+        race_field_size = field_sizes.get((runner["meeting_code"], runner["race_number"]))
         rows.append(
             _build_feature_row(
                 conn,
                 dict(runner),
                 recent_lines,
                 track_pars,
+                race_field_size=race_field_size,
             )
         )
     return rows
@@ -111,6 +120,7 @@ def _build_feature_row(
     runner: dict[str, object],
     recent_lines: list[dict[str, object]],
     track_pars: dict | None,
+    race_field_size: int | None = None,
 ) -> dict[str, object]:
     driver_stats = _rolling_person_stats(conn, "driver_name", runner["nominated_driver"])
     trainer_stats = _rolling_person_stats(conn, "trainer_name", runner["nominated_trainer"])
@@ -318,6 +328,37 @@ def _build_feature_row(
     sp_features = _sp_features(valid_recent_lines, race_nr_ceiling)
     _last10_wr, _last10_starts = _form_string_stats(runner.get("horse_lifetime_form"))
 
+    lead_rate_for_barrier = map_signals["style_lead_rate"]
+    today_barrier_score = _barrier_field_score(
+        runner.get("barrier"), race_field_size, lead_rate_for_barrier
+    )
+    historical_barriers = conn.execute(
+        """
+        SELECT rr.barrier,
+               (SELECT COUNT(*) FROM race_runners rr2
+                WHERE rr2.meeting_code = rr.meeting_code
+                  AND rr2.race_number = rr.race_number
+                  AND COALESCE(rr2.scratched, 0) = 0) AS field_size
+        FROM race_runners rr
+        JOIN meetings m ON m.meeting_code = rr.meeting_code
+        WHERE rr.horse_id = ?
+          AND rr.meeting_code != ?
+          AND COALESCE(rr.scratched, 0) = 0
+        ORDER BY m.meeting_date DESC
+        LIMIT 5
+        """,
+        (runner["horse_id"], runner["meeting_code"]),
+    ).fetchall()
+    recent_barrier_scores = [
+        s for row in historical_barriers
+        if (s := _barrier_field_score(row["barrier"], row["field_size"], lead_rate_for_barrier)) is not None
+    ]
+    if today_barrier_score is not None and len(recent_barrier_scores) >= 3:
+        avg_recent_barrier = sum(recent_barrier_scores) / len(recent_barrier_scores)
+        barrier_relief_score = round(today_barrier_score - avg_recent_barrier, 4)
+    else:
+        barrier_relief_score = None
+
     return {
         "meeting_code": runner["meeting_code"],
         "meeting_date": runner["meeting_date"],
@@ -420,6 +461,8 @@ def _build_feature_row(
         "sp_best_prob_at_class": sp_features["sp_best_prob_at_class"],
         "sp_short_count_last10": sp_features["sp_short_count_last10"],
         "sp_reliability_rate": sp_features["sp_reliability_rate"],
+        "race_field_size": race_field_size,
+        "barrier_relief_score": barrier_relief_score,
     }
 
 
@@ -847,6 +890,48 @@ def _parse_barrier_num(barrier: object) -> int | None:
             return int(text[2:])
         except ValueError:
             return None
+    return None
+
+
+def _barrier_field_score(
+    barrier_str: object,
+    field_size: int | None,
+    lead_rate: float | None,
+) -> float | None:
+    """Field-size and style-adjusted barrier score for barrier relief computation.
+
+    Fr barriers: percentile within field using (num-1)/(field_size-1), mapped
+    to the static scale range [+0.45, -0.45].
+    Sr barriers: style-dependent — non-leaders get credit for inside 2nd-row draws.
+    Falls back to static positional score when field_size is unavailable.
+    """
+    if not barrier_str:
+        return None
+    text = str(barrier_str).upper().strip()
+    is_leader = lead_rate is not None and lead_rate >= 0.25
+
+    if text.startswith("FR"):
+        try:
+            num = int(text[2:])
+        except ValueError:
+            return None
+        if field_size and field_size > 1:
+            pct = min(1.0, (num - 1) / (field_size - 1))
+            return round(0.45 - 0.90 * pct, 4)
+        fr_scores = {1: 0.45, 2: 0.30, 3: 0.18, 4: 0.08, 5: 0.00,
+                     6: -0.08, 7: -0.18, 8: -0.30}
+        return fr_scores.get(num, max(-0.45, -0.30 - 0.05 * (num - 8)))
+
+    if text.startswith("SR"):
+        try:
+            num = int(text[2:])
+        except ValueError:
+            return None
+        if is_leader:
+            return max(-0.45, -0.35 - 0.07 * (num - 1))
+        else:
+            return max(-0.45, -0.12 - 0.08 * (num - 1))
+
     return None
 
 
