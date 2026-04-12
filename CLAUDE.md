@@ -167,9 +167,11 @@ Known gaps and future work. Do not implement without discussing with the user fi
 - **Track condition collapsed — Fast ≠ Good** — `_normalize_track_condition()` in `parsers.py` maps FAST → "Good" before storing in `runner_recent_lines`. In harness racing, Fast (firm/hard) tracks produce faster times than Good. Collapsing them means a horse running 60.1s on a Fast track is compared to the same par as one running 60.1s on a Good track — understating the penalty. Fix: preserve "Fast" as its own condition bucket in the normaliser and build separate pars. Requires n ≥ 10 Fast samples per track/distance cell before a par is usable. Current data is too thin at most country tracks. Revisit once more meetings are ingested.
 
 ### Data Quality
-- **Trainer rolling stats are thin** — `trainer_last_30_win_rate` and `trainer_last_90_win_rate` are calculated from `horse_runs`, which only covers horses we have profiles for. Until historical results are bulk-ingested these numbers are unreliable. `trainer_form` score should be treated with caution until `fetch-results-history` has been run.
-- **`trainer_change_recent_flag` misfires on FORM:xxx runs** — FORM-synced runs have no `trainer_name`, so the streak calculation can't build a reliable history. May produce false positives for horses that haven't had profiles fetched.
 - **Duplicate rows in `runner_recent_lines`** — a horse appearing in multiple meetings (e.g. BH010426 and BH080426) gets its form lines written on each ingestion, bloating the table. The `meeting_code/race_number` filter in `build_runner_feature_rows` means only 6 unique rows are used per race (no scoring impact currently), but re-ingesting a meeting likely creates further duplicates over time. Fix: add a unique constraint or dedup on upsert in `storage.py`.
+
+## Website To-Do
+
+- **Trainer +/0/− button per horse** — mirrors the existing driver form button. Feeds `trainer_form_manual` which is already wired into S1 at weight 0.6 (`trainer_form_manual * w`). The automated rolling stats (`trainer_last_30/90_win_rate`, `trainer_page_season_win_rate`, `_trainer_form_score()`) are computed in features but intentionally unused in scoring — trainer form is manual-only until the button exists. Note: `trainer_change_recent_flag` logic is also unreliable on FORM-synced runs (no trainer name) — if trainer change flagging is added to the UI, source it from the manual `trainer_change_manual` field, not the automated flag.
 
 ## Key Validation Meeting
 
