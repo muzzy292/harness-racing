@@ -488,6 +488,7 @@ def _stage2_components(
     map_wide = _to_float(row.get("map_wide_risk_score"))
     style_restrained_rate = _to_float(row.get("style_restrained_rate"))
     barrier = row.get("barrier") or ""
+    lead_rate = _to_float(row.get("style_lead_rate"))
     nr_grade_delta = _to_float(row.get("nr_grade_delta"))
     dist_strike_rate_ratio = _to_float(row.get("dist_strike_rate_ratio"))
     dist_rge_starts = _to_int(row.get("dist_rge_starts")) or 0
@@ -500,7 +501,7 @@ def _stage2_components(
     second_up_improvement = _to_float(row.get("second_up_improvement"))
 
     return {
-        "barrier":      _barrier_score(barrier),
+        "barrier":      _barrier_score(barrier, lead_rate) * w.get("barrier", 1.0),
         # Lead and death use field-normalised probabilities (sum to 1.0 across the
         # race) so contested pace automatically reduces the lead bonus.
         # Weight ×2.0 for lead, ×1.2 for death — scaled to match old raw-score
@@ -596,8 +597,8 @@ def _neg_log_scale(value: float | None, missing: float) -> float:
     return -math.log(value)
 
 
-def _barrier_score(barrier: str) -> float:
-    text = barrier.upper().strip()
+def _barrier_score(barrier: str, lead_rate: float | None = None) -> float:
+    text = barrier.upper().strip() if barrier else ""
     if not text:
         return 0.0
     if text.startswith("FR"):
@@ -605,13 +606,19 @@ def _barrier_score(barrier: str) -> float:
             num = int(text[2:])
         except ValueError:
             return 0.0
-        return max(-0.45, 0.45 - 0.09 * (num - 1))
+        scores = {1: 0.45, 2: 0.30, 3: 0.18, 4: 0.08, 5: 0.00,
+                  6: -0.08, 7: -0.18, 8: -0.30}
+        return scores.get(num, max(-0.45, -0.30 - 0.05 * (num - 8)))
     if text.startswith("SR"):
         try:
             num = int(text[2:])
         except ValueError:
-            return -0.2
-        return max(-0.55, -0.18 - 0.08 * (num - 1))
+            return -0.20
+        is_leader = lead_rate is not None and lead_rate >= 0.25
+        if is_leader:
+            return max(-0.45, -0.35 - 0.07 * (num - 1))
+        else:
+            return max(-0.45, -0.12 - 0.08 * (num - 1))
     return 0.0
 
 
