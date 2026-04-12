@@ -199,6 +199,16 @@ def init_db(conn: sqlite3.Connection) -> None:
             "starting_price": "REAL",
         },
     )
+    conn.executescript("""
+        CREATE INDEX IF NOT EXISTS idx_recent_lines_horse_id
+            ON runner_recent_lines(horse_id);
+        CREATE INDEX IF NOT EXISTS idx_horse_runs_driver
+            ON horse_runs(driver_name);
+        CREATE INDEX IF NOT EXISTS idx_horse_runs_trainer
+            ON horse_runs(trainer_name);
+        CREATE INDEX IF NOT EXISTS idx_race_runners_horse_id
+            ON race_runners(horse_id);
+    """)
     conn.commit()
 
 

@@ -66,6 +66,19 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
     ).fetchall():
         field_sizes[(row["meeting_code"], row["race_number"])] = row["n"]
 
+    # Pre-compute rolling stats for every unique driver/trainer across all runners.
+    # Many runners share the same person — caching avoids redundant DB queries.
+    _driver_cache: dict[str, dict] = {}
+    _trainer_cache: dict[str, dict] = {}
+    for runner in runners:
+        for name, cache, field in [
+            (runner["nominated_driver"], _driver_cache, "driver_name"),
+            (runner["nominated_trainer"], _trainer_cache, "trainer_name"),
+        ]:
+            key = str(name or "").strip().upper()
+            if key and key not in cache:
+                cache[key] = _rolling_person_stats(conn, field, name)
+
     rows: list[dict[str, object]] = []
     for runner in runners:
         all_recent_lines = conn.execute(
@@ -89,6 +102,8 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
                 recent_lines.append(line)
 
         race_field_size = field_sizes.get((runner["meeting_code"], runner["race_number"]))
+        driver_key = str(runner["nominated_driver"] or "").strip().upper()
+        trainer_key = str(runner["nominated_trainer"] or "").strip().upper()
         rows.append(
             _build_feature_row(
                 conn,
@@ -96,6 +111,8 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
                 recent_lines,
                 track_pars,
                 race_field_size=race_field_size,
+                driver_stats=_driver_cache.get(driver_key),
+                trainer_stats=_trainer_cache.get(trainer_key),
             )
         )
     return rows
@@ -121,9 +138,13 @@ def _build_feature_row(
     recent_lines: list[dict[str, object]],
     track_pars: dict | None,
     race_field_size: int | None = None,
+    driver_stats: dict | None = None,
+    trainer_stats: dict | None = None,
 ) -> dict[str, object]:
-    driver_stats = _rolling_person_stats(conn, "driver_name", runner["nominated_driver"])
-    trainer_stats = _rolling_person_stats(conn, "trainer_name", runner["nominated_trainer"])
+    if driver_stats is None:
+        driver_stats = _rolling_person_stats(conn, "driver_name", runner["nominated_driver"])
+    if trainer_stats is None:
+        trainer_stats = _rolling_person_stats(conn, "trainer_name", runner["nominated_trainer"])
     race_par = lookup_race_par(
         track_pars, runner["track_name"], runner["race_distance"],
         nr_ceiling=_parse_race_nr_ceiling(runner.get("class_name")),
