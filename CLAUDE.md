@@ -88,7 +88,7 @@ Race-day factors — barrier, map, distance suitability, fitness.
 | pace_backmarker | 0.6 | restrained rate × (pace_pressure − 0.4) |
 | fitness | graduated | 15-28d: -0.35, 29-42d: -0.60, 43-84d: -0.85, 85-99d: -1.10, 100-119d: -1.45, 120-149d: -1.70, 150+d: -2.00 |
 | dist_strike_rate | 0.9 | penalty-only: win rate at distance vs career avg — penalises poor distance record, no boost for good (confidence-scaled, full weight ≥15 starts) |
-| driver_form | 0.6 | season win rate from driver profile page |
+| driver_form | 0.6 | manual +1/0/−1 input via web UI button (no scraping) |
 | nr_grade_delta | 0.4 | today's NR ceiling vs avg of last 5 runs (negative = dropping in grade) |
 
 ### Stage 3: Market Calibration
@@ -164,7 +164,7 @@ Known gaps and future work. Do not implement without discussing with the user fi
 
 ## Website To-Do
 
-- **Driver +/0/− button per horse** — `driver_form` (weight 0.6 in S2) currently uses `driver_page_season_win_rate` from `fetch-driver-stats` scraping. The web pipeline excludes `fetch-driver-stats`; the button replaces scraping entirely. When built, feed a `driver_form_manual` int (-1/0/1) into scoring and remove the `driver_page_season_win_rate` dependency. Score table column `driver_form` in `_stage2_components()` is the target.
+- **Driver +/0/− button per horse** — `driver_form` in S2 is now manual-only (`driver_form_manual` int, weight 0.6), matching trainer. Scoring no longer uses `driver_page_season_win_rate`. The button just needs to be wired up in the web UI to set `driver_form_manual` per runner at score time.
 - **Trainer +/0/− button per horse** — `trainer_form_manual` already wired into S2 at weight 0.6; just needs the UI button. The automated rolling stats (`trainer_last_30/90_win_rate`, `trainer_page_season_win_rate`, `_trainer_form_score()`) are computed in features but intentionally unused in scoring. Note: if trainer change flagging is added, source it from `trainer_change_manual` (not the automated flag, which misfires on FORM-synced runs).
 
 ## Key Validation Meeting

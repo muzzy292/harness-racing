@@ -33,7 +33,7 @@
     "map_death": 1.2,
     "dist_strike_rate": 0.9,
     "nr_grade_delta": 0.4,
-    "driver_form": 0.3,
+    "driver_form": 0.6,
     "trainer_form_manual": 0.6,
     "second_up": 1.5,
     "barrier_relief": 0.4

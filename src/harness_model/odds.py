@@ -494,7 +494,7 @@ def _stage2_components(
     dist_strike_rate_ratio = _to_float(row.get("dist_strike_rate_ratio"))
     dist_rge_starts = _to_int(row.get("dist_rge_starts")) or 0
     days_since_last_run = _to_float(row.get("days_since_last_run"))
-    driver_win_rate = _to_float(row.get("driver_page_season_win_rate"))
+    driver_form_manual = _to_int(row.get("driver_form_manual")) or 0
     trainer_change_manual = _to_float(row.get("trainer_change_manual"))
     trainer_form_manual = _to_int(row.get("trainer_form_manual")) or 0
     class_delta = _to_float(row.get("class_delta"))
@@ -549,9 +549,9 @@ def _stage2_components(
             min(second_up_improvement / 15.0, 1.0) * w.get("second_up", 1.5)
             if second_up_improvement else 0.0
         ),
-        # Driver form — current season win rate from official profile page.
-        # Centred at 15% (average NSW win rate). Missing = 0 (no effect).
-        "driver_form":  _pos_scale(driver_win_rate, center=0.15, divisor=0.10, missing=0.0) * w.get("driver_form", 0.3),
+        # Driver form — manual input only (+1 good form / 0 neutral / -1 poor form).
+        # Set via web UI button. No automated scraping.
+        "driver_form":  driver_form_manual * w.get("driver_form", 0.6),
         # Trainer form — manual input only (+1 good form / 0 neutral / -1 poor form).
         # Set via set-trainer-form CLI or web UI button. No automated scraping.
         "trainer_form": trainer_form_manual * w.get("trainer_form_manual", 0.6),
