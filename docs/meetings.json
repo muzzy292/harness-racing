@@ -96,5 +96,12 @@
     "meeting_date": "13 Apr 2026",
     "races": 9,
     "winners": 0
+  },
+  {
+    "meeting_code": "LM300326",
+    "track_name": "Goulburn",
+    "meeting_date": "30 Mar 2026",
+    "races": 8,
+    "winners": 2
   }
 ]
