@@ -523,14 +523,16 @@ def _stage2_components(
         "map_wide":    -(map_wide or 0.0) * w.get("map_wide", 0.5),
         "map_death":   -(field_death_prob or 0.0) * w.get("map_death", 1.2),
         # Distance strike rate — ratio of win% at this distance band vs career win%.
-        # ratio > 1 = horse wins more often at this distance than on average → boost.
-        # Penalty-only: fires when a horse wins significantly less often at this
-        # distance than its career average. ratio > 1 (distance specialist) is
-        # capped at 0 — a good distance record often reflects that the horse simply
-        # races here most often, not genuine specialisation, so we don't boost.
+        # Penalty: fires when ratio < 1 (wins less often at this distance than career avg).
+        # Boost: fires when ratio > 1 AND dist_rge_starts >= 15 — enough sample to be
+        # confident this is genuine specialisation, not noise. Capped at +0.6 (ratio 3.0).
         # Confidence-scaled by sample size: full weight at ≥15 distance starts.
         "dist_strike_rate": (
-            max(-1.35, min(0.0, (dist_strike_rate_ratio - 1.0) / 0.4)) * w.get("dist_strike_rate", 0.9)
+            (
+                max(-1.35, min(0.6, (dist_strike_rate_ratio - 1.0) / 0.4))
+                if dist_rge_starts >= 15
+                else max(-1.35, min(0.0, (dist_strike_rate_ratio - 1.0) / 0.4))
+            ) * w.get("dist_strike_rate", 0.9)
             * min(1.0, dist_rge_starts / 15.0)
             if dist_strike_rate_ratio is not None else 0.0
         ),
