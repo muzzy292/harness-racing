@@ -164,7 +164,8 @@ Known gaps and future work. Do not implement without discussing with the user fi
 
 ## Website To-Do
 
-- **Trainer +/0/− button per horse** — mirrors the existing driver form button. Feeds `trainer_form_manual` which is already wired into S1 at weight 0.6 (`trainer_form_manual * w`). The automated rolling stats (`trainer_last_30/90_win_rate`, `trainer_page_season_win_rate`, `_trainer_form_score()`) are computed in features but intentionally unused in scoring — trainer form is manual-only until the button exists. Note: `trainer_change_recent_flag` logic is also unreliable on FORM-synced runs (no trainer name) — if trainer change flagging is added to the UI, source it from the manual `trainer_change_manual` field, not the automated flag.
+- **Driver +/0/− button per horse** — `driver_form` (weight 0.6 in S2) currently uses `driver_page_season_win_rate` from `fetch-driver-stats` scraping. The web pipeline excludes `fetch-driver-stats`; the button replaces scraping entirely. When built, feed a `driver_form_manual` int (-1/0/1) into scoring and remove the `driver_page_season_win_rate` dependency. Score table column `driver_form` in `_stage2_components()` is the target.
+- **Trainer +/0/− button per horse** — `trainer_form_manual` already wired into S2 at weight 0.6; just needs the UI button. The automated rolling stats (`trainer_last_30/90_win_rate`, `trainer_page_season_win_rate`, `_trainer_form_score()`) are computed in features but intentionally unused in scoring. Note: if trainer change flagging is added, source it from `trainer_change_manual` (not the automated flag, which misfires on FORM-synced runs).
 
 ## Key Validation Meeting
 
