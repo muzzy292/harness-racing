@@ -188,6 +188,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             "line_nr_ceiling": "INTEGER",
             "line_race_age": "TEXT",
             "run_sp": "REAL",
+            "line_driver_name": "TEXT",
         },
     )
     _ensure_columns(
@@ -300,9 +301,9 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             meeting_code, race_number, horse_id, line_index, run_date,
             track_name, track_code, distance, condition, last_half, mile_rate,
             first_half, q1, q2, q3, q4, raw_comment, finish_position,
-            raw_margin, run_purse, line_nr_ceiling, line_race_age, run_sp, comment_adjustment, tempo_adjustment, null_run, adjusted_margin
+            raw_margin, run_purse, line_nr_ceiling, line_race_age, run_sp, comment_adjustment, tempo_adjustment, null_run, adjusted_margin, line_driver_name
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(meeting_code, race_number, horse_id, line_index) DO UPDATE SET
             run_date = excluded.run_date,
             track_name = excluded.track_name,
@@ -326,7 +327,8 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             comment_adjustment = excluded.comment_adjustment,
             tempo_adjustment = excluded.tempo_adjustment,
             null_run = excluded.null_run,
-            adjusted_margin = excluded.adjusted_margin
+            adjusted_margin = excluded.adjusted_margin,
+            line_driver_name = excluded.line_driver_name
         """,
         [
             (
@@ -357,6 +359,7 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
                 line.tempo_adjustment,
                 int(line.null_run),
                 line.adjusted_margin,
+                line.line_driver_name,
             )
             for runner in runners
             for line in runner.recent_lines

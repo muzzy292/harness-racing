@@ -71,6 +71,7 @@ class RunnerRecentLine:
     tempo_adjustment: float = 0.0
     null_run: bool = False
     adjusted_margin: float | None = None
+    line_driver_name: str | None = None
 
 
 @dataclass(slots=True)

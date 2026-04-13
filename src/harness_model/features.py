@@ -380,22 +380,13 @@ def _build_feature_row(
     else:
         barrier_relief_score = None
 
-    prior_driver_row = conn.execute(
-        """
-        SELECT rr.driver_name
-        FROM race_runners rr
-        JOIN meetings m ON m.meeting_code = rr.meeting_code
-        WHERE rr.horse_id = ?
-          AND rr.meeting_code != ?
-          AND COALESCE(rr.scratched, 0) = 0
-        ORDER BY m.meeting_date DESC
-        LIMIT 1
-        """,
-        (runner["horse_id"], runner["meeting_code"]),
-    ).fetchone()
-    if prior_driver_row and runner.get("nominated_driver"):
+    prior_driver = next(
+        (line.get("line_driver_name") for line in valid_recent_lines if line.get("line_driver_name")),
+        None,
+    )
+    if prior_driver and runner.get("nominated_driver"):
         driver_change_flag = int(
-            not _person_names_match(str(prior_driver_row["driver_name"] or ""), str(runner["nominated_driver"]))
+            not _person_names_match(str(prior_driver), str(runner["nominated_driver"]))
         )
     else:
         driver_change_flag = None

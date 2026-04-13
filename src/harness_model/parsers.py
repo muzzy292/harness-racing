@@ -930,6 +930,7 @@ def _extract_recent_lines_from_horse_block(
                 tempo_adjustment=tempo_adjustment,
                 null_run=null_run,
                 adjusted_margin=adjusted_margin,
+                line_driver_name=parsed.get("line_driver_name"),
             )
         )
     return recent_lines
@@ -965,6 +966,8 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
     run_sp = float(sp_match.group(1)) if sp_match else None
     age_match = re.search(r'(\d)yo', line_html, re.IGNORECASE)
     line_race_age = f"{age_match.group(1)}yo" if age_match else None
+    driver_match = re.search(r'<a href="/racing/driverlink/[^"]+">([^<]+)</a>', line_html, re.IGNORECASE)
+    line_driver_name = _clean_spaces(driver_match.group(1)) if driver_match else None
     return {
         "form_place": form_place_match.group("form_place"),
         "track_code": results_match.group("track"),
@@ -980,6 +983,7 @@ def _parse_recent_line_html(line_html: str) -> dict[str, str] | None:
         "line_nr_ceiling": line_nr_ceiling,
         "line_race_age": line_race_age,
         "run_sp": run_sp,
+        "line_driver_name": line_driver_name,
     }
 
 
