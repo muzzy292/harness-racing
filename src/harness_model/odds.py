@@ -157,6 +157,7 @@ def score_race_rows(
                 "runner_number": _to_int(row.get("runner_number")),
                 "barrier": row.get("barrier"),
                 "nominated_driver": row.get("nominated_driver"),
+                "driver_change_flag": row.get("driver_change_flag"),
                 "nominated_trainer": row.get("nominated_trainer"),
                 "career_starts": _to_int(row.get("career_starts")),
                 "stage1_score": stage1_score,

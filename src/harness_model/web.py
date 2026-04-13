@@ -559,6 +559,8 @@ def _render_meeting_html(
     .pill.win {{ background: var(--accent); color: white; }}
     .pill.fs {{ background: #7c3aed; color: white; }}
 
+    .driver-change {{ color: #f59e0b; font-weight: 600; }}
+
     .muted {{ color: var(--secondary); opacity: 0.5; }}
 
     /* ── Portrait mobile ── */
@@ -656,7 +658,7 @@ def _render_race_section(
               <td data-label="Horse">
                 <div class="horse-cell">
                   <strong>{html.escape(horse_name)}</strong>
-                  <span class="meta">{html.escape(str(row.get('nominated_trainer') or ''))} / {html.escape(str(row.get('nominated_driver') or ''))}</span>
+                  <span class="meta">{html.escape(str(row.get('nominated_trainer') or ''))} / {'<span class="driver-change">' + html.escape(str(row.get('nominated_driver') or '')) + '</span>' if row.get('driver_change_flag') == 1 else html.escape(str(row.get('nominated_driver') or ''))}</span>
                   <span>{''.join(badges)}</span>
                 </div>
               </td>
