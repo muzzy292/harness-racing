@@ -658,7 +658,7 @@ def _render_race_section(
               <td data-label="Horse">
                 <div class="horse-cell">
                   <strong>{html.escape(horse_name)}</strong>
-                  <span class="meta">{html.escape(str(row.get('nominated_trainer') or ''))} / {'<span class="driver-change">' + html.escape(str(row.get('nominated_driver') or '')) + '</span>' if row.get('driver_change_flag') == 1 else html.escape(str(row.get('nominated_driver') or ''))}</span>
+                  <span class="meta">{html.escape(str(row.get('nominated_trainer') or ''))} / {'<span class="driver-change">' + html.escape(str(row.get('nominated_driver') or '')) + '</span>' if str(row.get('driver_change_flag')) == '1' else html.escape(str(row.get('nominated_driver') or ''))}</span>
                   <span>{''.join(badges)}</span>
                 </div>
               </td>
