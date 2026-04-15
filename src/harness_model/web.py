@@ -5,7 +5,8 @@ import json
 import os
 import sqlite3
 import subprocess
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -239,10 +240,28 @@ def _write_index(
       color: var(--primary);
       line-height: 1.5;
     }}
+    .top-nav {{
+      background: var(--primary);
+      padding: 12px 20px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }}
+    .top-nav a {{
+      color: var(--secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }}
+    .top-nav a:hover {{ background: rgba(255,255,255,0.1); color: white; }}
+    .top-nav a.active {{ background: rgba(255,255,255,0.12); color: white; }}
     .hero {{
       background: var(--primary);
       color: white;
-      padding: 48px 20px 40px;
+      padding: 32px 20px 40px;
       text-align: center;
     }}
     .hero h1 {{
@@ -285,6 +304,10 @@ def _write_index(
   </style>
 </head>
 <body>
+  <nav class="top-nav">
+    <a href="index.html" class="active">Meetings</a>
+    <a href="stats.html">Stats</a>
+  </nav>
   <div class="hero">
     <h1>Harness Racing Scores</h1>
     <p>Fair odds and probabilities — select a meeting below</p>
@@ -608,7 +631,8 @@ def _render_meeting_html(
       <div class="summary-grid">{summary_html}</div>
     </section>
     <nav class="race-nav">
-      <a href="index.html">All meetings</a>
+      <a href="index.html">Meetings</a>
+      <a href="stats.html">Stats</a>
       {race_nav}
     </nav>
     {''.join(sections) if sections else '<div class="race-card"><p>No races found for this meeting.</p></div>'}
@@ -741,6 +765,388 @@ def _fmt_runner_number(value: object) -> str:
 
 def _normalise_name(value: str) -> str:
     return " ".join(value.upper().split())
+
+
+# ---------------------------------------------------------------------------
+# Stats page — driver / trainer performance tables
+# ---------------------------------------------------------------------------
+
+def _compute_person_stats(conn: sqlite3.Connection, field_name: str) -> list[dict]:
+    """Aggregate driver or trainer stats from race_results joined to meetings.
+
+    field_name: 'driver_name' or 'trainer_name'
+    Returns list of dicts sorted by L30 win% descending. Requires >= 3 overall starts.
+    """
+    rows = conn.execute(
+        f"""
+        SELECT
+            ru.{field_name}    AS name,
+            rr.starting_price  AS sp,
+            rr.finish_position AS pos,
+            m.meeting_date     AS meeting_date
+        FROM race_results rr
+        JOIN meetings m ON rr.meeting_code = m.meeting_code
+        JOIN race_runners ru
+          ON  ru.meeting_code = rr.meeting_code
+          AND ru.race_number  = rr.race_number
+          AND ru.horse_id     = rr.horse_id
+        WHERE ru.{field_name} IS NOT NULL
+          AND rr.starting_price IS NOT NULL
+        """,
+    ).fetchall()
+
+    today = datetime.today()
+    cutoff_30 = today - timedelta(days=30)
+    cutoff_14 = today - timedelta(days=14)
+
+    def _parse_date(s: str | None) -> datetime | None:
+        if not s:
+            return None
+        try:
+            return datetime.strptime(s.strip(), "%d %b %Y")
+        except ValueError:
+            return None
+
+    buckets: dict[str, list[dict]] = defaultdict(list)
+    for row in rows:
+        buckets[str(row["name"])].append({
+            "sp": float(row["sp"]),
+            "pos": row["pos"],
+            "date": _parse_date(row["meeting_date"]),
+        })
+
+    result: list[dict] = []
+    for name, runs in buckets.items():
+        overall_starts = len(runs)
+        if overall_starts < 3:
+            continue
+        overall_wins = sum(1 for r in runs if r["pos"] == 1)
+
+        l30_runs = [r for r in runs if r["date"] and r["date"] >= cutoff_30]
+        l30_starts = len(l30_runs)
+        l30_wins = sum(1 for r in l30_runs if r["pos"] == 1)
+        l30_places = sum(1 for r in l30_runs if r["pos"] is not None and int(r["pos"]) <= 3)
+
+        if l30_starts >= 3:
+            l30_win_pct: float | None = l30_wins / l30_starts
+            l30_place_pct: float | None = l30_places / l30_starts
+            l30_roi: float | None = sum(r["sp"] - 1 if r["pos"] == 1 else -1 for r in l30_runs) / l30_starts
+            l30_win_sps = [r["sp"] for r in l30_runs if r["pos"] == 1]
+            l30_avg_win_sp: float | None = sum(l30_win_sps) / len(l30_win_sps) if l30_win_sps else None
+        else:
+            l30_win_pct = None
+            l30_place_pct = None
+            l30_roi = None
+            l30_avg_win_sp = None
+
+        l14_runs = [r for r in runs if r["date"] and r["date"] >= cutoff_14]
+        l14_starts = len(l14_runs)
+        l14_wins = sum(1 for r in l14_runs if r["pos"] == 1)
+
+        result.append({
+            "name": name,
+            "overall_wins": overall_wins,
+            "overall_starts": overall_starts,
+            "l30_starts": l30_starts,
+            "l30_wins": l30_wins,
+            "l30_places": l30_places,
+            "l30_win_pct": l30_win_pct,
+            "l30_place_pct": l30_place_pct,
+            "l30_roi": l30_roi,
+            "l30_avg_win_sp": l30_avg_win_sp,
+            "l14_starts": l14_starts,
+            "l14_wins": l14_wins,
+        })
+
+    result.sort(key=lambda r: (r["l30_win_pct"] is None, -(r["l30_win_pct"] or 0.0)))
+    return result
+
+
+def _render_stats_table(rows: list[dict]) -> str:
+    """Render one driver or trainer stats table body."""
+    tr_parts: list[str] = []
+    for r in rows:
+        name = html.escape(r["name"])
+        highlight = (
+            r["l30_win_pct"] is not None
+            and r["l30_starts"] >= 3
+            and r["l30_win_pct"] >= 0.25
+        )
+        row_class = ' class="hot-row"' if highlight else ""
+
+        def _dash(v: object, fmt: str = "") -> str:
+            if v is None:
+                return '<span class="muted">–</span>'
+            try:
+                return format(float(v), fmt)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return str(v)
+
+        l30_win_pct_str = f"{r['l30_win_pct'] * 100:.1f}%" if r["l30_win_pct"] is not None else '<span class="muted">–</span>'
+        l30_place_pct_str = f"{r['l30_place_pct'] * 100:.1f}%" if r["l30_place_pct"] is not None else '<span class="muted">–</span>'
+        l30_roi_str = f"{r['l30_roi']:+.2f}" if r["l30_roi"] is not None else '<span class="muted">–</span>'
+        l30_avg_sp_str = f"{r['l30_avg_win_sp']:.2f}" if r["l30_avg_win_sp"] is not None else '<span class="muted">–</span>'
+        l14_str = f"{r['l14_wins']}-{r['l14_starts']}" if r["l14_starts"] > 0 else '<span class="muted">–</span>'
+        overall_str = f"{r['overall_wins']}-{r['overall_starts']}"
+
+        l30_starts_str = str(r["l30_starts"]) if r["l30_starts"] > 0 else '<span class="muted">–</span>'
+        l30_wins_str = str(r["l30_wins"]) if r["l30_starts"] >= 3 else '<span class="muted">–</span>'
+        l30_places_str = str(r["l30_places"]) if r["l30_starts"] >= 3 else '<span class="muted">–</span>'
+
+        tr_parts.append(
+            f"""<tr{row_class}>
+              <td>{name}</td>
+              <td class="num">{l30_starts_str}</td>
+              <td class="num">{l30_wins_str}</td>
+              <td class="num sort-col">{l30_win_pct_str}</td>
+              <td class="num">{l30_places_str}</td>
+              <td class="num">{l30_place_pct_str}</td>
+              <td class="num">{l30_roi_str}</td>
+              <td class="num">{l30_avg_sp_str}</td>
+              <td class="num">{l14_str}</td>
+              <td class="num">{overall_str}</td>
+            </tr>"""
+        )
+    return "\n".join(tr_parts)
+
+
+def _render_stats_html(driver_rows: list[dict], trainer_rows: list[dict], meta: dict) -> str:
+    """Render the standalone stats page HTML."""
+    generated = html.escape(meta.get("generated_at", ""))
+    total = meta.get("total_results", 0)
+    driver_tbody = _render_stats_table(driver_rows)
+    trainer_tbody = _render_stats_table(trainer_rows)
+
+    table_html = """<table class="stats-table" id="{tid}">
+        <thead>
+          <tr>
+            <th onclick="sortTable('{tid}',0)">Name</th>
+            <th class="num" onclick="sortTable('{tid}',1)">Starts (L30)</th>
+            <th class="num" onclick="sortTable('{tid}',2)">Wins (L30)</th>
+            <th class="num sorted-asc" onclick="sortTable('{tid}',3)">Win % (L30)</th>
+            <th class="num" onclick="sortTable('{tid}',4)">Places (L30)</th>
+            <th class="num" onclick="sortTable('{tid}',5)">Place % (L30)</th>
+            <th class="num" onclick="sortTable('{tid}',6)">ROI (L30)</th>
+            <th class="num" onclick="sortTable('{tid}',7)">Ave Win SP (L30)</th>
+            <th class="num" onclick="sortTable('{tid}',8)">L14 W-S</th>
+            <th class="num" onclick="sortTable('{tid}',9)">Overall W-S</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tbody}
+        </tbody>
+      </table>"""
+
+    driver_table = table_html.format(tid="drivers-table", tbody=driver_tbody)
+    trainer_table = table_html.format(tid="trainers-table", tbody=trainer_tbody)
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Driver &amp; Trainer Stats — Harness Racing</title>
+  <style>
+    :root {{
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --primary: #0f172a;
+      --secondary: #64748b;
+      --accent: #10b981;
+      --accent-dark: #059669;
+      --accent-soft: #ecfdf5;
+      --border: #e2e8f0;
+      --highlight: #f1f5f9;
+      --hot-bg: rgba(245, 158, 11, 0.08);
+    }}
+    * {{ box-sizing: border-box; }}
+    html {{ scroll-behavior: smooth; }}
+    body {{
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--primary);
+      background-color: var(--bg);
+      line-height: 1.5;
+    }}
+    .top-nav {{
+      background: var(--primary);
+      padding: 12px 20px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }}
+    .top-nav a {{
+      color: var(--secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }}
+    .top-nav a:hover {{ background: rgba(255,255,255,0.1); color: white; }}
+    .top-nav a.active {{ background: rgba(255,255,255,0.12); color: white; }}
+    .wrap {{ max-width: 1200px; margin: 0 auto; padding: 36px 20px 60px; }}
+    .hero {{
+      background: var(--primary);
+      color: white;
+      padding: 40px 20px 32px;
+      text-align: center;
+    }}
+    .hero h1 {{ margin: 0 0 8px; font-size: 36px; font-weight: 800; letter-spacing: -0.02em; }}
+    .hero p {{ margin: 0; color: var(--secondary); font-size: 15px; }}
+    .section-title {{
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 40px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--accent);
+      display: inline-block;
+    }}
+    .table-wrap {{
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--card-bg);
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }}
+    table.stats-table {{
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 700px;
+    }}
+    th, td {{
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 14px;
+      border-bottom: 1px solid var(--border);
+    }}
+    th {{
+      background: #fafafa;
+      color: var(--secondary);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }}
+    th:hover {{ color: var(--primary); background: var(--highlight); }}
+    th.sorted-asc::after {{ content: " ▼"; color: var(--accent-dark); }}
+    th.sorted-desc::after {{ content: " ▲"; color: var(--accent-dark); }}
+    td.num {{ text-align: right; }}
+    th.num {{ text-align: right; }}
+    tr:last-child td {{ border-bottom: none; }}
+    tr:hover {{ background: var(--highlight); }}
+    tr.hot-row {{ background: var(--hot-bg); }}
+    tr.hot-row:hover {{ background: rgba(245, 158, 11, 0.14); }}
+    .muted {{ color: var(--secondary); opacity: 0.5; }}
+    .footer {{
+      margin-top: 48px;
+      text-align: center;
+      color: var(--secondary);
+      font-size: 13px;
+    }}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="index.html">Meetings</a>
+    <a href="stats.html" class="active">Stats</a>
+  </nav>
+  <div class="hero">
+    <h1>Driver &amp; Trainer Stats</h1>
+    <p>Based on ingested race results — primary metrics are last 30 days</p>
+  </div>
+  <div class="wrap">
+    <div class="section-title">Drivers</div>
+    <div class="table-wrap">{driver_table}</div>
+
+    <div class="section-title">Trainers</div>
+    <div class="table-wrap">{trainer_table}</div>
+
+    <div class="footer">
+      Generated {generated} &nbsp;·&nbsp; {total:,} results ingested
+    </div>
+  </div>
+  <script>
+    function parseSortVal(text) {{
+      var t = text.replace(/[%+]/g, '').trim();
+      if (t === '' || t === '–' || t === '-') return null;
+      // W-S format like "3-12" → sort by win count descending
+      var ws = t.match(/^(\\d+)-(\\d+)$/);
+      if (ws) return parseInt(ws[1], 10);
+      var n = parseFloat(t);
+      return isNaN(n) ? t.toLowerCase() : n;
+    }}
+
+    var _sortState = {{}};
+
+    function sortTable(tableId, colIdx) {{
+      var table = document.getElementById(tableId);
+      var tbody = table.querySelector('tbody');
+      var rows = Array.from(tbody.querySelectorAll('tr'));
+      var ths = table.querySelectorAll('thead th');
+
+      var prev = _sortState[tableId] || {{}};
+      var asc = !(prev.col === colIdx && prev.asc);
+      _sortState[tableId] = {{ col: colIdx, asc: asc }};
+
+      ths.forEach(function(th) {{
+        th.classList.remove('sorted-asc', 'sorted-desc');
+      }});
+      ths[colIdx].classList.add(asc ? 'sorted-asc' : 'sorted-desc');
+
+      rows.sort(function(a, b) {{
+        var av = parseSortVal(a.cells[colIdx].textContent);
+        var bv = parseSortVal(b.cells[colIdx].textContent);
+        if (av === null && bv === null) return 0;
+        if (av === null) return 1;
+        if (bv === null) return -1;
+        if (av < bv) return asc ? 1 : -1;
+        if (av > bv) return asc ? -1 : 1;
+        return 0;
+      }});
+      rows.forEach(function(r) {{ tbody.appendChild(r); }});
+    }}
+
+    // Initial sort: L30 Win% (col 3) descending on page load
+    window.addEventListener('DOMContentLoaded', function() {{
+      sortTable('drivers-table', 3);
+      sortTable('trainers-table', 3);
+    }});
+  </script>
+</body>
+</html>
+"""
+
+
+def build_stats_site(
+    db_path: str | Path,
+    out_dir: str | Path,
+) -> Path:
+    """Build driver and trainer stats page and write to out_dir/stats.html."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    conn = connect(db_path)
+    init_db(conn)
+    driver_rows = _compute_person_stats(conn, "driver_name")
+    trainer_rows = _compute_person_stats(conn, "trainer_name")
+    total_rows = conn.execute("SELECT COUNT(*) FROM race_results").fetchone()[0]
+    conn.close()
+
+    meta = {
+        "generated_at": datetime.now().strftime("%d %b %Y %H:%M"),
+        "total_results": total_rows,
+    }
+    stats_html = _render_stats_html(driver_rows, trainer_rows, meta)
+    out_path = out_dir / "stats.html"
+    out_path.write_text(stats_html, encoding="utf-8")
+    print(f"Stats page written -> {out_path}  ({len(driver_rows)} drivers, {len(trainer_rows)} trainers)")
+    return out_path
 
 
 def publish_scored_meeting(

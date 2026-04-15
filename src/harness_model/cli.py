@@ -35,7 +35,7 @@ from .odds import (
     score_race_rows,
     write_scored_rows_csv,
 )
-from .web import build_meeting_site, publish_scored_meeting, serve_site
+from .web import build_meeting_site, build_stats_site, publish_scored_meeting, serve_site
 
 
 _DEFAULT_WEIGHTS_PATH = Path("weights.json")
@@ -213,6 +213,10 @@ def main() -> None:
     serve_site_parser.add_argument("--site-dir", default="data/site")
     serve_site_parser.add_argument("--host", default="127.0.0.1")
     serve_site_parser.add_argument("--port", type=int, default=8000)
+
+    build_stats_parser = subparsers.add_parser("build-stats-site", help="Build driver and trainer stats page from ingested results")
+    build_stats_parser.add_argument("--db", default="data/harness.db")
+    build_stats_parser.add_argument("--out", default="docs", help="Output directory for stats.html (default: docs)")
 
     args = parser.parse_args()
 
@@ -397,6 +401,8 @@ def main() -> None:
         print(f"Built meeting site page at {page_path}")
     elif args.command == "serve-site":
         serve_site(args.site_dir, host=args.host, port=args.port)
+    elif args.command == "build-stats-site":
+        build_stats_site(args.db, args.out)
     elif args.command == "calibrate-nr-factor":
         from .features import _NR_MARGIN_FACTOR
         r = calibrate_nr_factor(args.db)
