@@ -220,8 +220,8 @@ def upsert_meeting(conn: sqlite3.Connection, meeting: MeetingInfo) -> None:
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(meeting_code) DO UPDATE SET
             meeting_date = excluded.meeting_date,
-            track_name = excluded.track_name,
-            state = excluded.state,
+            track_name = COALESCE(excluded.track_name, track_name),
+            state = COALESCE(excluded.state, state),
             raw_title = excluded.raw_title
         """,
         (meeting.meeting_code, meeting.meeting_date, meeting.track_name, meeting.state, meeting.raw_title),
