@@ -33,7 +33,9 @@ def _nr_to_grade_band(nr_ceiling: int | float | None) -> str | None:
 
 
 _TRACK_NAME_ALIASES: dict[str, str] = {
-    "Bathurst": "Bthurst",
+    "Bathurst":  "Bthurst",   # harness.org.au 7-char abbreviation
+    "Narrabri":  "Narabri",   # harness.org.au drops one 'r'
+    "Canberra":  "Canbera",   # harness.org.au drops one 'r'
 }
 
 
