@@ -581,6 +581,7 @@ def _render_meeting_html(
     .pill.pick {{ background: var(--pick-text); color: white; }}
     .pill.win {{ background: var(--accent); color: white; }}
     .pill.fs {{ background: #7c3aed; color: white; }}
+    .pill.ns {{ background: #ea580c; color: white; }}
 
     .driver-change {{ color: #f59e0b; font-weight: 600; }}
 
@@ -675,6 +676,11 @@ def _render_race_section(
             badges.append('<span class="pill win">Winner</span>')
         if row.get("career_starts") == 0:
             badges.append('<span class="pill fs">FS</span>')
+        try:
+            if int(row.get("recent_sectional_count") or 0) == 0 and int(row.get("career_starts") or 0) > 0:
+                badges.append('<span class="pill ns">NS</span>')
+        except (TypeError, ValueError):
+            pass
         body_rows.append(
             f"""
             <tr{class_attr}>
