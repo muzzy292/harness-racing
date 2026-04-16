@@ -198,10 +198,13 @@ def _build_feature_row(
     # happen to have NR data (often the worst-performing ones).
     # The metric is only output when ≥1 line was actually NR-adjusted (otherwise it
     # would be identical to recent_line_avg_adj_margin and add no value).
-    # For avg: floor at 0.0 so a single standout run doesn't dominate the average.
+    # For avg: floor at -8.0m so grade-drop runs contribute meaningfully without one
+    # freakish win dominating. -8.0m ≈ 2× typical winning margin; outliers beyond that
+    # are already captured by the best (ceiling) feature. Original 0.0 floor was erasing
+    # grade-drop advantages entirely (e.g. 2nd by 1.5m in NR47 → class-adj -4.0 → 0.0).
     # For ceiling (best): uncapped — a win in a tougher grade should produce a
     # negative class-adj margin (better than par), which _neg_scale rewards positively.
-    class_adj_recent_margins: list[float] = []       # capped at 0.0 — used for avg
+    class_adj_recent_margins: list[float] = []       # floored at -8.0 — used for avg
     class_adj_recent_margins_raw: list[float] = []   # uncapped — used for ceiling
     _class_adj_nr_count = 0
     # When today's race has no NR ceiling (NMT1W, age-restricted, No NR), fall back
@@ -223,7 +226,7 @@ def _build_feature_row(
                 continue
             if line.get("line_nr_ceiling") is not None:
                 adj = margin - (float(line["line_nr_ceiling"]) - _class_ref_nr) * _NR_MARGIN_FACTOR
-                class_adj_recent_margins.append(max(0.0, adj))
+                class_adj_recent_margins.append(max(-8.0, adj))
                 class_adj_recent_margins_raw.append(adj)
                 _class_adj_nr_count += 1
             else:
@@ -237,7 +240,7 @@ def _build_feature_row(
                 if proxy is not None:
                     proxy_nr, reliability = proxy
                     adj = margin - (proxy_nr - _class_ref_nr) * _NR_MARGIN_FACTOR * reliability
-                    class_adj_recent_margins.append(max(0.0, adj))
+                    class_adj_recent_margins.append(max(-8.0, adj))
                     class_adj_recent_margins_raw.append(adj)
                     _class_adj_nr_count += 1
                 else:
