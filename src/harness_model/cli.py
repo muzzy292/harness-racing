@@ -35,7 +35,7 @@ from .odds import (
     score_race_rows,
     write_scored_rows_csv,
 )
-from .web import build_meeting_site, build_stats_site, publish_scored_meeting, serve_site
+from .web import build_betting_site, build_meeting_site, build_stats_site, publish_scored_meeting, serve_site
 
 
 _DEFAULT_WEIGHTS_PATH = Path("weights.json")
@@ -217,6 +217,12 @@ def main() -> None:
     build_stats_parser = subparsers.add_parser("build-stats-site", help="Build driver and trainer stats page from ingested results")
     build_stats_parser.add_argument("--db", default="data/harness.db")
     build_stats_parser.add_argument("--out", default="docs", help="Output directory for stats.html (default: docs)")
+
+    build_betting_parser = subparsers.add_parser("build-betting-site", help="Build fractional-Kelly bankroll backtest page from scored meetings vs stored results")
+    build_betting_parser.add_argument("--db", default="data/harness.db")
+    build_betting_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    build_betting_parser.add_argument("--out", default="docs", help="Output directory for betting.html (default: docs)")
+    build_betting_parser.add_argument("--starting-bankroll", type=float, default=1000.0)
 
     args = parser.parse_args()
 
@@ -403,6 +409,8 @@ def main() -> None:
         serve_site(args.site_dir, host=args.host, port=args.port)
     elif args.command == "build-stats-site":
         build_stats_site(args.db, args.out)
+    elif args.command == "build-betting-site":
+        build_betting_site(args.db, args.csv, args.out, starting_bankroll=args.starting_bankroll)
     elif args.command == "calibrate-nr-factor":
         from .features import _NR_MARGIN_FACTOR
         r = calibrate_nr_factor(args.db)

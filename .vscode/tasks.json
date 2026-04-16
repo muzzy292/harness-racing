@@ -23,7 +23,7 @@
         "build-features",
         "--db", "data/harness.db",
         "--csv", "data/features/runner_features.csv",
-        "--track-pars", "${input:trackParsPath}"
+        "--track-pars", "data/track_pars.json"
       ],
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
@@ -136,6 +136,41 @@
       "problemMatcher": []
     },
     {
+      "label": "Build Stats Site",
+      "type": "shell",
+      "command": "python -m harness_model.cli build-stats-site --db data/harness.db --out docs && git add docs/stats.html && git diff --cached --quiet && echo \"Stats page unchanged - nothing to commit\" || git commit -m \"Update stats page\" && git push",
+      "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "cmd.exe", "args": ["/C"] } },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Betting Site",
+      "type": "shell",
+      "command": "python -m harness_model.cli build-betting-site --db data/harness.db --csv data/features/runner_features.csv --out docs && git add docs/betting.html && git diff --cached --quiet && echo \"Betting page unchanged - nothing to commit\" || git commit -m \"Update betting page\" && git push",
+      "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "cmd.exe", "args": ["/C"] } },
+      "problemMatcher": []
+    },
+    {
+      "label": "Fetch + Ingest Results & Update Stats",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Fetch Results",
+        "Ingest Results",
+        "Build Stats Site"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Fetch + Ingest + Build Features + Score & Publish",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Fetch Meeting",
+        "Ingest Meeting",
+        "Build Features",
+        "Score and Publish"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "Full Pipeline (Ingest + Horses + Drivers + Features + Score)",
       "dependsOrder": "sequence",
       "dependsOn": [
@@ -156,11 +191,5 @@
       "description": "Meeting code (e.g. LM300326)",
       "default": "LM300326"
     },
-    {
-      "id": "trackParsPath",
-      "type": "promptString",
-      "description": "Full path to track pars JSON",
-      "default": "C:\\Users\\Paul Mustica\\Desktop\\track_pars.json"
-    }
   ]
 }

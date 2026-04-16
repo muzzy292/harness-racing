@@ -11,7 +11,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from .odds import load_feature_rows, load_market_rows, score_meeting_rows
+from .odds import load_feature_rows, load_market_rows, load_weights, score_meeting_rows
 from .storage import connect, init_db
 
 
@@ -307,6 +307,7 @@ def _write_index(
   <nav class="top-nav">
     <a href="index.html" class="active">Meetings</a>
     <a href="stats.html">Stats</a>
+    <a href="betting.html">Betting</a>
   </nav>
   <div class="hero">
     <h1>Harness Racing Scores</h1>
@@ -634,6 +635,7 @@ def _render_meeting_html(
     <nav class="race-nav">
       <a href="index.html">Meetings</a>
       <a href="stats.html">Stats</a>
+      <a href="betting.html">Betting</a>
       {race_nav}
     </nav>
     {''.join(sections) if sections else '<div class="race-card"><p>No races found for this meeting.</p></div>'}
@@ -1061,6 +1063,7 @@ def _render_stats_html(driver_rows: list[dict], trainer_rows: list[dict], meta: 
   <nav class="top-nav">
     <a href="index.html">Meetings</a>
     <a href="stats.html" class="active">Stats</a>
+    <a href="betting.html">Betting</a>
   </nav>
   <div class="hero">
     <h1>Driver &amp; Trainer Stats</h1>
@@ -1152,6 +1155,362 @@ def build_stats_site(
     out_path = out_dir / "stats.html"
     out_path.write_text(stats_html, encoding="utf-8")
     print(f"Stats page written -> {out_path}  ({len(driver_rows)} drivers, {len(trainer_rows)} trainers)")
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Betting / bankroll backtest page — fractional Kelly staking
+# ---------------------------------------------------------------------------
+
+_KELLY_FRACTION  = 0.25   # quarter-Kelly
+_MAX_BET_PCT     = 0.04   # never more than 4% of current bankroll
+_MIN_EDGE        = 0.10   # minimum 10% edge to bet
+
+
+def _kelly_stake_pct(model_prob: float, market_odds: float, fraction: float = _KELLY_FRACTION) -> float | None:
+    """Fractional Kelly stake as a fraction of bankroll, or None if no bet."""
+    if market_odds <= 1.0 or model_prob <= 0:
+        return None
+    market_prob = 1.0 / market_odds
+    edge = model_prob - market_prob
+    if edge < _MIN_EDGE:
+        return None
+    b = market_odds - 1.0
+    full_kelly = (b * model_prob - (1.0 - model_prob)) / b
+    if full_kelly <= 0:
+        return None
+    return min(full_kelly * fraction, _MAX_BET_PCT)
+
+
+def _bankroll_svg(records: list[dict], starting_bankroll: float) -> str:
+    values = [starting_bankroll] + [r["bankroll"] for r in records]
+    if len(values) < 2:
+        return ""
+    min_v = min(values) * 0.97
+    max_v = max(values) * 1.03
+    W, H = 800, 160
+    rng = max_v - min_v if max_v > min_v else 1.0
+
+    def px(i: int) -> float:
+        return i / (len(values) - 1) * W
+
+    def py(v: float) -> float:
+        return H - (v - min_v) / rng * H
+
+    pts = " ".join(f"{px(i):.1f},{py(v):.1f}" for i, v in enumerate(values))
+    colour = "#10b981" if values[-1] >= starting_bankroll else "#ef4444"
+    baseline = py(starting_bankroll)
+    return (
+        f'<svg viewBox="0 0 {W} {H}" preserveAspectRatio="none" '
+        f'style="width:100%;height:160px;display:block;">'
+        f'<line x1="0" y1="{baseline:.1f}" x2="{W}" y2="{baseline:.1f}" '
+        f'stroke="#64748b" stroke-width="1" stroke-dasharray="4,4"/>'
+        f'<polyline points="{pts}" fill="none" stroke="{colour}" stroke-width="2.5"/>'
+        f'</svg>'
+    )
+
+
+def _compute_bet_records(
+    conn: sqlite3.Connection,
+    csv_path: str | Path,
+    weights: dict | None,
+    starting_bankroll: float = 1000.0,
+) -> tuple[list[dict], dict]:
+    """Score all meetings in the CSV, join with race_results, apply fractional Kelly.
+
+    Returns (records, summary). Records are in chronological order.
+    """
+    # Results lookup: (meeting_code, race_number, normalised_name) → row
+    results_lookup: dict[tuple, dict] = {}
+    for r in conn.execute(
+        "SELECT meeting_code, race_number, horse_name, finish_position, starting_price "
+        "FROM race_results WHERE starting_price IS NOT NULL AND finish_position IS NOT NULL"
+    ).fetchall():
+        key = (r["meeting_code"], int(r["race_number"]), _normalise_name(str(r["horse_name"])))
+        results_lookup[key] = dict(r)
+
+    # Meeting metadata for sorting and display
+    meeting_meta: dict[str, dict] = {}
+    for r in conn.execute("SELECT meeting_code, meeting_date, track_name FROM meetings").fetchall():
+        meeting_meta[r["meeting_code"]] = dict(r)
+
+    def _date_key(mc: str) -> datetime:
+        d = (meeting_meta.get(mc) or {}).get("meeting_date", "")
+        try:
+            return datetime.strptime(d, "%d %b %Y")
+        except ValueError:
+            return datetime.min
+
+    # Score all meetings
+    feature_rows = load_feature_rows(csv_path)
+    meeting_codes = list(dict.fromkeys(r.get("meeting_code", "") for r in feature_rows if r.get("meeting_code")))
+    meeting_codes.sort(key=_date_key)
+
+    bankroll = starting_bankroll
+    unit_halved = False
+    records: list[dict] = []
+
+    for mc in meeting_codes:
+        scored = score_meeting_rows(feature_rows, mc, weights=weights)
+        for race_number, race_rows in sorted(scored.items()):
+            for row in race_rows:
+                horse = str(row.get("horse_name") or "")
+                model_prob_raw = row.get("win_probability")
+                try:
+                    model_prob = float(model_prob_raw or 0)
+                except (TypeError, ValueError):
+                    continue
+                if model_prob <= 0:
+                    continue
+
+                result = results_lookup.get((mc, race_number, _normalise_name(horse)))
+                if result is None:
+                    continue  # no result yet
+
+                market_odds = float(result["starting_price"])
+                finish_pos = result["finish_position"]
+
+                # Halve units once if bankroll drops 25% from start
+                if not unit_halved and bankroll < starting_bankroll * 0.75:
+                    unit_halved = True
+
+                fraction = _KELLY_FRACTION * (0.5 if unit_halved else 1.0)
+                stake_pct = _kelly_stake_pct(model_prob, market_odds, fraction)
+                if stake_pct is None:
+                    continue
+
+                stake = round(bankroll * stake_pct, 2)
+                won = int(finish_pos) == 1
+                profit = round(stake * (market_odds - 1), 2) if won else round(-stake, 2)
+                bankroll = round(bankroll + profit, 2)
+
+                edge_pct = (model_prob - 1.0 / market_odds) * 100
+                tier = "Max" if edge_pct >= 35 else "Standard" if edge_pct >= 20 else "Small"
+                meta = meeting_meta.get(mc, {})
+                fair_odds = row.get("fair_odds")
+
+                records.append({
+                    "meeting_code": mc,
+                    "meeting_date": meta.get("meeting_date", ""),
+                    "track_name": meta.get("track_name", ""),
+                    "race_number": race_number,
+                    "horse_name": horse,
+                    "model_prob": round(model_prob * 100, 1),
+                    "fair_odds": fair_odds,
+                    "market_odds": market_odds,
+                    "edge_pct": round(edge_pct, 1),
+                    "tier": tier,
+                    "stake": stake,
+                    "won": won,
+                    "finish_pos": finish_pos,
+                    "profit": profit,
+                    "bankroll": bankroll,
+                })
+
+    total_staked = sum(r["stake"] for r in records)
+    total_profit = sum(r["profit"] for r in records)
+    winners = sum(1 for r in records if r["won"])
+    n = len(records)
+    summary = {
+        "starting_bankroll": starting_bankroll,
+        "current_bankroll": bankroll,
+        "total_bets": n,
+        "winners": winners,
+        "win_rate": round(winners / n * 100, 1) if n else 0.0,
+        "total_staked": round(total_staked, 2),
+        "total_profit": round(total_profit, 2),
+        "roi": round(total_profit / total_staked * 100, 2) if total_staked else 0.0,
+        "avg_edge": round(sum(r["edge_pct"] for r in records) / n, 1) if n else 0.0,
+        "unit_halved": unit_halved,
+    }
+    return records, summary
+
+
+def _render_betting_html(records: list[dict], summary: dict, generated_at: str) -> str:
+    start_bank = summary["starting_bankroll"]
+    curr_bank  = summary["current_bankroll"]
+    profit     = summary["total_profit"]
+    profit_colour = "#10b981" if profit >= 0 else "#ef4444"
+    profit_sign   = "+" if profit >= 0 else ""
+
+    chart_svg = _bankroll_svg(records, start_bank)
+
+    def _sc(label: str, value: str, sub: str = "", colour: str = "") -> str:
+        style = f' style="color:{colour}"' if colour else ""
+        return f"""<div class="sc"><span class="sc-label">{html.escape(label)}</span>
+          <span class="sc-value"{style}>{html.escape(value)}</span>
+          {f'<span class="sc-sub">{html.escape(sub)}</span>' if sub else ''}
+        </div>"""
+
+    summary_html = "".join([
+        _sc("Starting Bank",  f"${start_bank:,.0f}"),
+        _sc("Current Bank",   f"${curr_bank:,.2f}",
+            sub=f"{profit_sign}${abs(profit):,.2f}", colour=profit_colour),
+        _sc("Total Bets",     str(summary["total_bets"]),
+            sub=f"{summary['winners']} winners"),
+        _sc("Win Rate",       f"{summary['win_rate']:.1f}%"),
+        _sc("ROI",            f"{profit_sign}{summary['roi']:.1f}%", colour=profit_colour),
+        _sc("Avg Edge",       f"{summary['avg_edge']:.1f}%"),
+        _sc("Total Staked",   f"${summary['total_staked']:,.2f}"),
+    ])
+
+    # Table rows — most recent first
+    tr_parts: list[str] = []
+    for r in reversed(records):
+        won = r["won"]
+        row_class = "bet-win" if won else "bet-loss"
+        tier_class = f"tier-{r['tier'].lower()}"
+        result_str = f"1st" if won else f"{r['finish_pos']}"
+        profit_str = f"+${r['profit']:.2f}" if won else f"-${abs(r['profit']):.2f}"
+        tr_parts.append(f"""<tr class="{row_class}">
+          <td>{html.escape(r['meeting_date'])}</td>
+          <td>{html.escape(r['track_name'] or r['meeting_code'])}</td>
+          <td>R{r['race_number']}</td>
+          <td>{html.escape(r['horse_name'])}</td>
+          <td class="num">{r['model_prob']:.1f}%</td>
+          <td class="num">${r['market_odds']:.2f}</td>
+          <td class="num">{r['edge_pct']:.1f}%</td>
+          <td class="num"><span class="tier {tier_class}">{html.escape(r['tier'])}</span></td>
+          <td class="num">${r['stake']:.2f}</td>
+          <td class="num">{result_str}</td>
+          <td class="num" style="color:{'#10b981' if won else '#ef4444'}">{profit_str}</td>
+          <td class="num">${r['bankroll']:,.2f}</td>
+        </tr>""")
+
+    table_body = "\n".join(tr_parts)
+    unit_note = " · Units halved (bank fell 25%)" if summary.get("unit_halved") else ""
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Betting Backtest — Harness Racing</title>
+  <style>
+    :root {{
+      --bg: #f8fafc; --card-bg: #ffffff; --primary: #0f172a;
+      --secondary: #64748b; --accent: #10b981; --accent-dark: #059669;
+      --border: #e2e8f0; --highlight: #f1f5f9;
+    }}
+    * {{ box-sizing: border-box; }}
+    html {{ scroll-behavior: smooth; }}
+    body {{ margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      color:var(--primary); background:var(--bg); line-height:1.5; }}
+    .top-nav {{ background:var(--primary); padding:12px 20px; display:flex; gap:8px; align-items:center; }}
+    .top-nav a {{ color:var(--secondary); text-decoration:none; font-size:14px; font-weight:600;
+      padding:6px 14px; border-radius:8px; transition:all 0.2s; }}
+    .top-nav a:hover {{ background:rgba(255,255,255,0.1); color:white; }}
+    .top-nav a.active {{ background:rgba(255,255,255,0.12); color:white; }}
+    .hero {{ background:var(--primary); color:white; padding:32px 20px; text-align:center; }}
+    .hero h1 {{ margin:0 0 8px; font-size:34px; font-weight:800; letter-spacing:-0.02em; }}
+    .hero p {{ margin:0; color:var(--secondary); font-size:14px; }}
+    .wrap {{ max-width:1300px; margin:0 auto; padding:32px 20px 60px; }}
+    .summary-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:28px; }}
+    .sc {{ background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:16px; }}
+    .sc-label {{ display:block; font-size:11px; color:var(--secondary); text-transform:uppercase;
+      letter-spacing:0.05em; margin-bottom:4px; }}
+    .sc-value {{ display:block; font-size:20px; font-weight:700; }}
+    .sc-sub {{ display:block; font-size:12px; color:var(--secondary); margin-top:2px; }}
+    .chart-card {{ background:var(--card-bg); border:1px solid var(--border); border-radius:16px;
+      padding:20px; margin-bottom:28px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); }}
+    .chart-card h3 {{ margin:0 0 12px; font-size:14px; color:var(--secondary); font-weight:600;
+      text-transform:uppercase; letter-spacing:0.05em; }}
+    .params {{ background:var(--card-bg); border:1px solid var(--border); border-radius:12px;
+      padding:14px 20px; margin-bottom:28px; font-size:13px; color:var(--secondary);
+      display:flex; gap:24px; flex-wrap:wrap; align-items:center; }}
+    .params strong {{ color:var(--primary); }}
+    .section-title {{ font-size:20px; font-weight:700; margin:0 0 14px;
+      padding-bottom:6px; border-bottom:2px solid var(--accent); display:inline-block; }}
+    .table-wrap {{ overflow-x:auto; border:1px solid var(--border); border-radius:16px;
+      background:var(--card-bg); box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); }}
+    table {{ width:100%; border-collapse:collapse; min-width:900px; }}
+    th,td {{ padding:9px 12px; text-align:left; font-size:13px; border-bottom:1px solid var(--border); }}
+    th {{ background:#fafafa; color:var(--secondary); font-size:11px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap; }}
+    tr:last-child td {{ border-bottom:none; }}
+    td.num {{ text-align:right; }}
+    th.num {{ text-align:right; }}
+    tr.bet-win {{ background:#f0fdf4; }}
+    tr.bet-win:hover {{ background:#dcfce7; }}
+    tr.bet-loss {{ background:#fff; }}
+    tr.bet-loss:hover {{ background:var(--highlight); }}
+    .tier {{ display:inline-block; padding:2px 8px; border-radius:4px;
+      font-size:11px; font-weight:700; text-transform:uppercase; }}
+    .tier-small    {{ background:#e0f2fe; color:#0369a1; }}
+    .tier-standard {{ background:#ecfdf5; color:#059669; }}
+    .tier-max      {{ background:#fef3c7; color:#b45309; }}
+    .footer {{ margin-top:40px; text-align:center; color:var(--secondary); font-size:13px; }}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="index.html">Meetings</a>
+    <a href="stats.html">Stats</a>
+    <a href="betting.html" class="active">Betting</a>
+  </nav>
+  <div class="hero">
+    <h1>Betting Backtest</h1>
+    <p>Quarter-Kelly staking · All tracks · Starting bank ${start_bank:,.0f}</p>
+  </div>
+  <div class="wrap">
+    <div class="summary-grid">{summary_html}</div>
+    <div class="params">
+      <span><strong>Strategy:</strong> Quarter-Kelly (0.25×)</span>
+      <span><strong>Min Edge:</strong> 10%</span>
+      <span><strong>Max Bet:</strong> 4% of bank</span>
+      <span><strong>Halve Units:</strong> if bank falls 25%</span>
+      <span><strong>Tracks:</strong> All</span>
+      {f'<span style="color:#f59e0b;font-weight:600;">⚠ Units halved</span>' if summary.get("unit_halved") else ''}
+    </div>
+    <div class="chart-card">
+      <h3>Bankroll progression — {summary['total_bets']} bets{unit_note}</h3>
+      {chart_svg if chart_svg else '<p style="color:var(--secondary)">No bets yet.</p>'}
+    </div>
+    <div class="section-title">Bet History</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Track</th><th>Race</th><th>Horse</th>
+            <th class="num">Model%</th><th class="num">SP</th>
+            <th class="num">Edge%</th><th class="num">Tier</th>
+            <th class="num">Stake</th><th class="num">Result</th>
+            <th class="num">P&amp;L</th><th class="num">Bank</th>
+          </tr>
+        </thead>
+        <tbody>{table_body if table_body else '<tr><td colspan="12" style="text-align:center;color:var(--secondary);padding:32px;">No bets recorded yet — run build-features then build-betting-site.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="footer">Generated {html.escape(generated_at)}</div>
+  </div>
+</body>
+</html>
+"""
+
+
+def build_betting_site(
+    db_path: str | Path,
+    csv_path: str | Path,
+    out_dir: str | Path,
+    starting_bankroll: float = 1000.0,
+) -> Path:
+    """Build fractional-Kelly backtest page and write to out_dir/betting.html."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    conn = connect(db_path)
+    init_db(conn)
+    weights_path = Path("weights.json")
+    weights = load_weights(weights_path) if weights_path.exists() else None
+    records, summary = _compute_bet_records(conn, csv_path, weights, starting_bankroll)
+    conn.close()
+
+    betting_html = _render_betting_html(
+        records, summary, datetime.now().strftime("%d %b %Y %H:%M")
+    )
+    out_path = out_dir / "betting.html"
+    out_path.write_text(betting_html, encoding="utf-8")
+    print(f"Betting page written -> {out_path}  ({summary['total_bets']} bets, ROI {summary['roi']:+.1f}%)")
     return out_path
 
 
