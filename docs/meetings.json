@@ -159,5 +159,12 @@
     "meeting_date": "16 Apr 2026",
     "races": 9,
     "winners": 0
+  },
+  {
+    "meeting_code": "EY170426",
+    "track_name": "Wagga",
+    "meeting_date": "17 Apr 2026",
+    "races": 6,
+    "winners": 0
   }
 ]
