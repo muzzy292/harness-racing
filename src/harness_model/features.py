@@ -164,13 +164,20 @@ def _build_feature_row(
     primary_adj_margins = adj_recent_margins
     primary_prices = prices
     primary_source_5 = valid_recent_lines[:5]
-    top3_in_5 = [run for run in primary_source_5 if run.get("finish_position") in (1, 2, 3)]
-    competitive_in_5 = [
-        run for run in primary_source_5
-        if run.get("adjusted_margin") is not None and float(run["adjusted_margin"]) <= 3.0
+    # last_5_attempts includes null runs so DNF/scratched races count as starts in the
+    # denominator — prevents horses with repeated null runs inflating their win/top3 rates.
+    last_5_attempts = recent_lines[:5]
+    top3_in_5 = [
+        run for run in last_5_attempts
+        if not _truthy(run.get("null_run")) and run.get("finish_position") in (1, 2, 3)
     ]
-    last_5_top3_rate = round(len(top3_in_5) / len(primary_source_5), 4) if primary_source_5 else None
-    last_5_competitive_rate = round(len(competitive_in_5) / len(primary_source_5), 4) if primary_source_5 else None
+    competitive_in_5 = [
+        run for run in last_5_attempts
+        if not _truthy(run.get("null_run"))
+        and run.get("adjusted_margin") is not None and float(run["adjusted_margin"]) <= 3.0
+    ]
+    last_5_top3_rate = round(len(top3_in_5) / len(last_5_attempts), 4) if last_5_attempts else None
+    last_5_competitive_rate = round(len(competitive_in_5) / len(last_5_attempts), 4) if last_5_attempts else None
     map_signals = _map_signals(valid_recent_lines, runner.get("barrier"))
     bmr_secs = _parse_bmr_secs(runner.get("form_bmr"))
     bmr_dist_rge_secs = _parse_bmr_secs(runner.get("form_bmr_dist_rge"))
@@ -443,7 +450,7 @@ def _build_feature_row(
         "last_10_avg_adj_margin": _avg(primary_adj_margins[:10]),
         "last_5_best_adj_margin": min(primary_adj_margins[:5]) if primary_adj_margins[:5] else None,
         "last_5_avg_sp": _avg(primary_prices[:5]),
-        "last_5_win_rate": round(len([r for r in primary_source_5 if r.get("finish_position") == 1]) / len(primary_source_5), 4) if primary_source_5 else None,
+        "last_5_win_rate": round(len([r for r in last_5_attempts if not _truthy(r.get("null_run")) and r.get("finish_position") == 1]) / len(last_5_attempts), 4) if last_5_attempts else None,
         "last_10_win_rate": _last10_wr,
         "last_10_starts": _last10_starts,
         "last_5_top3_rate": last_5_top3_rate,
