@@ -63,7 +63,8 @@ TRACK_CODE_MAP = {
 }
 
 STATE_TRACKS = {"Menangle": "NSW", "Penrith": "NSW", "Bathurst": "NSW", "Goulburn": "NSW"}
-EXCLUDED_RACE_KEYWORDS = ("TROT", "TROTTERS", "TROTTING", "2YO")
+# Whole-word match — prevents "TAMTROTS" (club name) triggering on "TROT".
+_EXCLUDED_RACE_RE = re.compile(r"\b(?:TROT(?:TERS|TING)?|2YO)\b")
 
 CODES = {
     "OL": -10.0, "OLM": -10.0, "OLT": -10.0, "OTE": -10.0, "OTM": -10.0, "OT": -10.0,
@@ -1220,7 +1221,7 @@ def _parse_recent_line_margin(value: str, finish_position: int | None) -> float 
 
 
 def _is_excluded_race(race_name: str | None) -> bool:
-    return bool(race_name and any(keyword in race_name.upper() for keyword in EXCLUDED_RACE_KEYWORDS))
+    return bool(race_name and _EXCLUDED_RACE_RE.search(race_name.upper()))
 
 
 def _parse_margin(value: str) -> float | None:
