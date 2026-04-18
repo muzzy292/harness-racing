@@ -60,21 +60,21 @@
     "track_name": "Young",
     "meeting_date": "10 Apr 2026",
     "races": 7,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "NR100426",
     "track_name": "Newcastle",
     "meeting_date": "10 Apr 2026",
     "races": 9,
-    "winners": 3
+    "winners": 2
   },
   {
     "meeting_code": "DU100426",
     "track_name": "Dubbo",
     "meeting_date": "10 Apr 2026",
     "races": 6,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "PC110426",
@@ -137,7 +137,7 @@
     "track_name": "Leeton",
     "meeting_date": "14 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "BH150426",
@@ -158,14 +158,14 @@
     "track_name": "Penrith",
     "meeting_date": "16 Apr 2026",
     "races": 9,
-    "winners": 2
+    "winners": 1
   },
   {
     "meeting_code": "EY170426",
     "track_name": "Wagga",
     "meeting_date": "17 Apr 2026",
     "races": 6,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "NR170426",
