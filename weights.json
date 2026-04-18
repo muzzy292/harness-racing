@@ -49,7 +49,7 @@
     "tier_150_plus": -2.0
   },
   "softmax": {
-    "temperature": 1.5,
+    "temperature": 2.25,
     "model_weight": 0.45,
     "market_weight": 0.55
   }
