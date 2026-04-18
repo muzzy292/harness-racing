@@ -66,6 +66,22 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
     ).fetchall():
         field_sizes[(row["meeting_code"], row["race_number"])] = row["n"]
 
+    # Average NR rating across all non-scratched runners per race.
+    # Used as a ground-truth field-quality anchor for No-NR races where race_nr_ceiling
+    # is absent — max(purse proxy, field_avg_nr) becomes _class_ref_nr.
+    field_avg_nrs: dict[tuple, float] = {}
+    for row in conn.execute(
+        "SELECT rr.meeting_code, rr.race_number, "
+        "AVG(CAST(COALESCE(rr.form_nr, hp.nr_rating) AS REAL)) AS avg_nr "
+        "FROM race_runners rr "
+        "LEFT JOIN horse_profiles hp ON hp.horse_id = rr.horse_id "
+        "WHERE COALESCE(rr.scratched, 0) = 0 "
+        "  AND COALESCE(rr.form_nr, hp.nr_rating) IS NOT NULL "
+        "GROUP BY rr.meeting_code, rr.race_number"
+    ).fetchall():
+        if row["avg_nr"] is not None:
+            field_avg_nrs[(row["meeting_code"], row["race_number"])] = round(float(row["avg_nr"]), 1)
+
     # Pre-compute rolling stats for every unique driver/trainer across all runners.
     # Many runners share the same person — caching avoids redundant DB queries.
     _driver_cache: dict[str, dict] = {}
@@ -102,6 +118,7 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
                 recent_lines.append(line)
 
         race_field_size = field_sizes.get((runner["meeting_code"], runner["race_number"]))
+        race_field_avg_nr = field_avg_nrs.get((runner["meeting_code"], runner["race_number"]))
         driver_key = str(runner["nominated_driver"] or "").strip().upper()
         trainer_key = str(runner["nominated_trainer"] or "").strip().upper()
         rows.append(
@@ -111,6 +128,7 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
                 recent_lines,
                 track_pars,
                 race_field_size=race_field_size,
+                race_field_avg_nr=race_field_avg_nr,
                 driver_stats=_driver_cache.get(driver_key),
                 trainer_stats=_trainer_cache.get(trainer_key),
             )
@@ -138,6 +156,7 @@ def _build_feature_row(
     recent_lines: list[dict[str, object]],
     track_pars: dict | None,
     race_field_size: int | None = None,
+    race_field_avg_nr: float | None = None,
     driver_stats: dict | None = None,
     trainer_stats: dict | None = None,
 ) -> dict[str, object]:
@@ -219,11 +238,22 @@ def _build_feature_row(
     # runs (Breeders Challenge, Carnival series) to be grade-calibrated against the
     # horse's current level even when the race itself has no formal NR grade.
     _class_ref_nr: float | None = race_nr_ceiling
-    if _class_ref_nr is None and nr_rating is not None:
-        try:
-            _class_ref_nr = float(nr_rating)
-        except (TypeError, ValueError):
-            pass
+    if _class_ref_nr is None:
+        # No-NR race today — derive the grade reference from the best available signal:
+        # max(purse proxy for today's race, field avg NR of today's runners).
+        # field_avg_nr anchors to actual field quality when runners have NR ratings;
+        # purse proxy is the floor when the field is unrated (maidens, juveniles).
+        # Fall back to horse's own NR only when neither signal is available.
+        _today_proxy = _no_nr_proxy(_to_float_local(runner.get("race_purse")), None)
+        _today_proxy_nr: float | None = _today_proxy[0] if _today_proxy is not None else None
+        _candidates = [x for x in (_today_proxy_nr, race_field_avg_nr) if x is not None]
+        if _candidates:
+            _class_ref_nr = max(_candidates)
+        elif nr_rating is not None:
+            try:
+                _class_ref_nr = float(nr_rating)
+            except (TypeError, ValueError):
+                pass
     if _class_ref_nr is not None:
         for line in valid_recent_lines[:5]:
             if line.get("adjusted_margin") in (None, ""):
@@ -505,6 +535,7 @@ def _build_feature_row(
         "sp_short_count_last10": sp_features["sp_short_count_last10"],
         "sp_reliability_rate": sp_features["sp_reliability_rate"],
         "race_field_size": race_field_size,
+        "race_field_avg_nr": race_field_avg_nr,
         "barrier_relief_score": barrier_relief_score,
     }
 
