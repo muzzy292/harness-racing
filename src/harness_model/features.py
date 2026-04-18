@@ -918,16 +918,16 @@ def _no_nr_proxy(purse: float | None, age: str | None) -> tuple[float, float] | 
 
     # 4yo or no age tag — scaled by prize money to reflect open-grade quality tiers.
     # $100k+  → NR120 (Group 1 / Inter-Dominion / elite national series)
-    # $50–99k → NR95  (Group 2/3, state championship finals)
-    # $20–49k → NR78  (state-level feature, open country championship)
-    # <$20k   → NR58  (club/country open, similar to old tiered values)
+    # $50–99k → NR105 (Group 2/3, state championship finals)
+    # $20–49k → NR90  (state-level feature, open country championship)
+    # <$20k   → NR70  (club/country open)
     if purse >= 100_000:
         return (120.0, 0.85)
     if purse >= 50_000:
-        return (95.0, 0.82)
+        return (105.0, 0.82)
     if purse >= 20_000:
-        return (78.0, 0.78)
-    return (58.0, 0.80)
+        return (90.0, 0.78)
+    return (70.0, 0.80)
 
 
 def _parse_barrier_num(barrier: object) -> int | None:
