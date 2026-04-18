@@ -1,6 +1,6 @@
 {
   "stage1": {
-    "consistency": 1.8,
+    "consistency": 1.4,
     "ceiling": 1.2,
     "late_speed": 1.4,
     "tempo_adj": 0.45,
@@ -12,7 +12,7 @@
     "career_win_rate": 0.6,
     "top3_rate": 0.6,
     "competitive_rate": 0.5,
-    "nr": 0.25,
+    "nr": 0.35,
     "class_pos": 0.15,
     "stake_class": 0.2,
     "class_delta": 0.3,
@@ -32,7 +32,7 @@
     "map_wide": 0.5,
     "map_death": 1.2,
     "dist_strike_rate": 0.9,
-    "nr_grade_delta": 0.4,
+    "nr_grade_delta": 0.7,
     "driver_form": 0.6,
     "trainer_form_manual": 0.6,
     "second_up": 1.5,
@@ -40,12 +40,12 @@
   },
   "fitness": {
     "tier_15_28": -0.35,
-    "tier_29_42": -0.60,
+    "tier_29_42": -0.6,
     "tier_43_84": -0.85,
-    "tier_85_99": -1.10,
+    "tier_85_99": -1.1,
     "tier_100_119": -1.45,
-    "tier_120_149": -1.70,
-    "tier_150_plus": -2.00
+    "tier_120_149": -1.7,
+    "tier_150_plus": -2.0
   },
   "softmax": {
     "temperature": 1.5,

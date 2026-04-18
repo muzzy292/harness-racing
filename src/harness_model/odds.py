@@ -8,7 +8,7 @@ from pathlib import Path
 
 _DEFAULT_WEIGHTS: dict = {
     "stage1": {
-        "consistency": 1.8,
+        "consistency": 1.4,
         "ceiling": 1.2,
         "late_speed": 1.4,
         "tempo_adj": 0.45,
@@ -20,7 +20,7 @@ _DEFAULT_WEIGHTS: dict = {
         "career_win_rate": 0.6,
         "top3_rate": 0.6,
         "competitive_rate": 0.5,
-        "nr": 0.25,
+        "nr": 0.35,
         "class_pos": 0.15,
         "stake_class": 0.2,
         "class_delta": 0.3,
@@ -38,7 +38,7 @@ _DEFAULT_WEIGHTS: dict = {
         "map_wide": 0.5,
         "map_death": 1.2,
         "dist_strike_rate": 0.9,
-        "nr_grade_delta": 0.4,
+        "nr_grade_delta": 0.7,
         "driver_form": 0.3,
         "trainer_form_manual": 0.6,
     },
