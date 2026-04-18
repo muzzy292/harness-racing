@@ -622,6 +622,29 @@ def _render_meeting_html(
       .horse-cell .meta {{ display: none; }}
       table {{ min-width: 700px; }}
     }}
+
+    /* ── Diagnostics panel ── */
+    .diag-row td {{ padding: 0; background: #f1f5f9; border-bottom: 2px solid var(--border); }}
+    .diag-panel {{ padding: 14px 18px 6px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }}
+    .diag-group {{ background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }}
+    .diag-group h4 {{ margin: 0 0 7px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--secondary); }}
+    .diag-kv {{ display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 1px solid var(--border); font-size: 11.5px; }}
+    .diag-kv:last-child {{ border-bottom: none; }}
+    .diag-kv .k {{ color: var(--secondary); white-space: nowrap; }}
+    .diag-kv .v {{ font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }}
+    .diag-kv .v.warn {{ color: #dc2626; }}
+    .diag-kv .v.ok   {{ color: #059669; }}
+    .diag-kv .v.muted {{ color: var(--secondary); font-weight: 400; }}
+    .diag-comps {{ display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 18px 14px; }}
+    .diag-comp-table {{ flex: 1; min-width: 190px; border-collapse: collapse; }}
+    .diag-comp-table caption {{ font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--secondary); text-align: left; padding-bottom: 4px; caption-side: top; }}
+    .diag-comp-table td {{ padding: 1px 5px; font-size: 11.5px; border: none; }}
+    .comp-name {{ color: var(--secondary); }}
+    .comp-pos  {{ color: #16a34a; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }}
+    .comp-neg  {{ color: #dc2626; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }}
+    .comp-zero {{ color: var(--secondary); opacity: 0.45; font-variant-numeric: tabular-nums; text-align: right; }}
+    .diag-toggle {{ background: none; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 10px; padding: 1px 5px; margin-left: 5px; color: var(--secondary); transition: transform 0.15s; line-height: 1.4; vertical-align: middle; }}
+    .diag-toggle.open {{ transform: rotate(90deg); color: var(--accent); border-color: var(--accent); }}
   </style>
 </head>
 <body>
@@ -640,9 +663,206 @@ def _render_meeting_html(
     </nav>
     {''.join(sections) if sections else '<div class="race-card"><p>No races found for this meeting.</p></div>'}
   </div>
+  <script>
+    function toggleDiag(id) {{
+      var row = document.getElementById(id);
+      var btn = document.querySelector('[onclick="toggleDiag(\\'' + id + '\\')"]');
+      if (!row) return;
+      var hidden = row.style.display === 'none' || row.style.display === '';
+      row.style.display = hidden ? 'table-row' : 'none';
+      if (btn) btn.classList.toggle('open', hidden);
+    }}
+  </script>
 </body>
 </html>
 """
+
+
+def _render_diag_row(row_id: str, row: dict[str, object]) -> str:
+    """Return a hidden <tr> with the full diagnostics panel for one horse."""
+    components = row.get("components") or {}
+
+    def _fv(key: str) -> float | None:
+        v = row.get(key)
+        try:
+            return float(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
+    def _iv(key: str) -> int | None:
+        v = _fv(key)
+        return int(v) if v is not None else None
+
+    def kv(label: str, display: str, css: str = "") -> str:
+        css_attr = f' class="{css}"' if css else ""
+        return f'<div class="diag-kv"><span class="k">{label}</span><span class="v"{css_attr}>{display}</span></div>'
+
+    def _fmt_m(v: float | None) -> tuple[str, str]:
+        if v is None:
+            return "—", "muted"
+        return f"{v:+.1f}m", ("ok" if v < 0 else ("warn" if v > 10 else ""))
+
+    def _fmt_pct(v: float | None, warn_above: float | None = None, ok_below: float | None = None) -> tuple[str, str]:
+        if v is None:
+            return "—", "muted"
+        s = f"{v:.1%}"
+        css = ""
+        if warn_above is not None and v > warn_above:
+            css = "warn"
+        elif ok_below is not None and v <= ok_below:
+            css = "ok"
+        return s, css
+
+    def _fmt_f(v: float | None, fmt: str = ".2f") -> tuple[str, str]:
+        if v is None:
+            return "—", "muted"
+        return format(v, fmt), ""
+
+    def _fmt_days(v: float | None) -> tuple[str, str]:
+        if v is None:
+            return "—", "muted"
+        d = int(v)
+        css = "warn" if d >= 43 else ("ok" if d <= 14 else "")
+        return f"{d}d", css
+
+    # --- Group A: Form Quality ---
+    avg_ca, avg_ca_css = _fmt_m(_fv("recent_line_avg_class_adj_margin"))
+    best_ca, best_ca_css = _fmt_m(_fv("recent_line_best_class_adj_margin"))
+    wr5, wr5_css = _fmt_pct(_fv("last_5_win_rate"), warn_above=0.50)
+    t3, t3_css = _fmt_pct(_fv("last_5_top3_rate"))
+    comp, comp_css = _fmt_pct(_fv("last_5_competitive_rate"))
+    sec_delta_v = _fv("last_3_avg_sectional_delta")
+    sec_delta_s = (f"{sec_delta_v:+.2f}s" if sec_delta_v is not None else "—")
+    sec_delta_css = ("ok" if sec_delta_v is not None and sec_delta_v < -0.5 else
+                     ("warn" if sec_delta_v is not None and sec_delta_v > 0.3 else
+                      ("muted" if sec_delta_v is None else "")))
+    sec_count = _iv("recent_sectional_count")
+    career_s = _iv("career_starts") or 0
+    sec_count_css = "warn" if (sec_count == 0 and career_s > 0) else ("muted" if sec_count is None else "")
+    null_flags = _iv("recent_line_null_flags") or 0
+    null_css = "warn" if null_flags > 1 else ("muted" if null_flags == 0 else "")
+
+    grp_a = (
+        kv("Avg Class Adj", avg_ca, avg_ca_css)
+        + kv("Best Class Adj", best_ca, best_ca_css)
+        + kv("Last 5 Win Rate", wr5, wr5_css)
+        + kv("Last 5 Top3 Rate", t3, t3_css)
+        + kv("Last 5 Competitive", comp, comp_css)
+        + kv("Sectional Δ (L3)", sec_delta_s, sec_delta_css)
+        + kv("Sectional Count", str(sec_count) if sec_count is not None else "—", sec_count_css)
+        + kv("Null Runs Excl.", str(null_flags), null_css)
+    )
+
+    # --- Group B: Class & NR ---
+    nr_v = _fv("nr_rating")
+    ceil_v = _fv("race_nr_ceiling")
+    delta_v = _fv("nr_grade_delta")
+    avg_ceil_v = _fv("avg_recent_nr_ceiling")
+    headroom_v = _fv("nr_headroom")
+    purse_v = _fv("avg_recent_run_purse")
+    class_delta_v = _fv("class_delta")
+
+    delta_s = (f"{delta_v:+.1f}" if delta_v is not None else "—")
+    delta_css = ("ok" if delta_v is not None and delta_v < -5 else
+                 ("warn" if delta_v is not None and delta_v > 5 else
+                  ("muted" if delta_v is None else "")))
+    purse_s = (f"${purse_v:,.0f}" if purse_v is not None else "—")
+    cd_s = (f"${class_delta_v:+,.0f}" if class_delta_v is not None else "—")
+    cd_css = "warn" if (class_delta_v is not None and class_delta_v > 5000) else ("muted" if class_delta_v is None else "")
+
+    grp_b = (
+        kv("NR Rating", str(int(nr_v)) if nr_v is not None else "—", "muted" if nr_v is None else "")
+        + kv("Race NR Ceiling", str(int(ceil_v)) if ceil_v is not None else "—", "muted" if ceil_v is None else "")
+        + kv("NR Grade Delta", delta_s, delta_css)
+        + kv("Avg Recent NR Ceil", f"{avg_ceil_v:.1f}" if avg_ceil_v is not None else "—", "muted" if avg_ceil_v is None else "")
+        + kv("NR Headroom", f"{headroom_v:+.1f}" if headroom_v is not None else "—", "muted" if headroom_v is None else "")
+        + kv("Avg Recent Purse", purse_s, "muted" if purse_v is None else "")
+        + kv("Class Delta", cd_s, cd_css)
+    )
+
+    # --- Group C: Race-day Factors ---
+    sp_v = _fv("last_5_avg_sp")
+    days_v = _fv("days_since_last_run")
+    days_s, days_css = _fmt_days(days_v)
+    lead_v = _fv("style_lead_rate")
+    relief_v = _fv("barrier_relief_score")
+    soft_v = _fv("map_soft_trip_score")
+    wide_v = _fv("map_wide_risk_score")
+    dsr_v = _fv("dist_strike_rate_ratio")
+    dsr_starts = _iv("dist_rge_starts") or 0
+
+    grp_c = (
+        kv("Last 5 Avg SP", f"${sp_v:.2f}" if sp_v is not None else "—", "muted" if sp_v is None else "")
+        + kv("Days Since Run", days_s, days_css)
+        + kv("Lead Rate", f"{lead_v:.1%}" if lead_v is not None else "—", "muted" if lead_v is None else "")
+        + kv("Barrier Relief", f"{relief_v:+.3f}" if relief_v is not None else "—", "muted" if relief_v is None else "")
+        + kv("Map Soft Score", f"{soft_v:.3f}" if soft_v is not None else "—", "muted" if soft_v is None else "")
+        + kv("Map Wide Risk", f"{wide_v:.3f}" if wide_v is not None else "—", "muted" if wide_v is None else "")
+        + kv("Dist Strike Rate", (f"{dsr_v:.2f} ({dsr_starts}st)" if dsr_v is not None else f"— ({dsr_starts}st)"), "muted" if dsr_v is None else "")
+    )
+
+    # --- Group D: Career / Season ---
+    c_starts = _iv("career_starts")
+    c_wins = _iv("career_wins")
+    c_wr = _fv("career_win_rate")
+    s_starts = _iv("season_starts")
+    s_wins = _iv("season_wins")
+    l10_wr = _fv("last_10_win_rate")
+    csr_v = _fv("ceiling_support_rate")
+    cbr_v = _iv("ceiling_best_run_index")
+
+    grp_d = (
+        kv("Career Starts", str(c_starts) if c_starts is not None else "—", "muted" if c_starts is None else "")
+        + kv("Career Wins", str(c_wins) if c_wins is not None else "—", "muted" if c_wins is None else "")
+        + kv("Career Win Rate", f"{c_wr:.1%}" if c_wr is not None else "—", "muted" if c_wr is None else "")
+        + kv("Season Starts", str(s_starts) if s_starts is not None else "—", "muted" if s_starts is None else "")
+        + kv("Season Wins", str(s_wins) if s_wins is not None else "—", "muted" if s_wins is None else "")
+        + kv("Last 10 Win Rate", f"{l10_wr:.1%}" if l10_wr is not None else "—", "muted" if l10_wr is None else "")
+        + kv("Ceiling Support", f"{csr_v:.1%}" if csr_v is not None else "—", "muted" if csr_v is None else "")
+        + kv("Best Run Index", str(cbr_v) if cbr_v is not None else "—", "muted" if cbr_v is None else "")
+    )
+
+    # --- Component tables ---
+    s1_keys = [
+        "consistency", "ceiling", "late_speed", "tempo_adj", "tempo_flags", "null_flags",
+        "market", "win_rate", "career_win_rate", "top3_rate", "competitive_rate",
+        "nr", "class_pos", "stake_class", "class_delta",
+        "sp_class", "sp_trend", "sp_market_ceiling", "sp_class_ceiling", "sp_avg_market",
+        "sp_reliability", "debut_adj",
+    ]
+    s2_keys = [
+        "barrier", "barrier_relief", "map_lead", "map_soft", "map_soft_context",
+        "pace_backmarker", "map_wide", "map_death", "dist_strike_rate",
+        "nr_grade_delta", "fitness", "second_up", "driver_form", "trainer_form",
+    ]
+
+    def comp_rows(keys: list[str]) -> str:
+        out = []
+        for k in keys:
+            v = components.get(k, 0.0) or 0.0
+            if abs(v) < 0.0005:
+                css = "comp-zero"
+            elif v > 0:
+                css = "comp-pos"
+            else:
+                css = "comp-neg"
+            out.append(f'<tr><td class="comp-name">{html.escape(k)}</td><td class="{css}">{v:+.3f}</td></tr>')
+        return "".join(out)
+
+    return f"""<tr id="{row_id}" class="diag-row" style="display:none">
+      <td colspan="12">
+        <div class="diag-panel">
+          <div class="diag-group"><h4>Form Quality</h4>{grp_a}</div>
+          <div class="diag-group"><h4>Class &amp; NR</h4>{grp_b}</div>
+          <div class="diag-group"><h4>Race-day</h4>{grp_c}</div>
+          <div class="diag-group"><h4>Career / Season</h4>{grp_d}</div>
+        </div>
+        <div class="diag-comps">
+          <table class="diag-comp-table"><caption>S1 Components</caption><tbody>{comp_rows(s1_keys)}</tbody></table>
+          <table class="diag-comp-table"><caption>S2 Components</caption><tbody>{comp_rows(s2_keys)}</tbody></table>
+        </div>
+      </td>
+    </tr>"""
 
 
 def _render_race_section(
@@ -659,7 +879,7 @@ def _render_race_section(
     )
     top_pick = max(ordered, key=lambda row: float(row.get("win_probability") or 0.0))
     body_rows: list[str] = []
-    for row in ordered:
+    for i, row in enumerate(ordered):
         horse_name = str(row.get("horse_name") or "")
         result = results_for_race.get(_normalise_name(horse_name))
         classes = []
@@ -683,6 +903,7 @@ def _render_race_section(
                 badges.append('<span class="pill ns">NS</span>')
         except (TypeError, ValueError):
             pass
+        row_id = f"diag_{race_number}_{i}"
         body_rows.append(
             f"""
             <tr{class_attr}>
@@ -691,7 +912,7 @@ def _render_race_section(
                 <div class="horse-cell">
                   <strong>{html.escape(horse_name)}</strong>
                   <span class="meta">{html.escape(str(row.get('nominated_trainer') or ''))} / {'<span class="driver-change">' + html.escape(str(row.get('nominated_driver') or '')) + '</span>' if str(row.get('driver_change_flag')) == '1' else html.escape(str(row.get('nominated_driver') or ''))}</span>
-                  <span>{''.join(badges)}</span>
+                  <span>{''.join(badges)}<button class="diag-toggle" onclick="toggleDiag('{row_id}')" title="Show diagnostics">&#9658;</button></span>
                 </div>
               </td>
               <td data-label="Barrier">{html.escape(str(row.get('barrier') or ''))}</td>
@@ -705,7 +926,7 @@ def _render_race_section(
               <td data-label="SP">{_fmt_decimal(sp) if sp is not None else '<span class="muted">-</span>'}</td>
               <td data-label="Margin">{_fmt_decimal(margin) if margin is not None else '<span class="muted">-</span>'}</td>
             </tr>
-            """
+            {_render_diag_row(row_id, row)}"""
         )
 
     top_pick_name = str(top_pick.get("horse_name") or "")

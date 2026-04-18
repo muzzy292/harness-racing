@@ -151,21 +151,18 @@ def score_race_rows(
         s2 = _stage2_components(row, w, field_lead_prob=field_lead_probs[i], field_death_prob=field_death_probs[i], pace_pressure=pace_pressure)
         stage1_score = round(sum(s1.values()), 4)
         stage2_score = round(sum(s2.values()), 4)
-        enriched.append(
-            {
-                "horse_name": row.get("horse_name"),
-                "runner_number": _to_int(row.get("runner_number")),
-                "barrier": row.get("barrier"),
-                "nominated_driver": row.get("nominated_driver"),
-                "driver_change_flag": row.get("driver_change_flag"),
-                "nominated_trainer": row.get("nominated_trainer"),
-                "career_starts": _to_int(row.get("career_starts")),
-                "stage1_score": stage1_score,
-                "stage2_score": stage2_score,
-                "score": round(stage1_score + stage2_score, 4),
-                "components": {**s1, **s2},
-            }
-        )
+        # Preserve all raw CSV columns so the web renderer can show diagnostics.
+        # Typed/scored fields overwrite the string versions from the CSV.
+        base = dict(row)
+        base.update({
+            "runner_number": _to_int(row.get("runner_number")),
+            "career_starts":  _to_int(row.get("career_starts")),
+            "stage1_score":   stage1_score,
+            "stage2_score":   stage2_score,
+            "score":          round(stage1_score + stage2_score, 4),
+            "components":     {**s1, **s2},
+        })
+        enriched.append(base)
 
     scores = [item["score"] for item in enriched]
     field_mean = sum(scores) / len(scores) if scores else 0.0
