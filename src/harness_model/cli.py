@@ -35,7 +35,7 @@ from .odds import (
     score_race_rows,
     write_scored_rows_csv,
 )
-from .web import build_betting_site, build_meeting_site, build_stats_site, publish_scored_meeting, serve_site
+from .web import build_betting_site, build_meeting_site, build_stats_site, publish_scored_meeting, republish_all_meetings, serve_site
 
 
 _DEFAULT_WEIGHTS_PATH = Path("weights.json")
@@ -52,6 +52,92 @@ def _resolve_weights(explicit_path: str | None) -> dict | None:
     if explicit_path:
         raise FileNotFoundError(f"Weights file not found: {explicit_path}")
     return None
+
+
+def _print_backtest_report(records: list[dict], min_edge: float = 0.0, model_only: bool = False) -> None:
+    odds_key = "model_odds" if model_only else "blended_odds"
+    prob_key = "model_prob" if model_only else "blended_prob"
+    odds_label = "Model-only" if model_only else "Blended (model*0.45 + market*0.55)"
+
+    valid = [r for r in records if r[odds_key] is not None and r["sp"] is not None and r["sp"] > 1.0]
+    total_horses = len(valid)
+    total_races = len({(r["meeting"], r["race"]) for r in valid})
+    total_winners = sum(1 for r in valid if r["won"])
+
+    print(f"\nBacktest Report - {total_horses} runners across {total_races} races  ({odds_label})")
+    print(f"Races with at least one result: {total_races}  |  Winners recorded: {total_winners}\n")
+
+    thresholds = [(0.0, "Any edge"), (0.10, ">=10%"), (0.25, ">=25%"), (0.50, ">=50%"), (1.00, ">=100%")]
+
+    def _roi_row(bets: list[dict]) -> tuple:
+        n = len(bets)
+        if n == 0:
+            return (0, 0, 0.0, 0.0, 0.0)
+        winners = [r for r in bets if r["won"]]
+        w = len(winners)
+        avg_sp = sum(r["sp"] for r in bets) / n
+        roi = (sum(r["sp"] for r in winners) - n) / n * 100
+        return (n, w, w / n * 100, avg_sp, roi)
+
+    def _print_roi_table(odds_k: str) -> None:
+        print(f"  {'Edge threshold':<16}  {'Bets':>6}  {'Winners':>8}  {'Strike%':>8}  {'Avg SP':>8}  {'ROI%':>8}")
+        print("  " + "-" * 62)
+        for threshold, label in thresholds:
+            bets = [
+                r for r in valid
+                if r[odds_k] < r["sp"] and (r["sp"] / r[odds_k] - 1) >= threshold
+            ]
+            n, w, strike, avg_sp, roi = _roi_row(bets)
+            if n == 0:
+                continue
+            print(f"  {label:<16}  {n:>6}  {w:>8}  {strike:>7.1f}%  ${avg_sp:>6.2f}  {roi:>+7.1f}%")
+
+    print(f"--- 1. Value Bet ROI - {odds_label} ---")
+    _print_roi_table(odds_key)
+
+    # Note: blended < SP iff model < SP (mathematical identity), so the same horses
+    # qualify for both. We show the model-only table only when --model-only is set.
+
+    # Calibration buckets
+    buckets = [(0.0, 0.05, "0-5%"), (0.05, 0.10, "5-10%"), (0.10, 0.20, "10-20%"),
+               (0.20, 0.35, "20-35%"), (0.35, 1.01, "35%+")]
+    print(f"\n--- 2. Calibration (model prob vs actual win rate) ---")
+    print(f"  {'Prob bucket':<12}  {'Horses':>7}  {'Actual W':>9}  {'Actual%':>8}  {'Model avg%':>11}  {'Diff':>7}")
+    print("  " + "-" * 60)
+    for lo, hi, label in buckets:
+        bucket = [r for r in valid if lo <= r[prob_key] < hi]
+        if not bucket:
+            continue
+        n = len(bucket)
+        w = sum(1 for r in bucket if r["won"])
+        actual_pct = w / n * 100
+        model_avg_pct = sum(r[prob_key] for r in bucket) / n * 100
+        diff = actual_pct - model_avg_pct
+        print(f"  {label:<12}  {n:>7}  {w:>9}  {actual_pct:>7.1f}%  {model_avg_pct:>10.1f}%  {diff:>+6.1f}%")
+
+    # Top value bets (model shortest vs SP)
+    value_records = sorted(
+        [r for r in valid if r[odds_key] < r["sp"]],
+        key=lambda r: r[odds_key] / r["sp"],
+    )
+    sec = "3"
+    print(f"\n--- {sec}. Top 20 value bets (model shortest vs SP) ---")
+    print(f"  {'Meeting':<10}  {'R':>2}  {'Horse':<26}  {'Model $':>8}  {'SP $':>7}  {'Edge':>7}  Won?")
+    print("  " + "-" * 74)
+    for r in value_records[:20]:
+        edge = r["sp"] / r[odds_key] - 1
+        won = "YES" if r["won"] else "no"
+        print(f"  {r['meeting']:<10}  {r['race']:>2}  {r['horse']:<26}  ${r[odds_key]:>6.2f}  ${r['sp']:>5.2f}  {edge:>+6.0%}  {won}")
+
+    # Top model misses (model much longer than SP)
+    miss_records = sorted(valid, key=lambda r: r[odds_key] / r["sp"], reverse=True)
+    print(f"\n--- 4. Top 20 model misses (model far above SP) ---")
+    print(f"  {'Meeting':<10}  {'R':>2}  {'Horse':<26}  {'Model $':>8}  {'SP $':>7}  {'Ratio':>7}  Won?")
+    print("  " + "-" * 74)
+    for r in miss_records[:20]:
+        ratio = r[odds_key] / r["sp"]
+        won = "YES" if r["won"] else "no"
+        print(f"  {r['meeting']:<10}  {r['race']:>2}  {r['horse']:<26}  ${r[odds_key]:>6.2f}  ${r['sp']:>5.2f}  {ratio:>6.1f}x  {won}")
 
 
 def main() -> None:
@@ -217,6 +303,19 @@ def main() -> None:
     build_stats_parser = subparsers.add_parser("build-stats-site", help="Build driver and trainer stats page from ingested results")
     build_stats_parser.add_argument("--db", default="data/harness.db")
     build_stats_parser.add_argument("--out", default="docs", help="Output directory for stats.html (default: docs)")
+
+    republish_all_parser = subparsers.add_parser("republish-all", help="Re-score and re-publish every meeting in docs/meetings.json in one batch")
+    republish_all_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    republish_all_parser.add_argument("--db", default="data/harness.db")
+    republish_all_parser.add_argument("--out", default="docs", help="docs/ output directory (default: docs)")
+    republish_all_parser.add_argument("--weights", default=None, help="Path to weights JSON file (default: data/weights.json if it exists)")
+
+    backtest_parser = subparsers.add_parser("backtest", help="Compare model fair odds vs SP across all meetings with stored results")
+    backtest_parser.add_argument("--db", default="data/harness.db")
+    backtest_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    backtest_parser.add_argument("--min-edge", type=float, default=0.0, help="Minimum edge threshold for value bets (default: 0.0 = all)")
+    backtest_parser.add_argument("--model-only", action="store_true", help="Use model-only fair odds instead of blended")
+    backtest_parser.add_argument("--weights", default=None, help="Path to weights JSON file (default: weights.json if it exists)")
 
     build_betting_parser = subparsers.add_parser("build-betting-site", help="Build fractional-Kelly bankroll backtest page from scored meetings vs stored results")
     build_betting_parser.add_argument("--db", default="data/harness.db")
@@ -407,8 +506,54 @@ def main() -> None:
         print(f"Built meeting site page at {page_path}")
     elif args.command == "serve-site":
         serve_site(args.site_dir, host=args.host, port=args.port)
+    elif args.command == "republish-all":
+        weights = _resolve_weights(getattr(args, "weights", None))
+        republish_all_meetings(args.csv, args.db, args.out, weights=weights)
     elif args.command == "build-stats-site":
         build_stats_site(args.db, args.out)
+    elif args.command == "backtest":
+        import sqlite3 as _sqlite3
+        rows = load_feature_rows(args.csv)
+        weights = _resolve_weights(getattr(args, "weights", None))
+        conn = _sqlite3.connect(args.db)
+        conn.row_factory = _sqlite3.Row
+        meetings = [
+            r[0] for r in conn.execute(
+                "SELECT DISTINCT meeting_code FROM race_results ORDER BY meeting_code"
+            ).fetchall()
+        ]
+        results_lookup: dict[tuple, dict] = {}
+        for r in conn.execute(
+            "SELECT meeting_code, race_number, horse_name, finish_position, starting_price "
+            "FROM race_results WHERE starting_price IS NOT NULL"
+        ).fetchall():
+            key = (r["meeting_code"], r["race_number"], r["horse_name"].upper())
+            results_lookup[key] = {"pos": r["finish_position"], "sp": r["starting_price"]}
+        conn.close()
+        records: list[dict] = []
+        for meeting_code in meetings:
+            try:
+                scored = score_meeting_rows(rows, meeting_code, weights=weights)
+            except Exception:
+                continue
+            for race_number, horse_rows in scored.items():
+                for h in horse_rows:
+                    key = (meeting_code, race_number, h["horse_name"].upper())
+                    if key not in results_lookup:
+                        continue
+                    res = results_lookup[key]
+                    records.append({
+                        "meeting": meeting_code,
+                        "race": race_number,
+                        "horse": h["horse_name"],
+                        "model_odds": h.get("fair_odds"),
+                        "blended_odds": h.get("adjusted_fair_odds"),
+                        "model_prob": h.get("win_probability"),
+                        "blended_prob": h.get("adjusted_probability"),
+                        "sp": res["sp"],
+                        "won": res["pos"] == 1,
+                    })
+        _print_backtest_report(records, min_edge=args.min_edge, model_only=args.model_only)
     elif args.command == "build-betting-site":
         build_betting_site(args.db, args.csv, args.out, starting_bankroll=args.starting_bankroll)
     elif args.command == "calibrate-nr-factor":
