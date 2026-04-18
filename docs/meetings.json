@@ -53,7 +53,7 @@
     "track_name": "Penrith",
     "meeting_date": "9 Apr 2026",
     "races": 8,
-    "winners": 7
+    "winners": 6
   },
   {
     "meeting_code": "YU100426",
@@ -88,7 +88,7 @@
     "track_name": "Narrabri",
     "meeting_date": "12 Apr 2026",
     "races": 6,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "CB130426",
@@ -172,7 +172,7 @@
     "track_name": "Newcastle",
     "meeting_date": "17 Apr 2026",
     "races": 8,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "PK170426",
