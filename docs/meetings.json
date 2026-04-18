@@ -18,21 +18,21 @@
     "track_name": "Wagga",
     "meeting_date": "4 Apr 2026",
     "races": 9,
-    "winners": 6
+    "winners": 8
   },
   {
     "meeting_code": "PK040426",
     "track_name": "Parkes",
     "meeting_date": "4 Apr 2026",
     "races": 9,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "TM060426",
     "track_name": "Temora",
     "meeting_date": "6 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "PC070426",
@@ -74,7 +74,7 @@
     "track_name": "Dubbo",
     "meeting_date": "10 Apr 2026",
     "races": 6,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "PC110426",
@@ -88,7 +88,7 @@
     "track_name": "Narrabri",
     "meeting_date": "12 Apr 2026",
     "races": 6,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "CB130426",
@@ -172,7 +172,7 @@
     "track_name": "Newcastle",
     "meeting_date": "17 Apr 2026",
     "races": 8,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "PK170426",
