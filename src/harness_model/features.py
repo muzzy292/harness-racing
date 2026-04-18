@@ -532,6 +532,8 @@ def _build_feature_row(
         "sp_best_prob_last5": sp_features["sp_best_prob_last5"],
         "sp_best_prob_last10": sp_features["sp_best_prob_last10"],
         "sp_best_prob_at_class": sp_features["sp_best_prob_at_class"],
+        "sp_avg_prob_at_class": sp_features["sp_avg_prob_at_class"],
+        "sp_best_prob_similar_grade": sp_features["sp_best_prob_similar_grade"],
         "sp_short_count_last10": sp_features["sp_short_count_last10"],
         "sp_reliability_rate": sp_features["sp_reliability_rate"],
         "race_field_size": race_field_size,
@@ -545,6 +547,8 @@ def _sp_features(lines: list[dict], race_nr_ceiling: float | None) -> dict[str, 
         "sp_avg_prob_last3": None, "sp_avg_prob_last5": None,
         "sp_best_prob_last5": None, "sp_best_prob_last10": None,
         "sp_best_prob_at_class": None,
+        "sp_avg_prob_at_class": None,
+        "sp_best_prob_similar_grade": None,
         "sp_short_count_last10": None, "sp_reliability_rate": None,
     }
     # Deduplicate by (run_date, track_code, distance) — same run can be written
@@ -590,6 +594,34 @@ def _sp_features(lines: list[dict], race_nr_ceiling: float | None) -> dict[str, 
         at_class = probs[:10]
     best_at_class = max(at_class) if at_class else None
 
+    # Grade-filtered avg: average implied prob from runs within ±5 NR of today.
+    # Unlike sp_avg_prob_last3 (raw recency), this only uses runs at similar class,
+    # preventing grade-drop contamination (high SPs from harder races drag the avg).
+    # Falls back to raw avg3 when no runs pass the filter (thin history, big grade jump).
+    if race_nr_ceiling is not None:
+        similar_probs_avg = [
+            p for p, nr, _ in run_data[:5]
+            if nr is not None and abs(nr - race_nr_ceiling) <= 5
+        ]
+        avg_at_class = _avg(similar_probs_avg) if similar_probs_avg else avg3
+    else:
+        avg_at_class = avg3  # No-NR race: dampening applied in odds.py
+
+    # Grade-filtered ceiling: best implied prob within ±5 NR of today.
+    # sp_class_ceiling (one-sided: nr >= race_nr) includes all harder-grade runs,
+    # which contaminates grade-drop horses (NR70 → NR50: NR70 runs pass the filter).
+    # ±5 NR symmetry answers: "was this horse ever strongly backed at *today's* grade?"
+    # No fallback — returns None when no similar-grade runs exist so the component
+    # scores 0.0 (missing=0.0) rather than double-counting sp_market_ceiling.
+    if race_nr_ceiling is not None:
+        similar_probs_ceil = [
+            p for p, nr, _ in run_data[:10]
+            if nr is not None and abs(nr - race_nr_ceiling) <= 5
+        ]
+        best_similar = max(similar_probs_ceil) if similar_probs_ceil else None
+    else:
+        best_similar = None  # No-NR race: no grade anchor; dampening applied in odds.py
+
     # Short-price count and reliability (SP < $4 = implied prob > 0.25)
     _SHORT = 0.25
     short_runs = [(p, pos) for p, _, pos in run_data[:10] if p >= _SHORT]
@@ -601,13 +633,15 @@ def _sp_features(lines: list[dict], race_nr_ceiling: float | None) -> dict[str, 
         reliability = None
 
     return {
-        "sp_avg_prob_last3":    round(avg3,          4) if avg3          is not None else None,
-        "sp_avg_prob_last5":    round(avg5,          4) if avg5          is not None else None,
-        "sp_best_prob_last5":   round(best5,         4) if best5         is not None else None,
-        "sp_best_prob_last10":  round(best10,        4) if best10        is not None else None,
-        "sp_best_prob_at_class":round(best_at_class, 4) if best_at_class is not None else None,
-        "sp_short_count_last10": short_count,
-        "sp_reliability_rate":  reliability,
+        "sp_avg_prob_last3":         round(avg3,          4) if avg3          is not None else None,
+        "sp_avg_prob_last5":         round(avg5,          4) if avg5          is not None else None,
+        "sp_best_prob_last5":        round(best5,         4) if best5         is not None else None,
+        "sp_best_prob_last10":       round(best10,        4) if best10        is not None else None,
+        "sp_best_prob_at_class":     round(best_at_class, 4) if best_at_class is not None else None,
+        "sp_avg_prob_at_class":      round(avg_at_class,  4) if avg_at_class  is not None else None,
+        "sp_best_prob_similar_grade":round(best_similar,  4) if best_similar  is not None else None,
+        "sp_short_count_last10":     short_count,
+        "sp_reliability_rate":       reliability,
     }
 
 
