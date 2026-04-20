@@ -758,7 +758,7 @@ def _dist_strike_rate_ratio(
 
     if dist_starts is None or dist_starts < 2:
         return None
-    if not career_starts or not career_wins:
+    if not career_starts or career_wins is None or career_wins < 2:
         return None
 
     career_win_rate = career_wins / career_starts
