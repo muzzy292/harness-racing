@@ -313,6 +313,55 @@ def _print_diagnose_report(race_groups: dict, out_path: str | None = None) -> No
             sp_str   = f"${w['sp']:.2f}" if w.get("sp") else " n/a"
             print(f"  {r['meeting']:<10}  {r['race']:>2}  {w['horse']:<22}  {w.get('model_rank','?'):>4}  {w.get('sp_rank','?'):>4}  {odds_str:>8}  {sp_str:>6}  {s1_str:>7}  {s2_str:>7}  {ngd_str:>11}  {nrc_str:>8}")
 
+    # ---- 8. S2 Blind Analysis ----
+    s2_misses = sorted(
+        [r for r in summaries if r["winner"] and (r["winner"].get("model_rank") or 0) >= 5],
+        key=lambda r: r["winner"].get("model_rank") or 0, reverse=True,
+    )
+    print(f"\n--- 8. S2 Blind Analysis — Winner Ranked 5+ by Model --- n={len(s2_misses)}")
+    if s2_misses:
+        demoted = [r for r in s2_misses if (r["winner"].get("model_rank") or 0) > (r["winner"].get("s1_rank") or 0)]
+        not_demoted = len(s2_misses) - len(demoted)
+        print(f"  S2 demoted winner (model_rank > s1_rank): {len(demoted)}/{len(s2_misses)}   "
+              f"S2 neutral or helped: {not_demoted}/{len(s2_misses)}")
+        print()
+        print(f"  {'Meet':<10}  {'R':>2}  {'Winner':<22}  {'S1#':>3}  {'Mdl#':>4}  {'D(S2)':>6}  "
+              f"{'map_ld':>7}  {'map_dt':>7}  {'fitness':>7}  {'barrier':>7}  {'brl_rel':>7}  {'nr_gd':>7}  {'m_soft':>7}")
+        print("  " + "-" * 115)
+        for r in s2_misses[:30]:
+            w = r["winner"]
+            s1r  = w.get("s1_rank") or 0
+            mlr  = w.get("model_rank") or 0
+            drk  = mlr - s1r
+            drk_str = f"{drk:+d}" if drk != 0 else "  0"
+            print(f"  {r['meeting']:<10}  {r['race']:>2}  {w['horse']:<22}  {s1r:>3}  {mlr:>4}  {drk_str:>6}  "
+                  f"{w.get('comp_map_lead', 0):>+7.3f}  {w.get('comp_map_death', 0):>+7.3f}  "
+                  f"{w.get('comp_fitness', 0):>+7.3f}  {w.get('comp_barrier', 0):>+7.3f}  "
+                  f"{w.get('comp_barrier_rel', 0):>+7.3f}  {w.get('comp_nr_grade', 0):>+7.3f}  "
+                  f"{w.get('comp_map_soft', 0):>+7.3f}")
+
+        # Tally which S2 component is the biggest drag on S2-demoted misses
+        _s2_comp_keys = ["comp_map_death", "comp_fitness", "comp_barrier", "comp_barrier_rel", "comp_map_soft"]
+        _s2_comp_labels = {"comp_map_death": "map_death", "comp_fitness": "fitness",
+                           "comp_barrier": "barrier", "comp_barrier_rel": "barrier_relief",
+                           "comp_map_soft": "map_soft"}
+        if demoted:
+            tally: dict[str, list[float]] = {k: [] for k in _s2_comp_keys}
+            for r in demoted:
+                w = r["winner"]
+                for k in _s2_comp_keys:
+                    v = w.get(k, 0.0)
+                    if v < 0:
+                        tally[k].append(v)
+            print(f"\n  Most penalising S2 components across {len(demoted)} S2-demoted misses:")
+            ranked_tally = sorted(
+                [(k, tally[k]) for k in _s2_comp_keys if tally[k]],
+                key=lambda x: sum(x[1]) / len(x[1])
+            )
+            for k, vals in ranked_tally:
+                avg = sum(vals) / len(vals)
+                print(f"    {_s2_comp_labels[k]:<16}  avg {avg:+.3f}  ({len(vals)} races with negative contribution)")
+
     # ---- Optional CSV output ----
     if out_path:
         import csv as _csv
@@ -324,6 +373,8 @@ def _print_diagnose_report(race_groups: dict, out_path: str | None = None) -> No
             "race_nr_ceiling", "nr_grade_delta",
             "sp_avg_market", "sp_class_ceiling", "sp_best_prob_at_class",
             "map_lead_score", "map_death_score", "map_soft_trip_score",
+            "comp_map_lead", "comp_map_death", "comp_fitness",
+            "comp_barrier", "comp_barrier_rel", "comp_nr_grade", "comp_map_soft",
         ]
         all_rows = [h for horses in race_groups.values() for h in horses]
         with open(out_path, "w", newline="", encoding="utf-8") as f:
@@ -804,6 +855,7 @@ def main() -> None:
                     if key not in results_lookup:
                         continue
                     res = results_lookup[key]
+                    comp = h.get("components") or {}
                     group.append({
                         "meeting": meeting_code,
                         "race": race_number,
@@ -824,10 +876,18 @@ def main() -> None:
                         "sp_avg_market": _fv(h, "sp_avg_prob_last3"),
                         "sp_class_ceiling": _fv(h, "sp_best_prob_similar_grade"),
                         "sp_best_prob_at_class": _fv(h, "sp_best_prob_at_class"),
-                        # Map
+                        # Map raw scores
                         "map_lead_score": _fv(h, "map_lead_score"),
                         "map_death_score": _fv(h, "map_death_score"),
                         "map_soft_trip_score": _fv(h, "map_soft_trip_score"),
+                        # S2 weighted component contributions (for S2-blind analysis)
+                        "comp_map_lead":    comp.get("map_lead", 0.0),
+                        "comp_map_death":   comp.get("map_death", 0.0),
+                        "comp_fitness":     comp.get("fitness", 0.0),
+                        "comp_barrier":     comp.get("barrier", 0.0),
+                        "comp_barrier_rel": comp.get("barrier_relief", 0.0),
+                        "comp_nr_grade":    comp.get("nr_grade_delta", 0.0),
+                        "comp_map_soft":    comp.get("map_soft", 0.0) + comp.get("map_soft_context", 0.0),
                     })
                 if len(group) < 2:
                     continue
