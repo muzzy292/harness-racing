@@ -140,6 +140,199 @@ def _print_backtest_report(records: list[dict], min_edge: float = 0.0, model_onl
         print(f"  {r['meeting']:<10}  {r['race']:>2}  {r['horse']:<26}  ${r[odds_key]:>6.2f}  ${r['sp']:>5.2f}  {ratio:>6.1f}x  {won}")
 
 
+def _print_diagnose_report(race_groups: dict, out_path: str | None = None) -> None:
+    """Per-race truth set: hit rates, failure quadrants, S1/S2 analysis, biggest misses.
+
+    race_groups: (meeting_code, race_number) -> list of horse dicts with ranks assigned.
+    """
+    all_keys = sorted(race_groups.keys())
+    total_races = len(all_keys)
+    if total_races == 0:
+        print("No races with results found.")
+        return
+
+    def _avg(lst: list) -> float:
+        return sum(lst) / len(lst) if lst else 0.0
+
+    # Build one summary dict per race
+    summaries = []
+    for key in all_keys:
+        horses = race_groups[key]
+        meeting, race = key
+        winner    = next((h for h in horses if h["finish_pos"] == 1), None)
+        model_top = next((h for h in horses if h["model_rank"] == 1), None)
+        sp_top    = next((h for h in horses if h["sp_rank"] == 1), None)
+        s1_top    = next((h for h in horses if h["s1_rank"] == 1), None)
+        model_top3 = [h for h in horses if h["model_rank"] <= 3]
+        best_map   = max(horses, key=lambda h: (h.get("map_lead_score") or -99))
+        summaries.append({
+            "meeting": meeting, "race": race,
+            "winner": winner, "model_top": model_top, "sp_top": sp_top,
+            "s1_top": s1_top, "model_top3": model_top3, "best_map": best_map,
+            "horses": horses,
+        })
+
+    def _won(r: dict, pick_key: str) -> bool:
+        return bool(r["winner"] and r[pick_key] and r["winner"]["horse"] == r[pick_key]["horse"])
+
+    # ---- 1. Hit Rate Summary ----
+    model_correct = sum(1 for r in summaries if _won(r, "model_top"))
+    sp_correct    = sum(1 for r in summaries if _won(r, "sp_top"))
+    top3_hit      = sum(1 for r in summaries if r["winner"] and any(h["horse"] == r["winner"]["horse"] for h in r["model_top3"]))
+    rank2         = sum(1 for r in summaries if r["winner"] and r["winner"].get("model_rank") == 2)
+    rank3         = sum(1 for r in summaries if r["winner"] and r["winner"].get("model_rank") == 3)
+    rank4plus     = sum(1 for r in summaries if r["winner"] and (r["winner"].get("model_rank") or 0) >= 4)
+
+    print(f"\nDiagnose Report  --  {total_races} races with results\n")
+    print("--- 1. Hit Rate Summary ---")
+    print(f"  {'':32}  Model       SP (market)")
+    print(f"  {'Top pick won':32}  {model_correct}/{total_races} ({model_correct/total_races*100:.1f}%)   {sp_correct}/{total_races} ({sp_correct/total_races*100:.1f}%)")
+    print(f"  {'Top 3 contained winner':32}  {top3_hit}/{total_races} ({top3_hit/total_races*100:.1f}%)")
+    print(f"  {'Winner was model 2nd':32}  {rank2}/{total_races}")
+    print(f"  {'Winner was model 3rd':32}  {rank3}/{total_races}")
+    print(f"  {'Winner was model 4th+':32}  {rank4plus}/{total_races}")
+
+    # ---- 2. Failure Pattern Quadrants ----
+    both_correct = sum(1 for r in summaries if _won(r, "model_top") and _won(r, "sp_top"))
+    model_edge   = sum(1 for r in summaries if _won(r, "model_top") and not _won(r, "sp_top"))
+    sp_failure   = sum(1 for r in summaries if not _won(r, "model_top") and _won(r, "sp_top"))
+    both_wrong   = sum(1 for r in summaries if not _won(r, "model_top") and not _won(r, "sp_top"))
+
+    print(f"\n--- 2. Failure Pattern Breakdown ---")
+    print(f"  {'Outcome':<34}  {'Races':>6}  {'%':>6}")
+    print("  " + "-" * 52)
+    print(f"  {'Model correct, SP correct':<34}  {both_correct:>6}  {both_correct/total_races*100:>5.1f}%  <- both right")
+    print(f"  {'Model correct, SP wrong':<34}  {model_edge:>6}  {model_edge/total_races*100:>5.1f}%  <- model edge")
+    print(f"  {'SP correct, model wrong':<34}  {sp_failure:>6}  {sp_failure/total_races*100:>5.1f}%  <- model failure")
+    print(f"  {'Both wrong':<34}  {both_wrong:>6}  {both_wrong/total_races*100:>5.1f}%  <- hard race")
+
+    # ---- 3. S1 vs S2 on Model Failures ----
+    failures = [r for r in summaries if r["winner"] and r["model_top"] and r["winner"]["horse"] != r["model_top"]["horse"]]
+    if failures:
+        top_s1  = [r["model_top"]["stage1"] for r in failures if r["model_top"]["stage1"] is not None]
+        top_s2  = [r["model_top"]["stage2"] for r in failures if r["model_top"]["stage2"] is not None]
+        top_tot = [r["model_top"]["total_score"] for r in failures if r["model_top"]["total_score"] is not None]
+        win_s1  = [r["winner"]["stage1"] for r in failures if r["winner"]["stage1"] is not None]
+        win_s2  = [r["winner"]["stage2"] for r in failures if r["winner"]["stage2"] is not None]
+        win_tot = [r["winner"]["total_score"] for r in failures if r["winner"]["total_score"] is not None]
+        avg_wr  = _avg([r["winner"].get("model_rank", 0) for r in failures])
+        s2_swung = sum(1 for r in failures if r["s1_top"] and r["model_top"] and r["s1_top"]["horse"] != r["model_top"]["horse"])
+
+        print(f"\n--- 3. S1 vs S2 Contribution on Model Failures (n={len(failures)}) ---")
+        print(f"  {'':30}  Model top pick   Actual winner")
+        print(f"  {'Avg S1 score':30}  {_avg(top_s1):>13.3f}   {_avg(win_s1):>12.3f}")
+        print(f"  {'Avg S2 score':30}  {_avg(top_s2):>13.3f}   {_avg(win_s2):>12.3f}")
+        print(f"  {'Avg total score':30}  {_avg(top_tot):>13.3f}   {_avg(win_tot):>12.3f}")
+        print(f"  {'Avg winner model rank':30}  {avg_wr:>13.1f}")
+        print(f"  {'S2 changed top pick':30}  {s2_swung:>13} races (S1 rank 1 != final rank 1)")
+
+    # ---- 4. Per-Race Detail Table ----
+    print(f"\n--- 4. Per-Race Detail Table ---")
+    print(f"  {'Meeting':<10}  {'R':>2}  {'Winner':<22}  {'SP$':>6}  {'Mdl#':>4}  {'SP#':>4}  {'Model top 3':<38}  {'W.S1':>6}  {'W.S2':>6}")
+    print("  " + "-" * 112)
+    for r in summaries:
+        w = r["winner"]
+        if not w:
+            continue
+        top3_str = ", ".join(h["horse"][:12] for h in sorted(r["model_top3"], key=lambda h: h["model_rank"]))
+        sp_str   = f"${w['sp']:.2f}" if w.get("sp") else "  n/a"
+        s1_str   = f"{w['stage1']:+.2f}" if w.get("stage1") is not None else "  n/a"
+        s2_str   = f"{w['stage2']:+.2f}" if w.get("stage2") is not None else "  n/a"
+        print(f"  {r['meeting']:<10}  {r['race']:>2}  {w['horse']:<22}  {sp_str:>6}  {w.get('model_rank','?'):>4}  {w.get('sp_rank','?'):>4}  {top3_str:<38}  {s1_str:>6}  {s2_str:>6}")
+
+    # ---- 5. SP Knew, Model Didn't ----
+    sp_knew = [
+        r for r in summaries
+        if r["winner"] and r["sp_top"] and r["model_top"]
+        and r["winner"]["horse"] == r["sp_top"]["horse"]
+        and (r["winner"].get("model_rank") or 0) >= 4
+    ]
+    sp_knew.sort(key=lambda r: r["winner"].get("model_rank") or 0, reverse=True)
+    print(f"\n--- 5. SP Knew, Model Didn't (SP fav won, model rank 4+) --- n={len(sp_knew)} ({len(sp_knew)/total_races*100:.1f}% of races)")
+    if sp_knew:
+        print(f"  {'Meeting':<10}  {'R':>2}  {'Winner':<22}  {'Mdl#':>4}  {'SP#':>4}  {'Model$':>8}  {'SP$':>6}  {'nr_grade_delta':>15}  {'sp_class_ceil':>14}")
+        print("  " + "-" * 104)
+        for r in sp_knew:
+            w = r["winner"]
+            ngd = w.get("nr_grade_delta")
+            spc = w.get("sp_class_ceiling")
+            ngd_str  = f"{ngd:+.1f}" if ngd is not None else "    n/a"
+            spc_str  = f"{spc:+.3f}" if spc is not None else "      n/a"
+            odds_str = f"${w['model_odds']:.2f}" if w.get("model_odds") else "  n/a"
+            sp_str   = f"${w['sp']:.2f}" if w.get("sp") else " n/a"
+            print(f"  {r['meeting']:<10}  {r['race']:>2}  {w['horse']:<22}  {w.get('model_rank','?'):>4}  {w.get('sp_rank','?'):>4}  {odds_str:>8}  {sp_str:>6}  {ngd_str:>15}  {spc_str:>14}")
+
+    # ---- 6. Map Override Opportunities ----
+    map_overrides = []
+    for r in summaries:
+        bm = r["best_map"]
+        mt = r["model_top"]
+        if not (bm and mt):
+            continue
+        if bm["horse"] == mt["horse"]:
+            continue  # best-map horse IS the top pick — no override opportunity
+        bm_finish = bm.get("finish_pos")
+        if bm_finish and bm_finish <= 3:
+            map_overrides.append({
+                "meeting": r["meeting"], "race": r["race"],
+                "bm_horse": bm["horse"],
+                "bm_model_rank": bm.get("model_rank"),
+                "bm_sp_rank": bm.get("sp_rank"),
+                "bm_finish": bm_finish,
+                "bm_map": bm.get("map_lead_score"),
+                "winner": r["winner"]["horse"] if r["winner"] else "?",
+                "winner_map": r["winner"].get("map_lead_score") if r["winner"] else None,
+            })
+    print(f"\n--- 6. Map Override Opportunities (best-map horse not top pick, placed top 3) --- n={len(map_overrides)} ({len(map_overrides)/total_races*100:.1f}% of races)")
+    if map_overrides:
+        print(f"  {'Meeting':<10}  {'R':>2}  {'Best-map horse':<22}  {'Mdl#':>4}  {'SP#':>4}  {'Finish':>6}  {'MapLd':>6}  {'Winner':<22}  {'WinMap':>6}")
+        print("  " + "-" * 108)
+        for mo in map_overrides[:20]:
+            bm_map = f"{mo['bm_map']:.2f}" if mo.get("bm_map") is not None else "  n/a"
+            w_map  = f"{mo['winner_map']:.2f}" if mo.get("winner_map") is not None else "  n/a"
+            print(f"  {mo['meeting']:<10}  {mo['race']:>2}  {mo['bm_horse']:<22}  {mo['bm_model_rank']:>4}  {mo['bm_sp_rank']:>4}  {mo['bm_finish']:>6}  {bm_map:>6}  {mo['winner']:<22}  {w_map:>6}")
+
+    # ---- 7. Biggest Model Misses ----
+    misses = sorted(
+        [r for r in summaries if r["winner"] and (r["winner"].get("model_rank") or 0) >= 5],
+        key=lambda r: r["winner"].get("model_rank") or 0, reverse=True,
+    )
+    print(f"\n--- 7. Biggest Model Misses (winner ranked 5th+ by model) --- n={len(misses)}")
+    if misses:
+        print(f"  {'Meeting':<10}  {'R':>2}  {'Winner':<22}  {'Mdl#':>4}  {'SP#':>4}  {'Model$':>8}  {'SP$':>6}  {'S1':>7}  {'S2':>7}  {'nr_grade_d':>11}  {'NR ceil':>8}")
+        print("  " + "-" * 116)
+        for r in misses[:20]:
+            w = r["winner"]
+            ngd = w.get("nr_grade_delta")
+            nrc = w.get("race_nr_ceiling")
+            s1_str   = f"{w['stage1']:+.3f}" if w.get("stage1") is not None else "    n/a"
+            s2_str   = f"{w['stage2']:+.3f}" if w.get("stage2") is not None else "    n/a"
+            ngd_str  = f"{ngd:+.1f}" if ngd is not None else "      n/a"
+            nrc_str  = f"{nrc:.0f}" if nrc is not None else "    n/a"
+            odds_str = f"${w['model_odds']:.2f}" if w.get("model_odds") else "  n/a"
+            sp_str   = f"${w['sp']:.2f}" if w.get("sp") else " n/a"
+            print(f"  {r['meeting']:<10}  {r['race']:>2}  {w['horse']:<22}  {w.get('model_rank','?'):>4}  {w.get('sp_rank','?'):>4}  {odds_str:>8}  {sp_str:>6}  {s1_str:>7}  {s2_str:>7}  {ngd_str:>11}  {nrc_str:>8}")
+
+    # ---- Optional CSV output ----
+    if out_path:
+        import csv as _csv
+        csv_fields = [
+            "meeting", "race", "horse", "horse_id", "runner_number",
+            "finish_pos", "model_rank", "sp_rank", "s1_rank",
+            "model_prob", "model_odds", "sp",
+            "stage1", "stage2", "total_score",
+            "race_nr_ceiling", "nr_grade_delta",
+            "sp_avg_market", "sp_class_ceiling", "sp_best_prob_at_class",
+            "map_lead_score", "map_death_score", "map_soft_trip_score",
+        ]
+        all_rows = [h for horses in race_groups.values() for h in horses]
+        with open(out_path, "w", newline="", encoding="utf-8") as f:
+            writer = _csv.DictWriter(f, fieldnames=csv_fields, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(all_rows)
+        print(f"\nWrote per-horse diagnostic CSV to {out_path}  ({len(all_rows)} rows)")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Harness racing odds model pipeline")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -316,6 +509,13 @@ def main() -> None:
     backtest_parser.add_argument("--min-edge", type=float, default=0.0, help="Minimum edge threshold for value bets (default: 0.0 = all)")
     backtest_parser.add_argument("--model-only", action="store_true", help="Use model-only fair odds instead of blended")
     backtest_parser.add_argument("--weights", default=None, help="Path to weights JSON file (default: weights.json if it exists)")
+
+    diagnose_parser = subparsers.add_parser("diagnose", help="Per-race truth set: hit rates, failure quadrants, S1/S2 analysis, map overrides, biggest misses")
+    diagnose_parser.add_argument("--db", default="data/harness.db")
+    diagnose_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    diagnose_parser.add_argument("--meeting-code", default=None, help="Limit to a single meeting (default: all meetings with results)")
+    diagnose_parser.add_argument("--out", default=None, help="Write per-horse diagnostic CSV to this path")
+    diagnose_parser.add_argument("--weights", default=None, help="Path to weights JSON file (default: weights.json if it exists)")
 
     build_betting_parser = subparsers.add_parser("build-betting-site", help="Build fractional-Kelly bankroll backtest page from scored meetings vs stored results")
     build_betting_parser.add_argument("--db", default="data/harness.db")
@@ -554,6 +754,91 @@ def main() -> None:
                         "won": res["pos"] == 1,
                     })
         _print_backtest_report(records, min_edge=args.min_edge, model_only=args.model_only)
+    elif args.command == "diagnose":
+        import sqlite3 as _sqlite3
+        rows = load_feature_rows(args.csv)
+        weights = _resolve_weights(getattr(args, "weights", None))
+        conn = _sqlite3.connect(args.db)
+        conn.row_factory = _sqlite3.Row
+        if args.meeting_code:
+            meetings = [args.meeting_code]
+        else:
+            meetings = [r[0] for r in conn.execute(
+                "SELECT DISTINCT meeting_code FROM race_results ORDER BY meeting_code"
+            ).fetchall()]
+        # Load all finish positions (not just non-null SP — we want full finish order)
+        results_lookup: dict[tuple, dict] = {}
+        for r in conn.execute(
+            "SELECT meeting_code, race_number, horse_name, finish_position, starting_price "
+            "FROM race_results"
+        ).fetchall():
+            key = (r["meeting_code"], r["race_number"], r["horse_name"].upper())
+            results_lookup[key] = {"pos": r["finish_position"], "sp": r["starting_price"]}
+        conn.close()
+        def _fv(row: dict, key: str) -> float | None:
+            """Read a CSV passthrough field as float; return None if absent or non-numeric."""
+            val = row.get(key)
+            if val is None:
+                return None
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                return None
+
+        race_groups: dict[tuple, list[dict]] = {}
+        for meeting_code in meetings:
+            try:
+                scored = score_meeting_rows(rows, meeting_code, weights=weights)
+            except Exception:
+                continue
+            for race_number, horse_rows in scored.items():
+                group = []
+                for h in horse_rows:
+                    key = (meeting_code, race_number, h["horse_name"].upper())
+                    if key not in results_lookup:
+                        continue
+                    res = results_lookup[key]
+                    group.append({
+                        "meeting": meeting_code,
+                        "race": race_number,
+                        "horse": h["horse_name"],
+                        "horse_id": h.get("horse_id"),
+                        "runner_number": h.get("runner_number"),
+                        "finish_pos": res["pos"],
+                        "sp": res["sp"],
+                        "stage1": h.get("stage1_score"),
+                        "stage2": h.get("stage2_score"),
+                        "total_score": h.get("score"),
+                        "model_prob": h.get("adjusted_probability"),
+                        "model_odds": h.get("adjusted_fair_odds"),
+                        # Grade context (CSV passthrough — convert to float)
+                        "race_nr_ceiling": _fv(h, "race_nr_ceiling"),
+                        "nr_grade_delta": _fv(h, "nr_grade_delta"),
+                        # SP subsystem
+                        "sp_avg_market": _fv(h, "sp_avg_prob_last3"),
+                        "sp_class_ceiling": _fv(h, "recent_line_sp_class_score"),
+                        "sp_best_prob_at_class": _fv(h, "sp_best_prob_at_class"),
+                        # Map
+                        "map_lead_score": _fv(h, "map_lead_score"),
+                        "map_death_score": _fv(h, "map_death_score"),
+                        "map_soft_trip_score": _fv(h, "map_soft_trip_score"),
+                    })
+                if len(group) < 2:
+                    continue
+                # Model rank: highest adjusted_probability = rank 1
+                group.sort(key=lambda x: -(x["model_prob"] or 0))
+                for i, h in enumerate(group):
+                    h["model_rank"] = i + 1
+                # SP rank: lowest SP = rank 1 (favourite); None SP gets pushed to the back
+                group_sp = sorted(group, key=lambda x: x["sp"] if x["sp"] else 9999)
+                for i, h in enumerate(group_sp):
+                    h["sp_rank"] = i + 1
+                # S1 rank: highest stage1_score = rank 1
+                group.sort(key=lambda x: -(x["stage1"] or 0))
+                for i, h in enumerate(group):
+                    h["s1_rank"] = i + 1
+                race_groups[(meeting_code, race_number)] = group
+        _print_diagnose_report(race_groups, out_path=args.out)
     elif args.command == "build-betting-site":
         build_betting_site(args.db, args.csv, args.out, starting_bankroll=args.starting_bankroll)
     elif args.command == "calibrate-nr-factor":
