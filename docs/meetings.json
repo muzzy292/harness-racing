@@ -81,7 +81,7 @@
     "track_name": "Menangle",
     "meeting_date": "11 Apr 2026",
     "races": 7,
-    "winners": 5
+    "winners": 6
   },
   {
     "meeting_code": "NA120426",
@@ -151,14 +151,14 @@
     "track_name": "Tamworth",
     "meeting_date": "16 Apr 2026",
     "races": 8,
-    "winners": 2
+    "winners": 1
   },
   {
     "meeting_code": "PE160426",
     "track_name": "Penrith",
     "meeting_date": "16 Apr 2026",
     "races": 9,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "EY170426",
@@ -172,7 +172,7 @@
     "track_name": "Newcastle",
     "meeting_date": "17 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 2
   },
   {
     "meeting_code": "PK170426",
