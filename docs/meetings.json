@@ -67,7 +67,7 @@
     "track_name": "Newcastle",
     "meeting_date": "10 Apr 2026",
     "races": 9,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "DU100426",
@@ -109,7 +109,7 @@
     "track_name": "Newcastle",
     "meeting_date": "2 Apr 2026",
     "races": 9,
-    "winners": 6
+    "winners": 5
   },
   {
     "meeting_code": "PC310326",
@@ -151,7 +151,7 @@
     "track_name": "Tamworth",
     "meeting_date": "16 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "PE160426",
@@ -193,7 +193,7 @@
     "track_name": "Coolamon",
     "meeting_date": "19 Apr 2026",
     "races": 7,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "CB190426",
