@@ -435,9 +435,13 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         # country ($6,936) ≈ −0.35, metro ($20k+) ≈ +1.2. Capped ±1.5 so a
         # horse coming out of BC/G1 races doesn't dominate the score.
         "stake_class": max(-1.5, min(1.5, _pos_scale(avg_run_purse, center=8000.0, divisor=3000.0, missing=0.0))) * w.get("stake_class", 0.2),
-        # Capped ±2.0 — a large class drop is a positive signal but should not
-        # overwhelm the form-based components.
-        "class_delta": max(-2.0, min(2.0, _pos_scale(class_delta, center=0.0, divisor=-2000.0, missing=0.0))) * w.get("class_delta", 0.3),
+        # Capped ±2.0. Divisor widened to 4000 so the cap isn't hit until a
+        # $8,000 purse swing — small country-grade steps no longer max out the signal.
+        # Dampened to 0.3× when nr_headroom > 8: in wide-grade races (e.g. NR45–70)
+        # the purse reflects the ceiling, not the horse's actual competition level,
+        # so a $6k→$12k "step up" or $12k→$6k "step down" is a ceiling artefact
+        # rather than a genuine class change. Applies symmetrically to both directions.
+        "class_delta": max(-2.0, min(2.0, _pos_scale(class_delta, center=0.0, divisor=-4000.0, missing=0.0))) * w.get("class_delta", 0.25) * (0.3 if (nr_headroom or 0) > 8 else 1.0),
         # SP relative to class — was the horse well-backed in quality races?
         # sp_class_score = avg(-log(SP) × purse/8000); negative scores = outsider,
         # near-zero = neutral. Capped ±1.5 so a single extreme run doesn't dominate.
