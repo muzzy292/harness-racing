@@ -25,13 +25,13 @@
     "sp_similar_grade": 0.0
   },
   "stage2": {
-    "map_lead": 2.0,
-    "map_soft": 0.45,
-    "map_soft_context": 0.3,
+    "map_lead": 3.0,
+    "map_soft": 0.7,
+    "map_soft_context": 0.5,
     "pace_backmarker": 0.6,
     "pace_backmarker_threshold": 0.4,
     "map_wide": 0.5,
-    "map_death": 1.2,
+    "map_death": 1.5,
     "dist_strike_rate": 0.9,
     "nr_grade_delta": 0.7,
     "driver_form": 0.6,
