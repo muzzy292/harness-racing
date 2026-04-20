@@ -1950,7 +1950,7 @@ def build_diagnose_site(
                     "model_odds": h.get("adjusted_fair_odds"),
                     "race_nr_ceiling": _fv_web(h, "race_nr_ceiling"),
                     "nr_grade_delta": _fv_web(h, "nr_grade_delta"),
-                    "sp_class_ceiling": _fv_web(h, "recent_line_sp_class_score"),
+                    "sp_class_ceiling": _fv_web(h, "sp_best_prob_similar_grade"),
                     "map_lead_score": _fv_web(h, "map_lead_score"),
                 })
             if len(group) < 2:
@@ -2295,7 +2295,7 @@ def _render_diagnose_html(race_groups: dict, generated_at: str) -> str:
           <th class="num">Mdl#</th><th class="num">SP#</th>
           <th class="num">Model$</th><th class="num">SP$</th>
           <th class="num">nr_grade_delta</th>
-          <th class="num">sp_class_ceil</th>
+          <th class="num">sp_sim_grade_prob</th>
         </tr></thead>
         <tbody id="sp-knew-tbody"></tbody>
       </table>

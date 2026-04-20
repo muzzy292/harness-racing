@@ -822,7 +822,7 @@ def main() -> None:
                         "nr_grade_delta": _fv(h, "nr_grade_delta"),
                         # SP subsystem
                         "sp_avg_market": _fv(h, "sp_avg_prob_last3"),
-                        "sp_class_ceiling": _fv(h, "recent_line_sp_class_score"),
+                        "sp_class_ceiling": _fv(h, "sp_best_prob_similar_grade"),
                         "sp_best_prob_at_class": _fv(h, "sp_best_prob_at_class"),
                         # Map
                         "map_lead_score": _fv(h, "map_lead_score"),

@@ -307,6 +307,8 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
     top3_rate = _to_float(row.get("last_5_top3_rate"))
     competitive_rate = _to_float(row.get("last_5_competitive_rate"))
     career_starts = _to_int(row.get("career_starts"))
+    race_nr_ceiling_s1 = _to_float(row.get("race_nr_ceiling"))
+    nr_grade_delta_s1  = _to_float(row.get("nr_grade_delta"))
     sec3 = _to_float(row.get("last_3_avg_sectional_delta"))
     comment_adj = _to_float(row.get("recent_line_avg_comment_adj"))
     tempo_adj = _to_float(row.get("recent_line_avg_tempo_adj"))
@@ -341,15 +343,16 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
     sp_best_prob_similar = _to_float(row.get("sp_best_prob_similar_grade"))
     sp_reliability_rate = _to_float(row.get("sp_reliability_rate"))
 
-    # SP dampening — reserved for future calibration once more results data is
-    # available. Grade-drop dampening (nr_grade_delta < -5 → ×0.3) and No-NR
-    # dampening (race_nr_ceiling None → ×0.0/0.5) both regressed top-pick winners
-    # by 8 across 26 meetings when tested (73 vs 81 baseline). The grade filter on
-    # sp_avg_market had a similar neutral-to-negative effect. Left at 1.0 until
-    # 30+ meetings of results are available to calibrate the dampening factors.
-    # New feature columns (sp_avg_prob_at_class, sp_best_prob_similar_grade) remain
-    # in the CSV as signals for future weight fitting.
+    # SP dampening multiplier — applied to all SP components before scoring.
+    # Grade-drop contamination (horse $21 at NR70, entering NR50 today) is handled
+    # by the ±5 NR filter on sp_class_ceiling and sp_avg_market — those features
+    # already return None/neutral when no similar-grade runs exist, so a blanket
+    # multiplier is not needed and would crush legitimate positive SP signals.
+    # No-NR gate: maiden/ungraded races with <10 career starts have no reliable
+    # grade anchor — SP history is too thin and class-mixed to be useful.
     _sp_final_mult = 1.0
+    if race_nr_ceiling_s1 is None and (career_starts or 0) < 10:
+        _sp_final_mult = 0.0
 
     # Priority for consistency/ceiling:
     # 1. Class-adjusted recent-line margins — same data as recent_line_adj but each
@@ -444,24 +447,27 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         # divisor=0.05: 5pp shortening in implied prob → +1.0 in _pos_scale before weight.
         # Weight zeroed in weights.json — retained for potential reinstatement.
         "sp_trend": _pos_scale(sp_trend, center=0.0, divisor=0.05, missing=0.0) * w.get("sp_trend", 0.0),
-        # SP components — all multiplied by _sp_final_mult (0.3 for grade-drop,
-        # 0.0/0.5 for No-NR races) to prevent cross-grade contamination.
+        # SP components — all multiplied by _sp_final_mult (0.0 for No-NR maiden
+        # races with <10 starts, 1.0 otherwise) to prevent cross-grade contamination.
         # Peak market confidence: best implied probability in last 10 runs (unfiltered).
         # Centred at 0.10 ($10 SP). Useful when the horse has never run at today's
         # grade — at least we know its career peak market regard.
         # Capped ±1.5. Reduced weight (0.20) now that sp_similar_grade captures the
         # grade-appropriate peak; sp_market_ceiling provides the broader fallback.
         "sp_market_ceiling": max(-1.5, min(1.5, _pos_scale(sp_best_prob_last10, center=0.10, divisor=0.15, missing=0.0))) * w.get("sp_market_ceiling", 0.35) * _sp_final_mult,
-        # Class-gated peak confidence: best implied prob from runs at today's class
-        # or higher (line_nr_ceiling >= race_nr_ceiling). Stronger than unconstrained
-        # ceiling but one-sided — still includes much harder-grade runs on grade-drop
-        # horses. Dampened by _sp_final_mult for grade-drop and No-NR cases.
-        "sp_class_ceiling": max(-1.5, min(1.5, _pos_scale(sp_best_prob_at_class, center=0.10, divisor=0.15, missing=0.0))) * w.get("sp_class_ceiling", 0.45) * _sp_final_mult,
-        # Recent average market respect: avg implied prob last 3 runs (unfiltered).
-        # sp_avg_prob_at_class (±5 NR grade filter) is computed in features.py and
-        # available in the CSV for future use, but tested neutrally — reverted to
-        # raw avg3 until more results data is available to confirm the benefit.
-        "sp_avg_market": max(-1.5, min(1.5, _pos_scale(sp_avg_prob_last3, center=0.10, divisor=0.15, missing=0.0))) * w.get("sp_avg_market", 0.25) * _sp_final_mult,
+        # Grade-symmetric peak: best implied prob from runs within ±5 NR of today.
+        # Replaces the one-sided at_class gate (nr >= race_nr) which contaminated
+        # grade-drop horses — NR70 runs passed the NR50 filter, dragging the score
+        # negative for horses that were simply outclassed at harder grades.
+        # ±5 NR symmetry answers: "was this horse ever strongly backed at today's grade?"
+        # Falls back to missing=0.0 (neutral) when no similar-grade runs exist.
+        "sp_class_ceiling": max(-1.5, min(1.5, _pos_scale(sp_best_prob_similar, center=0.10, divisor=0.15, missing=0.0))) * w.get("sp_class_ceiling", 0.45) * _sp_final_mult,
+        # Recent average market respect: avg implied prob from runs within ±5 NR of today.
+        # Replaces raw last-3 avg which mixed grade contexts — a horse averaging $18
+        # in NR70 races doesn't mean $18 at NR50 today.
+        # sp_avg_prob_at_class falls back to raw avg3 in features.py when no ±5 NR
+        # runs exist, so this degrades gracefully for horses with thin grade history.
+        "sp_avg_market": max(-1.5, min(1.5, _pos_scale(sp_avg_prob_at_class, center=0.10, divisor=0.15, missing=0.0))) * w.get("sp_avg_market", 0.25) * _sp_final_mult,
         # Grade-symmetric peak: best implied prob within ±5 NR of today.
         # Computed in features.py (sp_best_prob_similar_grade), weight currently 0.0
         # — available for future calibration once 30+ meetings of results exist.
