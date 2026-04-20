@@ -15,7 +15,7 @@ from .track_pars import _nr_to_grade_band, lookup_race_par
 # A horse that ran in NR43 dropping to NR40 gets each margin reduced by 3 * factor.
 # Calibration starting point — adjust against results once ≥30 grade-drop winners
 # have been observed.
-_NR_MARGIN_FACTOR = 0.5
+_NR_MARGIN_FACTOR = 0.7
 
 
 def install_sqlite_helpers(conn: sqlite3.Connection) -> None:
