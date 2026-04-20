@@ -762,6 +762,48 @@ def upsert_results(conn: sqlite3.Connection, results: list) -> None:
     conn.commit()
 
     upsert_result_horse_runs(conn, results, resolved_ids)
+    _mark_absent_runners_scratched(conn, results)
+
+
+def _mark_absent_runners_scratched(conn: sqlite3.Connection, results: list) -> None:
+    """After ingesting results, mark any race_runners entry that didn't run as scratched.
+
+    The results HTML only lists horses that actually raced — any nominated runner
+    absent from the results was scratched (pre-race or late scratching).
+    Only races that have at least one result row are processed, so partially
+    ingested meetings don't accidentally scratch their whole field.
+    """
+    # Build {(meeting_code, race_number): {upper_horse_name, ...}} from results
+    ran: dict[tuple[str, int], set[str]] = {}
+    for r in results:
+        key = (r.meeting_code, r.race_number)
+        ran.setdefault(key, set()).add(r.horse_name.upper())
+
+    updated = 0
+    for (meeting_code, race_number), ran_names in ran.items():
+        nominees = conn.execute(
+            """
+            SELECT horse_name FROM race_runners
+            WHERE meeting_code = ? AND race_number = ?
+              AND COALESCE(scratched, 0) = 0
+            """,
+            (meeting_code, race_number),
+        ).fetchall()
+        for nominee in nominees:
+            if nominee["horse_name"].upper() not in ran_names:
+                conn.execute(
+                    """
+                    UPDATE race_runners SET scratched = 1
+                    WHERE meeting_code = ? AND race_number = ?
+                      AND UPPER(horse_name) = ?
+                    """,
+                    (meeting_code, race_number, nominee["horse_name"].upper()),
+                )
+                updated += 1
+
+    if updated:
+        conn.commit()
+        print(f"  Auto-scratched {updated} runner(s) absent from results.")
 
 
 def scratch_horse(
