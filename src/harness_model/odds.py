@@ -528,9 +528,18 @@ def _stage2_components(
     class_delta = _to_float(row.get("class_delta"))
     nr_headroom = _to_float(row.get("nr_headroom"))
     second_up_improvement = _to_float(row.get("second_up_improvement"))
+    field_size = _to_int(row.get("race_field_size")) or 10
+    # Field-size scalers: smaller fields → less traffic → wide draws and death
+    # seat are less punishing. Capped at 1.0 so large fields keep full penalty.
+    _barrier_field_mult  = min(1.0, field_size / 10.0)
+    _death_field_mult    = min(1.0, field_size / 8.0)
+    # Fitness grade-drop dampener: a horse returning from a spell into a much
+    # easier race (nr_grade_delta < -8) has its rustiness partially offset by
+    # weaker opposition — apply 50% of the normal fitness penalty.
+    _fitness_grade_mult  = 0.5 if (nr_grade_delta or 0) < -8 else 1.0
 
     return {
-        "barrier":      _barrier_score(barrier, lead_rate) * w.get("barrier", 1.0),
+        "barrier":      _barrier_score(barrier, lead_rate) * w.get("barrier", 1.0) * _barrier_field_mult,
         # Bonus when today's barrier is better than horse's recent average.
         # Clip at 0 — only reward improvement; worsening is covered by the static score.
         "barrier_relief": max(0.0, barrier_relief or 0.0) * w.get("barrier_relief", 0.4),
@@ -549,7 +558,7 @@ def _stage2_components(
         # to avoid rewarding backmarkers in genuinely uncontested fields.
         "pace_backmarker": (style_restrained_rate or 0.0) * max(0.0, pace_pressure - w.get("pace_backmarker_threshold", 0.4)) * w.get("pace_backmarker", 0.6),
         "map_wide":    -(map_wide or 0.0) * w.get("map_wide", 0.5),
-        "map_death":   -(field_death_prob or 0.0) * w.get("map_death", 1.2),
+        "map_death":   -(field_death_prob or 0.0) * w.get("map_death", 1.5) * _death_field_mult,
         # Distance strike rate — ratio of win% at this distance band vs career win%.
         # Penalty: fires when ratio < 1 (wins less often at this distance than career avg).
         # Boost: fires when ratio > 1 AND dist_rge_starts >= 15 — enough sample to be
@@ -569,7 +578,7 @@ def _stage2_components(
         # ~0.04 per NR point of drop. Requires ≥2 recent lines with NR data (else 0).
         "nr_grade_delta": max(-1.5, min(1.5, _pos_scale(nr_grade_delta, center=0.0, divisor=-10.0, missing=0.0))) * w.get("nr_grade_delta", 0.4),
         # Fitness — graduated penalty by days since last run.
-        "fitness":      _fitness_score(days_since_last_run, fw),
+        "fitness":      _fitness_score(days_since_last_run, fw) * _fitness_grade_mult,
         # Second-up improvement — horse showed marked form improvement on first run
         # back from a spell and is now second-up. Scaled by metres of improvement
         # (15m = full weight). Only fires when conditions are met; zero otherwise.
