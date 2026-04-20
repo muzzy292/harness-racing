@@ -1,21 +1,21 @@
 {
   "stage1": {
-    "consistency": 1.4,
-    "ceiling": 1.2,
-    "late_speed": 1.4,
-    "tempo_adj": 0.45,
-    "tempo_flags": 0.08,
-    "null_flags": 0.25,
+    "consistency": 1.0,
+    "ceiling": 0.9,
+    "late_speed": 0.8,
+    "tempo_adj": 0.35,
+    "tempo_flags": 0.05,
+    "null_flags": 0.20,
     "market_min": 0.0,
     "market_max": 0.0,
-    "win_rate": 0.7,
-    "career_win_rate": 0.6,
-    "top3_rate": 0.6,
-    "competitive_rate": 0.5,
+    "win_rate": 0.6,
+    "career_win_rate": 0.5,
+    "top3_rate": 0.5,
+    "competitive_rate": 0.3,
     "nr": 0.35,
     "class_pos": 0.15,
     "stake_class": 0.2,
-    "class_delta": 0.3,
+    "class_delta": 0.25,
     "sp_class": 0.0,
     "sp_trend": 0.0,
     "sp_market_ceiling": 0.35,
@@ -49,7 +49,7 @@
     "tier_150_plus": -2.0
   },
   "softmax": {
-    "temperature": 2.25,
+    "temperature": 1.8,
     "model_weight": 0.45,
     "market_weight": 0.55
   }
