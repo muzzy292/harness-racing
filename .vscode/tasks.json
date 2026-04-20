@@ -143,9 +143,23 @@
       "problemMatcher": []
     },
     {
+      "label": "Republish All Meetings",
+      "type": "shell",
+      "command": "python -m harness_model.cli republish-all --csv data/features/runner_features.csv --db data/harness.db --out docs",
+      "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "cmd.exe", "args": ["/C"] } },
+      "problemMatcher": []
+    },
+    {
       "label": "Build Betting Site",
       "type": "shell",
       "command": "python -m harness_model.cli build-betting-site --db data/harness.db --csv data/features/runner_features.csv --out docs && git add docs/betting.html && git diff --cached --quiet && echo \"Betting page unchanged - nothing to commit\" || git commit -m \"Update betting page\" && git push",
+      "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "cmd.exe", "args": ["/C"] } },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Diagnose Site",
+      "type": "shell",
+      "command": "python -m harness_model.cli build-diagnose-site --db data/harness.db --csv data/features/runner_features.csv --out docs && git add docs/diagnose.html && git diff --cached --quiet && echo \"Diagnose page unchanged - nothing to commit\" || git commit -m \"Update diagnose page\" && git push",
       "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "cmd.exe", "args": ["/C"] } },
       "problemMatcher": []
     },

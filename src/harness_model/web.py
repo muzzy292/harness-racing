@@ -308,6 +308,7 @@ def _write_index(
     <a href="index.html" class="active">Meetings</a>
     <a href="stats.html">Stats</a>
     <a href="betting.html">Betting</a>
+    <a href="diagnose.html">Diagnose</a>
   </nav>
   <div class="hero">
     <h1>Harness Racing Scores</h1>
@@ -659,6 +660,7 @@ def _render_meeting_html(
       <a href="index.html">Meetings</a>
       <a href="stats.html">Stats</a>
       <a href="betting.html">Betting</a>
+      <a href="diagnose.html">Diagnose</a>
       {race_nav}
     </nav>
     {''.join(sections) if sections else '<div class="race-card"><p>No races found for this meeting.</p></div>'}
@@ -1285,6 +1287,7 @@ def _render_stats_html(driver_rows: list[dict], trainer_rows: list[dict], meta: 
     <a href="index.html">Meetings</a>
     <a href="stats.html" class="active">Stats</a>
     <a href="betting.html">Betting</a>
+    <a href="diagnose.html">Diagnose</a>
   </nav>
   <div class="hero">
     <h1>Driver &amp; Trainer Stats</h1>
@@ -1668,6 +1671,7 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
     <a href="index.html">Meetings</a>
     <a href="stats.html">Stats</a>
     <a href="betting.html" class="active">Betting</a>
+    <a href="diagnose.html">Diagnose</a>
   </nav>
   <div class="hero">
     <h1>Betting Backtest</h1>
@@ -1785,3 +1789,711 @@ def publish_scored_meeting(
             print(f"  Warning: git push failed (exit {push.returncode}). Check remote is configured.")
     except FileNotFoundError:
         print("  Warning: git not found on PATH — HTML written but not pushed.")
+
+
+def republish_all_meetings(
+    csv_path: str | Path = "data/features/runner_features.csv",
+    db_path: str | Path = "data/harness.db",
+    docs_dir: str | Path = "docs",
+    weights: dict | None = None,
+) -> int:
+    """Re-score and re-render every meeting in docs/meetings.json in one batch.
+
+    Loads feature rows and opens the DB once, writes all HTMLs, then does a
+    single git add/commit/push. Returns the number of meetings republished.
+    """
+    repo_root = Path(__file__).parents[2]
+    docs = Path(docs_dir) if Path(docs_dir).is_absolute() else (repo_root / docs_dir)
+    docs.mkdir(parents=True, exist_ok=True)
+
+    manifest_path = docs / "meetings.json"
+    if not manifest_path.exists():
+        print("No meetings.json found — nothing to republish.")
+        return 0
+
+    manifest: list[dict[str, Any]] = json.loads(manifest_path.read_text(encoding="utf-8"))
+    meeting_codes = [m["meeting_code"] for m in manifest if m.get("meeting_code")]
+    if not meeting_codes:
+        print("meetings.json is empty — nothing to republish.")
+        return 0
+
+    print(f"Loading features from {csv_path} ...")
+    feature_rows = load_feature_rows(csv_path)
+
+    conn = connect(db_path)
+    init_db(conn)
+
+    published = 0
+    for code in meeting_codes:
+        try:
+            meeting_scores = score_meeting_rows(feature_rows, code, weights=weights)
+            meeting_meta = _load_meeting_metadata(conn, code)
+            result_rows = _load_results(conn, code)
+
+            races_scored = sum(1 for rows in meeting_scores.values() if rows)
+            winners_count = _count_top_pick_winners(meeting_scores, result_rows)
+
+            page_path = docs / f"{code}.html"
+            page_path.write_text(
+                _render_meeting_html(code, meeting_scores, meeting_meta, result_rows),
+                encoding="utf-8",
+            )
+            # Update the manifest entry in-place (races/winners counts may have changed)
+            entry = next((m for m in manifest if m.get("meeting_code") == code), None)
+            if entry:
+                entry["races"] = races_scored
+                entry["winners"] = winners_count
+                if meeting_meta:
+                    for k in ("track_name", "meeting_date"):
+                        if meeting_meta.get(k):
+                            entry[k] = meeting_meta[k]
+
+            print(f"  {code}: {races_scored} races, {winners_count} winners")
+            published += 1
+        except Exception as exc:  # noqa: BLE001
+            print(f"  {code}: ERROR — {exc}")
+
+    conn.close()
+
+    # Write updated manifest and rebuild index
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    _write_index(docs)
+
+    print(f"\nRepublished {published}/{len(meeting_codes)} meetings.")
+
+    try:
+        subprocess.run(["git", "add", str(docs)], check=True, cwd=repo_root)
+        commit = subprocess.run(
+            ["git", "commit", "-m", f"Republish all meetings ({published} pages)"],
+            cwd=repo_root,
+        )
+        if commit.returncode not in (0, 1):
+            print(f"  Warning: git commit exited with code {commit.returncode}")
+            return published
+        push = subprocess.run(["git", "push"], cwd=repo_root)
+        if push.returncode == 0:
+            print("  Pushed to GitHub Pages.")
+        else:
+            print(f"  Warning: git push failed (exit {push.returncode}).")
+    except FileNotFoundError:
+        print("  Warning: git not found on PATH — HTMLs written but not pushed.")
+
+    return published
+
+
+# ---------------------------------------------------------------------------
+# Diagnostic page
+# ---------------------------------------------------------------------------
+
+def _fv_web(row: dict, key: str) -> float | None:
+    """Read a CSV passthrough field as float, silently returning None if absent/non-numeric."""
+    val = row.get(key)
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def build_diagnose_site(
+    csv_path: str | Path,
+    db_path: str | Path,
+    out_dir: str | Path = "docs",
+    weights: dict | None = None,
+) -> Path:
+    """Score all meetings with stored results, build the diagnostic truth-set page."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    rows = load_feature_rows(csv_path)
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    meetings = [r[0] for r in conn.execute(
+        "SELECT DISTINCT meeting_code FROM race_results ORDER BY meeting_code"
+    ).fetchall()]
+
+    results_lookup: dict[tuple, dict] = {}
+    for r in conn.execute(
+        "SELECT meeting_code, race_number, horse_name, finish_position, starting_price "
+        "FROM race_results"
+    ).fetchall():
+        key = (r["meeting_code"], r["race_number"], r["horse_name"].upper())
+        results_lookup[key] = {"pos": r["finish_position"], "sp": r["starting_price"]}
+    conn.close()
+
+    # Build race_groups identical to the diagnose CLI handler
+    race_groups: dict[tuple, list[dict]] = {}
+    for meeting_code in meetings:
+        try:
+            scored = score_meeting_rows(rows, meeting_code, weights=weights)
+        except Exception:
+            continue
+        for race_number, horse_rows in scored.items():
+            group = []
+            for h in horse_rows:
+                key = (meeting_code, race_number, h["horse_name"].upper())
+                if key not in results_lookup:
+                    continue
+                res = results_lookup[key]
+                group.append({
+                    "meeting": meeting_code,
+                    "race": race_number,
+                    "horse": h["horse_name"],
+                    "finish_pos": res["pos"],
+                    "sp": res["sp"],
+                    "stage1": h.get("stage1_score"),
+                    "stage2": h.get("stage2_score"),
+                    "total_score": h.get("score"),
+                    "model_prob": h.get("adjusted_probability"),
+                    "model_odds": h.get("adjusted_fair_odds"),
+                    "race_nr_ceiling": _fv_web(h, "race_nr_ceiling"),
+                    "nr_grade_delta": _fv_web(h, "nr_grade_delta"),
+                    "sp_class_ceiling": _fv_web(h, "recent_line_sp_class_score"),
+                    "map_lead_score": _fv_web(h, "map_lead_score"),
+                })
+            if len(group) < 2:
+                continue
+            group.sort(key=lambda x: -(x["model_prob"] or 0))
+            for i, h in enumerate(group):
+                h["model_rank"] = i + 1
+            group_sp = sorted(group, key=lambda x: x["sp"] if x["sp"] else 9999)
+            for i, h in enumerate(group_sp):
+                h["sp_rank"] = i + 1
+            group.sort(key=lambda x: -(x["stage1"] or 0))
+            for i, h in enumerate(group):
+                h["s1_rank"] = i + 1
+            race_groups[(meeting_code, race_number)] = group
+
+    generated_at = datetime.now().strftime("%d %b %Y %H:%M")
+    html_str = _render_diagnose_html(race_groups, generated_at)
+    out_path = out_dir / "diagnose.html"
+    out_path.write_text(html_str, encoding="utf-8")
+    return out_path
+
+
+def _render_diagnose_html(race_groups: dict, generated_at: str) -> str:
+    """Render the full diagnostic page as an HTML string."""
+
+    def _avg(lst: list) -> float | None:
+        return sum(lst) / len(lst) if lst else None
+
+    # ---- Build per-race JSON rows for client-side filtering ----
+    race_rows: list[dict] = []
+    map_rows: list[dict] = []
+
+    for key in sorted(race_groups.keys()):
+        horses = race_groups[key]
+        meeting, race = key
+        winner    = next((h for h in horses if h["finish_pos"] == 1), None)
+        model_top = next((h for h in horses if h["model_rank"] == 1), None)
+        sp_top    = next((h for h in horses if h["sp_rank"] == 1), None)
+        s1_top    = next((h for h in horses if h["s1_rank"] == 1), None)
+        model_ranked = sorted(horses, key=lambda h: h["model_rank"])
+        best_map  = max(horses, key=lambda h: (h.get("map_lead_score") or -99))
+
+        if not (winner and model_top and sp_top):
+            continue
+
+        model_correct = winner["horse"] == model_top["horse"]
+        sp_correct    = winner["horse"] == sp_top["horse"]
+        is_sp_knew    = sp_correct and (winner.get("model_rank") or 0) >= 4
+        s1_changed    = s1_top and model_top and s1_top["horse"] != model_top["horse"]
+
+        race_rows.append({
+            "meeting": meeting,
+            "race": race,
+            # Winner
+            "winner": winner["horse"],
+            "winner_sp": winner["sp"],
+            "winner_model_rank": winner.get("model_rank"),
+            "winner_sp_rank": winner.get("sp_rank"),
+            "winner_model_odds": winner.get("model_odds"),
+            "winner_s1": winner.get("stage1"),
+            "winner_s2": winner.get("stage2"),
+            "winner_total": winner.get("total_score"),
+            "winner_nr_grade_delta": winner.get("nr_grade_delta"),
+            "winner_race_nr_ceiling": winner.get("race_nr_ceiling"),
+            "winner_sp_class_ceiling": winner.get("sp_class_ceiling"),
+            "winner_map": winner.get("map_lead_score"),
+            # Model top pick (may differ from winner)
+            "model_top1": model_top["horse"],
+            "model_top1_s1": model_top.get("stage1"),
+            "model_top1_s2": model_top.get("stage2"),
+            "model_top1_total": model_top.get("total_score"),
+            "model_top2": model_ranked[1]["horse"] if len(model_ranked) > 1 else None,
+            "model_top3": model_ranked[2]["horse"] if len(model_ranked) > 2 else None,
+            # Flags
+            "model_correct": model_correct,
+            "sp_correct": sp_correct,
+            "is_sp_knew": is_sp_knew,
+            "s2_changed_top": s1_changed,
+        })
+
+        # Map override: best-map horse not top pick AND placed top 3
+        bm_finish = best_map.get("finish_pos")
+        if best_map["horse"] != model_top["horse"] and bm_finish and bm_finish <= 3:
+            map_rows.append({
+                "meeting": meeting,
+                "race": race,
+                "bm_horse": best_map["horse"],
+                "bm_model_rank": best_map.get("model_rank"),
+                "bm_sp_rank": best_map.get("sp_rank"),
+                "bm_finish": bm_finish,
+                "bm_map": best_map.get("map_lead_score"),
+                "winner": winner["horse"],
+                "winner_map": winner.get("map_lead_score"),
+            })
+
+    # ---- Pre-compute global + per-meeting summary stats ----
+    def _compute_stats(rows: list[dict]) -> dict:
+        n = len(rows)
+        if n == 0:
+            return {}
+        failures = [r for r in rows if not r["model_correct"]]
+        return {
+            "total_races": n,
+            "model_correct": sum(1 for r in rows if r["model_correct"]),
+            "sp_correct": sum(1 for r in rows if r["sp_correct"]),
+            "top3_hit": sum(1 for r in rows if (r["winner_model_rank"] or 0) <= 3),
+            "rank2": sum(1 for r in rows if r["winner_model_rank"] == 2),
+            "rank3": sum(1 for r in rows if r["winner_model_rank"] == 3),
+            "rank4plus": sum(1 for r in rows if (r["winner_model_rank"] or 0) >= 4),
+            "both_correct": sum(1 for r in rows if r["model_correct"] and r["sp_correct"]),
+            "model_edge": sum(1 for r in rows if r["model_correct"] and not r["sp_correct"]),
+            "sp_failure": sum(1 for r in rows if not r["model_correct"] and r["sp_correct"]),
+            "both_wrong": sum(1 for r in rows if not r["model_correct"] and not r["sp_correct"]),
+            "sp_knew_count": sum(1 for r in rows if r.get("is_sp_knew")),
+            "s2_swung": sum(1 for r in rows if r.get("s2_changed_top")),
+            "big_miss_count": sum(1 for r in rows if (r["winner_model_rank"] or 0) >= 5),
+            # S1/S2 on failures: model top pick vs winner
+            "avg_top_s1": _avg([r["model_top1_s1"] for r in failures if r["model_top1_s1"] is not None]),
+            "avg_top_s2": _avg([r["model_top1_s2"] for r in failures if r["model_top1_s2"] is not None]),
+            "avg_top_tot": _avg([r["model_top1_total"] for r in failures if r["model_top1_total"] is not None]),
+            "avg_win_s1": _avg([r["winner_s1"] for r in failures if r["winner_s1"] is not None]),
+            "avg_win_s2": _avg([r["winner_s2"] for r in failures if r["winner_s2"] is not None]),
+            "avg_win_tot": _avg([r["winner_total"] for r in failures if r["winner_total"] is not None]),
+            "avg_winner_rank": _avg([r["winner_model_rank"] for r in failures if r["winner_model_rank"] is not None]),
+        }
+
+    global_stats = _compute_stats(race_rows)
+    meetings_list = sorted({r["meeting"] for r in race_rows})
+    by_meeting = {m: _compute_stats([r for r in race_rows if r["meeting"] == m]) for m in meetings_list}
+
+    data_json = json.dumps({
+        "global": global_stats,
+        "by_meeting": by_meeting,
+        "races": race_rows,
+        "map_overrides": map_rows,
+    }, separators=(",", ":"))
+
+    n_races = global_stats.get("total_races", 0)
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Model Diagnostic — Harness Racing</title>
+  <style>
+    :root {{
+      --bg:#f8fafc; --card-bg:#ffffff; --primary:#0f172a;
+      --secondary:#64748b; --accent:#10b981; --accent-dark:#059669;
+      --border:#e2e8f0; --highlight:#f1f5f9;
+      --red:#ef4444; --amber:#f59e0b; --blue:#3b82f6;
+    }}
+    *{{box-sizing:border-box;}}
+    html{{scroll-behavior:smooth;}}
+    body{{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      color:var(--primary);background:var(--bg);line-height:1.5;}}
+    .top-nav{{background:var(--primary);padding:12px 20px;display:flex;gap:8px;align-items:center;}}
+    .top-nav a{{color:var(--secondary);text-decoration:none;font-size:14px;font-weight:600;
+      padding:6px 14px;border-radius:8px;transition:all 0.2s;}}
+    .top-nav a:hover{{background:rgba(255,255,255,0.1);color:white;}}
+    .top-nav a.active{{background:rgba(255,255,255,0.12);color:white;}}
+    .hero{{background:var(--primary);color:white;padding:32px 20px;}}
+    .hero-inner{{max-width:1300px;margin:0 auto;display:flex;align-items:center;gap:24px;flex-wrap:wrap;}}
+    .hero h1{{margin:0;font-size:28px;font-weight:800;letter-spacing:-0.02em;}}
+    .hero p{{margin:4px 0 0;color:var(--secondary);font-size:13px;}}
+    .meeting-select{{margin-left:auto;display:flex;align-items:center;gap:10px;}}
+    .meeting-select label{{color:rgba(255,255,255,0.7);font-size:13px;font-weight:600;white-space:nowrap;}}
+    .meeting-select select{{padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);color:white;font-size:14px;font-weight:600;cursor:pointer;
+      appearance:none;-webkit-appearance:none;min-width:180px;}}
+    .meeting-select select option{{background:#1e293b;color:white;}}
+    .wrap{{max-width:1300px;margin:0 auto;padding:28px 20px 60px;}}
+    /* Summary cards */
+    .cards-row{{display:grid;gap:14px;margin-bottom:24px;}}
+    .cards-row.two{{grid-template-columns:1fr 1fr;}}
+    .cards-row.three{{grid-template-columns:repeat(3,1fr);}}
+    @media(max-width:700px){{.cards-row.two,.cards-row.three{{grid-template-columns:1fr;}}}}
+    .card{{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;
+      padding:18px 20px;box-shadow:0 2px 4px rgba(0,0,0,0.04);}}
+    .card-title{{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;
+      color:var(--secondary);margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);}}
+    /* Mini stat rows */
+    .stat-row{{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;
+      font-size:13px;border-bottom:1px solid var(--highlight);}}
+    .stat-row:last-child{{border-bottom:none;}}
+    .stat-label{{color:var(--secondary);}}
+    .stat-val{{font-weight:700;font-size:14px;}}
+    .stat-val.green{{color:var(--accent-dark);}}
+    .stat-val.red{{color:var(--red);}}
+    .stat-val.amber{{color:var(--amber);}}
+    /* Quadrant grid */
+    .quad-grid{{display:grid;grid-template-columns:1fr 1fr;gap:8px;}}
+    .quad{{border-radius:10px;padding:12px;text-align:center;}}
+    .quad .q-val{{font-size:22px;font-weight:800;}}
+    .quad .q-pct{{font-size:12px;font-weight:600;color:var(--secondary);}}
+    .quad .q-label{{font-size:11px;color:var(--secondary);margin-top:2px;}}
+    .quad.both-right{{background:#f0fdf4;border:1px solid #bbf7d0;}}
+    .quad.model-edge{{background:#f0f9ff;border:1px solid #bae6fd;}}
+    .quad.model-fail{{background:#fff1f2;border:1px solid #fecdd3;}}
+    .quad.both-wrong{{background:#fafafa;border:1px solid var(--border);}}
+    /* Section header */
+    .section-header{{display:flex;align-items:baseline;gap:12px;margin:28px 0 12px;}}
+    .section-title{{font-size:16px;font-weight:700;}}
+    .section-count{{font-size:13px;color:var(--secondary);}}
+    /* Tables */
+    .table-wrap{{overflow-x:auto;border:1px solid var(--border);border-radius:14px;
+      background:var(--card-bg);box-shadow:0 2px 4px rgba(0,0,0,0.04);}}
+    table{{width:100%;border-collapse:collapse;min-width:700px;}}
+    th,td{{padding:8px 12px;text-align:left;font-size:12px;border-bottom:1px solid var(--border);}}
+    th{{background:#fafafa;color:var(--secondary);font-size:10px;font-weight:700;
+      text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;}}
+    tr:last-child td{{border-bottom:none;}}
+    td.num{{text-align:right;font-variant-numeric:tabular-nums;}}
+    th.num{{text-align:right;}}
+    tr.model-win{{background:#f0fdf4;}}
+    tr.model-win:hover{{background:#dcfce7;}}
+    tr.model-loss:hover{{background:var(--highlight);}}
+    .badge{{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;}}
+    .badge.win{{background:#dcfce7;color:#15803d;}}
+    .badge.loss{{background:#fee2e2;color:#b91c1c;}}
+    .hidden{{display:none!important;}}
+    .no-data{{padding:24px;text-align:center;color:var(--secondary);font-size:13px;}}
+    .footer{{margin-top:40px;text-align:center;color:var(--secondary);font-size:12px;}}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="index.html">Meetings</a>
+    <a href="stats.html">Stats</a>
+    <a href="betting.html">Betting</a>
+    <a href="diagnose.html" class="active">Diagnose</a>
+  </nav>
+  <div class="hero">
+    <div class="hero-inner">
+      <div>
+        <h1>Model Diagnostic</h1>
+        <p>Per-race truth set &middot; {n_races} races with results &middot; Generated {html.escape(generated_at)}</p>
+      </div>
+      <div class="meeting-select">
+        <label for="meeting-sel">Filter meeting:</label>
+        <select id="meeting-sel">
+          <option value="all">All meetings ({n_races} races)</option>
+          {''.join(f'<option value="{m}">{html.escape(m)}</option>' for m in meetings_list)}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- Row 1: Hit Rate + Quadrants -->
+    <div class="cards-row two">
+      <div class="card">
+        <div class="card-title">Hit Rate</div>
+        <div class="stat-row"><span class="stat-label">Top pick won (model)</span><span class="stat-val" id="s-model-correct"></span></div>
+        <div class="stat-row"><span class="stat-label">Top pick won (SP)</span><span class="stat-val" id="s-sp-correct"></span></div>
+        <div class="stat-row"><span class="stat-label">Top 3 contained winner</span><span class="stat-val" id="s-top3"></span></div>
+        <div class="stat-row"><span class="stat-label">Winner was model 2nd</span><span class="stat-val" id="s-rank2"></span></div>
+        <div class="stat-row"><span class="stat-label">Winner was model 3rd</span><span class="stat-val" id="s-rank3"></span></div>
+        <div class="stat-row"><span class="stat-label">Winner was model 4th+</span><span class="stat-val red" id="s-rank4plus"></span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Failure Quadrants</div>
+        <div class="quad-grid">
+          <div class="quad both-right">
+            <div class="q-val" id="q-both-correct"></div>
+            <div class="q-pct" id="q-both-correct-pct"></div>
+            <div class="q-label">Both right</div>
+          </div>
+          <div class="quad model-edge">
+            <div class="q-val" id="q-model-edge"></div>
+            <div class="q-pct" id="q-model-edge-pct"></div>
+            <div class="q-label">Model edge</div>
+          </div>
+          <div class="quad model-fail">
+            <div class="q-val" id="q-sp-failure"></div>
+            <div class="q-pct" id="q-sp-failure-pct"></div>
+            <div class="q-label">Model failure</div>
+          </div>
+          <div class="quad both-wrong">
+            <div class="q-val" id="q-both-wrong"></div>
+            <div class="q-pct" id="q-both-wrong-pct"></div>
+            <div class="q-label">Both wrong</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: S1 vs S2 breakdown -->
+    <div class="cards-row three">
+      <div class="card">
+        <div class="card-title">S1 vs S2 on Failures</div>
+        <div class="stat-row"><span class="stat-label"></span><span class="stat-label" style="font-weight:700">Top pick &nbsp;&nbsp; Winner</span></div>
+        <div class="stat-row"><span class="stat-label">Avg S1 score</span><span class="stat-val" id="s-s1-compare"></span></div>
+        <div class="stat-row"><span class="stat-label">Avg S2 score</span><span class="stat-val" id="s-s2-compare"></span></div>
+        <div class="stat-row"><span class="stat-label">Avg total score</span><span class="stat-val" id="s-tot-compare"></span></div>
+        <div class="stat-row"><span class="stat-label">Avg winner model rank</span><span class="stat-val" id="s-avg-rank"></span></div>
+        <div class="stat-row"><span class="stat-label">S2 changed top pick</span><span class="stat-val" id="s-s2-swung"></span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Flagged Patterns</div>
+        <div class="stat-row"><span class="stat-label">SP knew, model didn't (rank 4+)</span><span class="stat-val red" id="s-sp-knew"></span></div>
+        <div class="stat-row"><span class="stat-label">Map override placed top 3</span><span class="stat-val amber" id="s-map-override"></span></div>
+        <div class="stat-row"><span class="stat-label">Big miss (winner rank 5+)</span><span class="stat-val red" id="s-big-miss"></span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Score Distribution</div>
+        <div class="stat-row"><span class="stat-label">Total races</span><span class="stat-val" id="s-total-races"></span></div>
+        <div class="stat-row"><span class="stat-label">Model correct</span><span class="stat-val green" id="s-model-pct"></span></div>
+        <div class="stat-row"><span class="stat-label">SP correct</span><span class="stat-val" id="s-sp-pct"></span></div>
+        <div class="stat-row"><span class="stat-label">Model vs SP gap</span><span class="stat-val" id="s-gap"></span></div>
+      </div>
+    </div>
+
+    <!-- Section 4: Per-Race Detail -->
+    <div class="section-header">
+      <div class="section-title">Per-Race Detail</div>
+      <div class="section-count" id="detail-count"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="detail-table">
+        <thead><tr>
+          <th>Meeting</th><th class="num">R</th>
+          <th>Winner</th><th class="num">SP$</th>
+          <th class="num">Mdl#</th><th class="num">SP#</th>
+          <th>Model top 3</th>
+          <th class="num">W.S1</th><th class="num">W.S2</th>
+        </tr></thead>
+        <tbody id="detail-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Section 5: SP Knew, Model Didn't -->
+    <div class="section-header">
+      <div class="section-title">SP Knew, Model Didn't</div>
+      <div class="section-count" id="sp-knew-count"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="sp-knew-table">
+        <thead><tr>
+          <th>Meeting</th><th class="num">R</th>
+          <th>Winner</th>
+          <th class="num">Mdl#</th><th class="num">SP#</th>
+          <th class="num">Model$</th><th class="num">SP$</th>
+          <th class="num">nr_grade_delta</th>
+          <th class="num">sp_class_ceil</th>
+        </tr></thead>
+        <tbody id="sp-knew-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Section 6: Map Overrides -->
+    <div class="section-header">
+      <div class="section-title">Map Override Opportunities</div>
+      <div class="section-count" id="map-count"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="map-table">
+        <thead><tr>
+          <th>Meeting</th><th class="num">R</th>
+          <th>Best-map horse</th>
+          <th class="num">Mdl#</th><th class="num">SP#</th><th class="num">Finish</th>
+          <th class="num">Map score</th>
+          <th>Winner</th><th class="num">Winner map</th>
+        </tr></thead>
+        <tbody id="map-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Section 7: Biggest Misses -->
+    <div class="section-header">
+      <div class="section-title">Biggest Model Misses</div>
+      <div class="section-count" id="miss-count"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="miss-table">
+        <thead><tr>
+          <th>Meeting</th><th class="num">R</th>
+          <th>Winner</th>
+          <th class="num">Mdl#</th><th class="num">SP#</th>
+          <th class="num">Model$</th><th class="num">SP$</th>
+          <th class="num">S1</th><th class="num">S2</th>
+          <th class="num">nr_grade_delta</th><th class="num">NR ceil</th>
+        </tr></thead>
+        <tbody id="miss-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="footer">Generated {html.escape(generated_at)}</div>
+  </div>
+
+<script>
+const DATA = {data_json};
+
+function fmt(v, decimals, prefix) {{
+  if (v === null || v === undefined) return '<span style="color:#94a3b8">n/a</span>';
+  const s = (v >= 0 && prefix ? '+' : '') + v.toFixed(decimals);
+  return s;
+}}
+function fmtOdds(v) {{
+  return v ? '$' + v.toFixed(2) : '<span style="color:#94a3b8">n/a</span>';
+}}
+function pct(n, total) {{
+  return total ? (n / total * 100).toFixed(1) + '%' : '—';
+}}
+function el(id) {{ return document.getElementById(id); }}
+
+function updateSummary(stats) {{
+  const n = stats.total_races || 0;
+  el('s-total-races').textContent = n;
+  el('s-model-correct').textContent = stats.model_correct + '/' + n + ' (' + pct(stats.model_correct, n) + ')';
+  el('s-sp-correct').textContent    = stats.sp_correct + '/' + n + ' (' + pct(stats.sp_correct, n) + ')';
+  el('s-top3').textContent          = stats.top3_hit + '/' + n + ' (' + pct(stats.top3_hit, n) + ')';
+  el('s-rank2').textContent         = stats.rank2 + '/' + n;
+  el('s-rank3').textContent         = stats.rank3 + '/' + n;
+  el('s-rank4plus').textContent     = stats.rank4plus + '/' + n;
+
+  el('q-both-correct').textContent     = stats.both_correct;
+  el('q-both-correct-pct').textContent = pct(stats.both_correct, n);
+  el('q-model-edge').textContent       = stats.model_edge;
+  el('q-model-edge-pct').textContent   = pct(stats.model_edge, n);
+  el('q-sp-failure').textContent       = stats.sp_failure;
+  el('q-sp-failure-pct').textContent   = pct(stats.sp_failure, n);
+  el('q-both-wrong').textContent       = stats.both_wrong;
+  el('q-both-wrong-pct').textContent   = pct(stats.both_wrong, n);
+
+  const f = n => n !== null && n !== undefined ? n.toFixed(3) : 'n/a';
+  el('s-s1-compare').innerHTML  = f(stats.avg_top_s1) + ' &nbsp; ' + f(stats.avg_win_s1);
+  el('s-s2-compare').innerHTML  = f(stats.avg_top_s2) + ' &nbsp; ' + f(stats.avg_win_s2);
+  el('s-tot-compare').innerHTML = f(stats.avg_top_tot) + ' &nbsp; ' + f(stats.avg_win_tot);
+  el('s-avg-rank').textContent  = stats.avg_winner_rank !== null ? stats.avg_winner_rank.toFixed(1) : 'n/a';
+  el('s-s2-swung').textContent  = stats.s2_swung + ' races';
+
+  el('s-sp-knew').textContent   = stats.sp_knew_count + ' races';
+  el('s-map-override').textContent = '—'; // recomputed below after filtering
+  el('s-big-miss').textContent  = stats.big_miss_count + ' races';
+
+  const modelPct = n ? (stats.model_correct / n * 100).toFixed(1) : '—';
+  const spPct    = n ? (stats.sp_correct    / n * 100).toFixed(1) : '—';
+  el('s-model-pct').textContent = modelPct + '%';
+  el('s-sp-pct').textContent    = spPct + '%';
+  const gap = n ? ((stats.model_correct - stats.sp_correct) / n * 100).toFixed(1) : '—';
+  el('s-gap').textContent = (parseFloat(gap) >= 0 ? '+' : '') + gap + '%';
+  el('s-gap').className = 'stat-val ' + (parseFloat(gap) >= 0 ? 'green' : 'red');
+}}
+
+function buildDetailRows(races) {{
+  return races.map(r => {{
+    const cls = r.model_correct ? 'model-win' : 'model-loss';
+    const badge = r.model_correct
+      ? '<span class="badge win">WIN</span>'
+      : '<span class="badge loss">LOSS</span>';
+    const top3 = [r.model_top1, r.model_top2, r.model_top3].filter(Boolean)
+      .map(n => n.length > 12 ? n.slice(0,12) : n).join(', ');
+    const sp = r.winner_sp ? '$' + r.winner_sp.toFixed(2) : 'n/a';
+    return `<tr class="${{cls}}" data-meeting="${{r.meeting}}">
+      <td>${{r.meeting}}</td><td class="num">${{r.race}}</td>
+      <td>${{r.winner}} ${{badge}}</td>
+      <td class="num">${{sp}}</td>
+      <td class="num">${{r.winner_model_rank ?? '?'}}</td>
+      <td class="num">${{r.winner_sp_rank ?? '?'}}</td>
+      <td style="font-size:11px;color:var(--secondary)">${{top3}}</td>
+      <td class="num">${{fmt(r.winner_s1, 2, true)}}</td>
+      <td class="num">${{fmt(r.winner_s2, 2, true)}}</td>
+    </tr>`;
+  }}).join('');
+}}
+
+function buildSpKnewRows(races) {{
+  const rows = races.filter(r => r.is_sp_knew);
+  return rows.map(r => {{
+    return `<tr data-meeting="${{r.meeting}}">
+      <td>${{r.meeting}}</td><td class="num">${{r.race}}</td>
+      <td>${{r.winner}}</td>
+      <td class="num" style="color:var(--red);font-weight:700">${{r.winner_model_rank ?? '?'}}</td>
+      <td class="num">${{r.winner_sp_rank ?? '?'}}</td>
+      <td class="num">${{fmtOdds(r.winner_model_odds)}}</td>
+      <td class="num">${{r.winner_sp ? '$' + r.winner_sp.toFixed(2) : 'n/a'}}</td>
+      <td class="num">${{fmt(r.winner_nr_grade_delta, 1, true)}}</td>
+      <td class="num">${{fmt(r.winner_sp_class_ceiling, 3, true)}}</td>
+    </tr>`;
+  }}).join('') || '<tr><td colspan="9" class="no-data">No SP-knew failures in this selection.</td></tr>';
+}}
+
+function buildMapRows(mapRows) {{
+  return mapRows.map(r => {{
+    return `<tr data-meeting="${{r.meeting}}">
+      <td>${{r.meeting}}</td><td class="num">${{r.race}}</td>
+      <td style="font-weight:600">${{r.bm_horse}}</td>
+      <td class="num">${{r.bm_model_rank ?? '?'}}</td>
+      <td class="num">${{r.bm_sp_rank ?? '?'}}</td>
+      <td class="num">${{r.bm_finish}}</td>
+      <td class="num">${{fmt(r.bm_map, 2, false)}}</td>
+      <td>${{r.winner}}</td>
+      <td class="num">${{fmt(r.winner_map, 2, false)}}</td>
+    </tr>`;
+  }}).join('') || '<tr><td colspan="9" class="no-data">No map override opportunities in this selection.</td></tr>';
+}}
+
+function buildMissRows(races) {{
+  const rows = races.filter(r => (r.winner_model_rank || 0) >= 5)
+    .sort((a, b) => (b.winner_model_rank || 0) - (a.winner_model_rank || 0));
+  return rows.map(r => {{
+    return `<tr data-meeting="${{r.meeting}}">
+      <td>${{r.meeting}}</td><td class="num">${{r.race}}</td>
+      <td>${{r.winner}}</td>
+      <td class="num" style="color:var(--red);font-weight:700">${{r.winner_model_rank ?? '?'}}</td>
+      <td class="num">${{r.winner_sp_rank ?? '?'}}</td>
+      <td class="num">${{fmtOdds(r.winner_model_odds)}}</td>
+      <td class="num">${{r.winner_sp ? '$' + r.winner_sp.toFixed(2) : 'n/a'}}</td>
+      <td class="num">${{fmt(r.winner_s1, 3, true)}}</td>
+      <td class="num">${{fmt(r.winner_s2, 3, true)}}</td>
+      <td class="num">${{fmt(r.winner_nr_grade_delta, 1, true)}}</td>
+      <td class="num">${{r.winner_race_nr_ceiling !== null && r.winner_race_nr_ceiling !== undefined ? r.winner_race_nr_ceiling : '<span style="color:#94a3b8">n/a</span>'}}</td>
+    </tr>`;
+  }}).join('') || '<tr><td colspan="11" class="no-data">No big misses in this selection.</td></tr>';
+}}
+
+function render(meeting) {{
+  const isAll = meeting === 'all';
+  const stats = isAll ? DATA.global : (DATA.by_meeting[meeting] || {{}});
+  updateSummary(stats);
+
+  const races   = isAll ? DATA.races       : DATA.races.filter(r => r.meeting === meeting);
+  const mapData = isAll ? DATA.map_overrides : DATA.map_overrides.filter(r => r.meeting === meeting);
+
+  el('detail-tbody').innerHTML = buildDetailRows(races);
+  el('detail-count').textContent = races.length + ' races';
+
+  const spKnew = races.filter(r => r.is_sp_knew);
+  el('sp-knew-tbody').innerHTML = buildSpKnewRows(races);
+  el('sp-knew-count').textContent = spKnew.length + ' races';
+
+  el('map-tbody').innerHTML = buildMapRows(mapData);
+  el('map-count').textContent = mapData.length + ' races';
+  el('s-map-override').textContent = mapData.length + ' races';
+
+  const misses = races.filter(r => (r.winner_model_rank || 0) >= 5);
+  el('miss-tbody').innerHTML = buildMissRows(races);
+  el('miss-count').textContent = misses.length + ' races';
+}}
+
+document.getElementById('meeting-sel').addEventListener('change', e => render(e.target.value));
+render('all');
+</script>
+</body>
+</html>"""

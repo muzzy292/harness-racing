@@ -35,7 +35,7 @@ from .odds import (
     score_race_rows,
     write_scored_rows_csv,
 )
-from .web import build_betting_site, build_meeting_site, build_stats_site, publish_scored_meeting, republish_all_meetings, serve_site
+from .web import build_betting_site, build_diagnose_site, build_meeting_site, build_stats_site, publish_scored_meeting, republish_all_meetings, serve_site
 
 
 _DEFAULT_WEIGHTS_PATH = Path("weights.json")
@@ -517,6 +517,12 @@ def main() -> None:
     diagnose_parser.add_argument("--out", default=None, help="Write per-horse diagnostic CSV to this path")
     diagnose_parser.add_argument("--weights", default=None, help="Path to weights JSON file (default: weights.json if it exists)")
 
+    build_diagnose_parser = subparsers.add_parser("build-diagnose-site", help="Build the per-race diagnostic truth-set page (diagnose.html)")
+    build_diagnose_parser.add_argument("--db", default="data/harness.db")
+    build_diagnose_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    build_diagnose_parser.add_argument("--out", default="docs", help="Output directory (default: docs)")
+    build_diagnose_parser.add_argument("--weights", default=None, help="Path to weights JSON file")
+
     build_betting_parser = subparsers.add_parser("build-betting-site", help="Build fractional-Kelly bankroll backtest page from scored meetings vs stored results")
     build_betting_parser.add_argument("--db", default="data/harness.db")
     build_betting_parser.add_argument("--csv", default="data/features/runner_features.csv")
@@ -841,6 +847,10 @@ def main() -> None:
         _print_diagnose_report(race_groups, out_path=args.out)
     elif args.command == "build-betting-site":
         build_betting_site(args.db, args.csv, args.out, starting_bankroll=args.starting_bankroll)
+    elif args.command == "build-diagnose-site":
+        weights = _resolve_weights(getattr(args, "weights", None))
+        page_path = build_diagnose_site(args.csv, args.db, args.out, weights=weights)
+        print(f"Built diagnostic page at {page_path}")
     elif args.command == "calibrate-nr-factor":
         from .features import _NR_MARGIN_FACTOR
         r = calibrate_nr_factor(args.db)
