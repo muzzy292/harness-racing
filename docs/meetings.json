@@ -222,5 +222,12 @@
     "meeting_date": "22 Apr 2026",
     "races": 7,
     "winners": 0
+  },
+  {
+    "meeting_code": "PE230426",
+    "track_name": "Penrith",
+    "meeting_date": "23 Apr 2026",
+    "races": 8,
+    "winners": 0
   }
 ]
