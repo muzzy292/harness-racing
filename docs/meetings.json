@@ -18,7 +18,7 @@
     "track_name": "Wagga",
     "meeting_date": "4 Apr 2026",
     "races": 9,
-    "winners": 7
+    "winners": 6
   },
   {
     "meeting_code": "PK040426",
@@ -137,7 +137,7 @@
     "track_name": "Leeton",
     "meeting_date": "14 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "BH150426",
@@ -179,7 +179,7 @@
     "track_name": "Parkes",
     "meeting_date": "17 Apr 2026",
     "races": 9,
-    "winners": 2
+    "winners": 1
   },
   {
     "meeting_code": "PC180426",
@@ -228,7 +228,7 @@
     "track_name": "Penrith",
     "meeting_date": "23 Apr 2026",
     "races": 8,
-    "winners": 0
+    "winners": 2
   },
   {
     "meeting_code": "EY240426",
