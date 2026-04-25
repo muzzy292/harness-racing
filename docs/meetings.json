@@ -186,7 +186,7 @@
     "track_name": "Menangle",
     "meeting_date": "18 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "CL190426",
@@ -235,21 +235,21 @@
     "track_name": "Wagga",
     "meeting_date": "24 Apr 2026",
     "races": 7,
-    "winners": 0
+    "winners": 2
   },
   {
     "meeting_code": "PK240426",
     "track_name": "Parkes",
     "meeting_date": "24 Apr 2026",
     "races": 8,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "NR240426",
     "track_name": "Newcastle",
     "meeting_date": "24 Apr 2026",
     "races": 8,
-    "winners": 0
+    "winners": 3
   },
   {
     "meeting_code": "PC250426",
