@@ -271,5 +271,12 @@
     "meeting_date": "26 Apr 2026",
     "races": 9,
     "winners": 4
+  },
+  {
+    "meeting_code": "LM270426",
+    "track_name": "Goulburn",
+    "meeting_date": "27 Apr 2026",
+    "races": 8,
+    "winners": 0
   }
 ]
