@@ -68,8 +68,8 @@ Historical form — independent of today's race conditions.
 | top3_rate | 0.6 | last 5 top-3 finish rate |
 | competitive_rate | 0.5 | last 5 runs within 3m of winner |
 | career_win_rate | 0.6 | career win rate vs 12% centre |
-| nr | 0.25 | NR rating vs centre of 45 |
-| class_pos | 0.15 | NR headroom from race ceiling |
+| nr | 0.70 | NR rating vs centre of 45 |
+| class_pos | 0.30 | NR headroom from race ceiling |
 | stake_class | 0.2 | avg recent stake (outlier-capped) |
 | class_delta | 0.3 | race purse vs avg recent run purse |
 
@@ -89,7 +89,7 @@ Race-day factors — barrier, map, distance suitability, fitness.
 | fitness | graduated | 15-28d: -0.35, 29-42d: -0.60, 43-84d: -0.85, 85-99d: -1.10, 100-119d: -1.45, 120-149d: -1.70, 150+d: -2.00 |
 | dist_strike_rate | 0.9 | penalty-only: win rate at distance vs career avg — penalises poor distance record, no boost for good (confidence-scaled, full weight ≥15 starts) |
 | driver_form | 0.6 | manual +1/0/−1 input via web UI button (no scraping) |
-| nr_grade_delta | 0.4 | today's NR ceiling vs avg of last 5 runs (negative = dropping in grade) |
+| nr_grade_delta | 1.4 | today's NR ceiling vs avg of last 5 runs (negative = dropping in grade) |
 
 ### Stage 3: Market Calibration
 - Softmax (temperature 2.75) converts scores to probabilities
