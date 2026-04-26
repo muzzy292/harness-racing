@@ -299,6 +299,62 @@ def _build_feature_row(
         ceiling_support_rate = None
         ceiling_best_run_index = None
 
+    # --- Last win ceiling extension ---
+    # Extend the ceiling beyond the 6-run form-line window by checking horse_runs
+    # for the most recent win. If that win class-adjusts to a better (more negative)
+    # margin than the recent-line ceiling, it becomes the ceiling value.
+    # NR ceiling is estimated via _no_nr_proxy(stake) since horse_runs has no
+    # line_nr_ceiling column — same fallback used for no-NR recent lines.
+    # ceiling_support_rate is intentionally NOT updated: it measures consistency
+    # in recent runs; the win's staleness discount is handled by ceiling_best_run_index.
+    last_win_class_adj_margin: float | None = None
+    last_win_run_index: int | None = None
+    if _class_ref_nr is not None and runner.get("horse_id"):
+        _last_win_row = conn.execute(
+            """
+            SELECT adjusted_margin, margin, stake, run_date
+            FROM horse_runs
+            WHERE horse_id = ?
+              AND finish_position = 1
+              AND COALESCE(race_type, 'RACE') <> 'TRIAL'
+              AND COALESCE(null_run, 0) = 0
+              AND (adjusted_margin IS NOT NULL OR margin IS NOT NULL)
+            ORDER BY _sort_run_date(run_date) DESC
+            LIMIT 1
+            """,
+            (runner["horse_id"],),
+        ).fetchone()
+        if _last_win_row:
+            # Winning margin is stored as positive (e.g. won by 3.2m → adjusted_margin=3.2).
+            # Negate to match the class_adj_recent_margins_raw convention where negative =
+            # closer to / ahead of the leader (i.e. better performance).
+            _win_margin = float(_last_win_row["adjusted_margin"] or _last_win_row["margin"])
+            _win_class_adj = -_win_margin
+            # Class-adjust using purse proxy — winning in a tougher grade is more impressive.
+            _win_proxy = _no_nr_proxy(_last_win_row["stake"], None)
+            if _win_proxy is not None:
+                _win_nr, _win_reliability = _win_proxy
+                _win_class_adj -= (_win_nr - _class_ref_nr) * _NR_MARGIN_FACTOR * _win_reliability
+            last_win_class_adj_margin = round(_win_class_adj, 4)
+            # Find how many starts back this win was in the full career sequence.
+            _all_run_dates = [
+                r["run_date"] for r in conn.execute(
+                    """
+                    SELECT run_date FROM horse_runs
+                    WHERE horse_id = ?
+                      AND COALESCE(race_type, 'RACE') <> 'TRIAL'
+                    ORDER BY _sort_run_date(run_date) DESC
+                    """,
+                    (runner["horse_id"],),
+                ).fetchall()
+            ]
+            _win_date = _last_win_row["run_date"]
+            last_win_run_index = _all_run_dates.index(_win_date) if _win_date in _all_run_dates else None
+            # Update ceiling if the win is the best run seen.
+            _current_ceiling = min(_ceiling_margins) if _ceiling_margins else None
+            if _current_ceiling is None or _win_class_adj < _current_ceiling:
+                ceiling_best_run_index = last_win_run_index
+
     raw_run_purses = [line["run_purse"] for line in recent_lines if line.get("run_purse") is not None]
     capped_run_purses = _cap_outlier_stakes([float(p) for p in raw_run_purses])
     avg_recent_run_purse = _avg(capped_run_purses[:5])
@@ -518,9 +574,26 @@ def _build_feature_row(
         "avg_recent_nr_ceiling": avg_recent_nr_ceiling,
         "nr_grade_delta": nr_grade_delta,
         "recent_line_avg_class_adj_margin": _avg(class_adj_recent_margins) if (len(class_adj_recent_margins) >= 2 and _class_adj_nr_count >= 1) else None,
-        "recent_line_best_class_adj_margin": min(class_adj_recent_margins_raw) if (_class_adj_nr_count >= 1 and class_adj_recent_margins_raw) else None,
+        "recent_line_best_class_adj_margin": (
+            # Take the better (more negative) of: recent form line ceiling vs last win.
+            # Both are class-adjusted to today's grade so they're directly comparable.
+            min(
+                x for x in (
+                    min(class_adj_recent_margins_raw) if (_class_adj_nr_count >= 1 and class_adj_recent_margins_raw) else None,
+                    last_win_class_adj_margin,
+                )
+                if x is not None
+            )
+            if any(x is not None for x in (
+                min(class_adj_recent_margins_raw) if (_class_adj_nr_count >= 1 and class_adj_recent_margins_raw) else None,
+                last_win_class_adj_margin,
+            ))
+            else None
+        ),
         "ceiling_support_rate": ceiling_support_rate,
         "ceiling_best_run_index": ceiling_best_run_index,
+        "last_win_run_index": last_win_run_index,
+        "last_win_class_adj_margin": last_win_class_adj_margin,
         "race_purse": race_purse,
         "avg_recent_run_purse": avg_recent_run_purse,
         "class_delta": class_delta,
