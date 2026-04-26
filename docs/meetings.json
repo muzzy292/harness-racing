@@ -257,5 +257,12 @@
     "meeting_date": "25 Apr 2026",
     "races": 9,
     "winners": 0
+  },
+  {
+    "meeting_code": "FB260426",
+    "track_name": "Forbes",
+    "meeting_date": "26 Apr 2026",
+    "races": 9,
+    "winners": 0
   }
 ]
