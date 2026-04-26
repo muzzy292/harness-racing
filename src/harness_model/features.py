@@ -312,7 +312,7 @@ def _build_feature_row(
     if _class_ref_nr is not None and runner.get("horse_id"):
         _last_win_row = conn.execute(
             """
-            SELECT adjusted_margin, margin, stake, run_date
+            SELECT adjusted_margin, margin, stake, run_date, track_code
             FROM horse_runs
             WHERE horse_id = ?
               AND finish_position = 1
@@ -332,11 +332,29 @@ def _build_feature_row(
             # Negate so the ceiling follows the convention where negative = better.
             _win_margin = float(_last_win_row["margin"] if _last_win_row["margin"] is not None else (_last_win_row["adjusted_margin"] or 0.0))
             _win_class_adj = -_win_margin
-            # Class-adjust using purse proxy — winning in a tougher grade is more impressive.
-            _win_proxy = _no_nr_proxy(_last_win_row["stake"], None)
-            if _win_proxy is not None:
-                _win_nr, _win_reliability = _win_proxy
-                _win_class_adj -= (_win_nr - _class_ref_nr) * _NR_MARGIN_FACTOR * _win_reliability
+            # Class-adjust using the actual NR ceiling from runner_recent_lines when available
+            # (horse_runs has no line_nr_ceiling column). Only fall back to _no_nr_proxy for
+            # genuine no-NR races — the proxy is too coarse for NR races.
+            _win_nr_row = conn.execute(
+                """
+                SELECT line_nr_ceiling FROM runner_recent_lines
+                WHERE horse_id = ?
+                  AND run_date = ?
+                  AND track_code = ?
+                  AND finish_position = 1
+                  AND line_nr_ceiling IS NOT NULL
+                LIMIT 1
+                """,
+                (runner["horse_id"], _last_win_row["run_date"], _last_win_row["track_code"]),
+            ).fetchone()
+            if _win_nr_row is not None:
+                _win_nr = float(_win_nr_row["line_nr_ceiling"])
+                _win_class_adj -= (_win_nr - _class_ref_nr) * _NR_MARGIN_FACTOR
+            else:
+                _win_proxy = _no_nr_proxy(_last_win_row["stake"], None)
+                if _win_proxy is not None:
+                    _win_nr, _win_reliability = _win_proxy
+                    _win_class_adj -= (_win_nr - _class_ref_nr) * _NR_MARGIN_FACTOR * _win_reliability
             last_win_class_adj_margin = round(_win_class_adj, 4)
             # Find how many starts back this win was in the full career sequence.
             _all_run_dates = [
