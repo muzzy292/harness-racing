@@ -318,7 +318,7 @@ def _build_feature_row(
               AND finish_position = 1
               AND COALESCE(race_type, 'RACE') <> 'TRIAL'
               AND COALESCE(null_run, 0) = 0
-              AND (adjusted_margin IS NOT NULL OR margin IS NOT NULL)
+              AND margin IS NOT NULL
               AND _sort_run_date(run_date) < _sort_run_date(?)
             ORDER BY _sort_run_date(run_date) DESC
             LIMIT 1
@@ -326,10 +326,11 @@ def _build_feature_row(
             (runner["horse_id"], runner.get("meeting_date")),
         ).fetchone()
         if _last_win_row:
-            # Winning margin is stored as positive (e.g. won by 3.2m → adjusted_margin=3.2).
-            # Negate to match the class_adj_recent_margins_raw convention where negative =
-            # closer to / ahead of the leader (i.e. better performance).
-            _win_margin = float(_last_win_row["adjusted_margin"] or _last_win_row["margin"])
+            # Use raw margin (not adjusted_margin) for the ceiling — trip quality adjustments
+            # belong in consistency, not in peak-ability measurement. horse_runs.margin stores
+            # the physical winning margin as positive (e.g. won by 3.2m → margin=3.2).
+            # Negate so the ceiling follows the convention where negative = better.
+            _win_margin = float(_last_win_row["margin"] if _last_win_row["margin"] is not None else (_last_win_row["adjusted_margin"] or 0.0))
             _win_class_adj = -_win_margin
             # Class-adjust using purse proxy — winning in a tougher grade is more impressive.
             _win_proxy = _no_nr_proxy(_last_win_row["stake"], None)

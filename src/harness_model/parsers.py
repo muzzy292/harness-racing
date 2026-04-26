@@ -1193,6 +1193,15 @@ def _parse_form_place(value: str) -> int | None:
 def _parse_recent_line_margin(value: str, finish_position: int | None) -> float | None:
     plain = _clean_spaces(value).lower()
     if finish_position == 1:
+        # Parse the winning margin from the line text. Format: "$SP[, fav], X.Xm, Y.Ym, 2nd HORSE"
+        # Store as negative so the class_adj formula (lower = better) treats dominant wins correctly.
+        # e.g. won by 20.1m → -20.1; photo finish or unparseable → 0.0
+        _win_match = re.search(r"\$[\d]+(?:\.\d+)?(?:\s+fav)?,\s*([\d.]+)m\b", plain)
+        if _win_match:
+            return -float(_win_match.group(1))
+        _win_hd = re.search(r"\$[\d]+(?:\.\d+)?(?:\s+fav)?,\s*(shfhd|hfhd|sh|hd)\b", plain)
+        if _win_hd:
+            return -0.05 if _win_hd.group(1) == "shfhd" else -0.1
         return 0.0
     # Explicit numeric margin: "btn 9.9m"
     match = re.search(r"btn\s+([\d\.]+)m", plain)

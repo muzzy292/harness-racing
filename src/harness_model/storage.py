@@ -482,6 +482,14 @@ def sync_runner_recent_lines_to_horse_runs(conn: sqlite3.Connection, runners: li
                 continue
             race_name = f"FORM:{line.track_name or line.track_code or 'UNK'}:{norm_date or 'UNK'}"
             distance_code = str(line.distance or "")
+            # runner_recent_lines stores winner margins as negative (won by Xm → -X).
+            # horse_runs convention is positive winning margin (consistent with profile-
+            # sourced runs). Flip sign for wins so ceiling code can negate uniformly.
+            _hr_margin = (
+                -line.raw_margin
+                if (line.finish_position == 1 and line.raw_margin is not None and line.raw_margin < 0)
+                else line.raw_margin
+            )
             synced_rows.append(
                 (
                     runner.horse_id,
@@ -489,7 +497,7 @@ def sync_runner_recent_lines_to_horse_runs(conn: sqlite3.Connection, runners: li
                     line.track_code,
                     line.finish_position,
                     None,
-                    line.raw_margin,
+                    _hr_margin,
                     line.mile_rate,
                     None,
                     None,
