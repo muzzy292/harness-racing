@@ -264,5 +264,12 @@
     "meeting_date": "26 Apr 2026",
     "races": 9,
     "winners": 0
+  },
+  {
+    "meeting_code": "CL260426",
+    "track_name": "Coolamon",
+    "meeting_date": "26 Apr 2026",
+    "races": 9,
+    "winners": 0
   }
 ]
