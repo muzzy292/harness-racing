@@ -319,10 +319,11 @@ def _build_feature_row(
               AND COALESCE(race_type, 'RACE') <> 'TRIAL'
               AND COALESCE(null_run, 0) = 0
               AND (adjusted_margin IS NOT NULL OR margin IS NOT NULL)
+              AND _sort_run_date(run_date) < _sort_run_date(?)
             ORDER BY _sort_run_date(run_date) DESC
             LIMIT 1
             """,
-            (runner["horse_id"],),
+            (runner["horse_id"], runner.get("meeting_date")),
         ).fetchone()
         if _last_win_row:
             # Winning margin is stored as positive (e.g. won by 3.2m → adjusted_margin=3.2).
@@ -343,9 +344,10 @@ def _build_feature_row(
                     SELECT run_date FROM horse_runs
                     WHERE horse_id = ?
                       AND COALESCE(race_type, 'RACE') <> 'TRIAL'
+                      AND _sort_run_date(run_date) < _sort_run_date(?)
                     ORDER BY _sort_run_date(run_date) DESC
                     """,
-                    (runner["horse_id"],),
+                    (runner["horse_id"], runner.get("meeting_date")),
                 ).fetchall()
             ]
             _win_date = _last_win_row["run_date"]
