@@ -470,21 +470,22 @@ def sync_runner_recent_lines_to_horse_runs(conn: sqlite3.Connection, runners: li
         # Matching on (run_date, track_code) is sufficient — a horse cannot race
         # twice at the same track on the same day.
         existing_keys = {
-            (row["run_date"], row["track_code"])
+            (_normalize_run_date(row["run_date"]) if row["run_date"] else row["run_date"], row["track_code"])
             for row in conn.execute(
                 "SELECT run_date, track_code FROM horse_runs WHERE horse_id = ?",
                 (runner.horse_id,),
             ).fetchall()
         }
         for line in runner.recent_lines:
-            if (line.run_date, line.track_code) in existing_keys:
+            norm_date = _normalize_run_date(line.run_date) if line.run_date else line.run_date
+            if (norm_date, line.track_code) in existing_keys:
                 continue
-            race_name = f"FORM:{line.track_name or line.track_code or 'UNK'}:{line.run_date or 'UNK'}"
+            race_name = f"FORM:{line.track_name or line.track_code or 'UNK'}:{norm_date or 'UNK'}"
             distance_code = str(line.distance or "")
             synced_rows.append(
                 (
                     runner.horse_id,
-                    line.run_date,
+                    norm_date,
                     line.track_code,
                     line.finish_position,
                     None,
@@ -596,7 +597,7 @@ def upsert_horse_profile(conn: sqlite3.Connection, profile: HorseProfile) -> Non
         [
             (
                 run.horse_id,
-                run.run_date,
+                _normalize_run_date(run.run_date) if run.run_date else run.run_date,
                 run.track_code,
                 run.finish_position,
                 run.barrier,
