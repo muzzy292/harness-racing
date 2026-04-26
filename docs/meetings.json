@@ -18,7 +18,7 @@
     "track_name": "Wagga",
     "meeting_date": "4 Apr 2026",
     "races": 9,
-    "winners": 6
+    "winners": 5
   },
   {
     "meeting_code": "PK040426",
@@ -39,21 +39,21 @@
     "track_name": "Menangle",
     "meeting_date": "7 Apr 2026",
     "races": 6,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "BH080426",
     "track_name": "Bathurst",
     "meeting_date": "8 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 2
   },
   {
     "meeting_code": "PE090426",
     "track_name": "Penrith",
     "meeting_date": "9 Apr 2026",
     "races": 8,
-    "winners": 6
+    "winners": 5
   },
   {
     "meeting_code": "YU100426",
@@ -74,14 +74,14 @@
     "track_name": "Dubbo",
     "meeting_date": "10 Apr 2026",
     "races": 6,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "PC110426",
     "track_name": "Menangle",
     "meeting_date": "11 Apr 2026",
     "races": 7,
-    "winners": 6
+    "winners": 5
   },
   {
     "meeting_code": "NA120426",
@@ -95,7 +95,7 @@
     "track_name": "Canberra",
     "meeting_date": "13 Apr 2026",
     "races": 9,
-    "winners": 6
+    "winners": 5
   },
   {
     "meeting_code": "LM300326",
@@ -123,7 +123,7 @@
     "track_name": "Penrith",
     "meeting_date": "2 Apr 2026",
     "races": 8,
-    "winners": 6
+    "winners": 4
   },
   {
     "meeting_code": "PC140426",
@@ -137,21 +137,21 @@
     "track_name": "Leeton",
     "meeting_date": "14 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "BH150426",
     "track_name": "Bathurst",
     "meeting_date": "15 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 0
   },
   {
     "meeting_code": "TA160426",
     "track_name": "Tamworth",
     "meeting_date": "16 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "PE160426",
@@ -172,14 +172,14 @@
     "track_name": "Newcastle",
     "meeting_date": "17 Apr 2026",
     "races": 8,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "PK170426",
     "track_name": "Parkes",
     "meeting_date": "17 Apr 2026",
     "races": 9,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "PC180426",
@@ -193,28 +193,28 @@
     "track_name": "Coolamon",
     "meeting_date": "19 Apr 2026",
     "races": 7,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "CB190426",
     "track_name": "Canberra",
     "meeting_date": "19 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "NR200426",
     "track_name": "Newcastle",
     "meeting_date": "20 Apr 2026",
     "races": 7,
-    "winners": 0
+    "winners": 2
   },
   {
     "meeting_code": "PC210426",
     "track_name": "Menangle",
     "meeting_date": "21 Apr 2026",
     "races": 5,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "BH220426",
@@ -228,7 +228,7 @@
     "track_name": "Penrith",
     "meeting_date": "23 Apr 2026",
     "races": 8,
-    "winners": 2
+    "winners": 1
   },
   {
     "meeting_code": "EY240426",
@@ -242,27 +242,27 @@
     "track_name": "Parkes",
     "meeting_date": "24 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 4
   },
   {
     "meeting_code": "NR240426",
     "track_name": "Newcastle",
     "meeting_date": "24 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "PC250426",
     "track_name": "Menangle",
     "meeting_date": "25 Apr 2026",
     "races": 9,
-    "winners": 0
+    "winners": 3
   },
   {
     "meeting_code": "FB260426",
     "track_name": "Forbes",
     "meeting_date": "26 Apr 2026",
-    "races": 9,
+    "races": 3,
     "winners": 0
   },
   {
@@ -270,6 +270,6 @@
     "track_name": "Coolamon",
     "meeting_date": "26 Apr 2026",
     "races": 9,
-    "winners": 0
+    "winners": 2
   }
 ]
