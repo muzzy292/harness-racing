@@ -400,6 +400,19 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
     _ceiling_recency = _recency_table.get(_ceiling_best_run_index, 0.68) if _ceiling_best_run_index is not None else 1.0
     ceiling_score = _raw_ceiling * _ceiling_reliability * _ceiling_recency * w.get("ceiling", 1.2)
 
+    # NR consistency gate: when a horse's average class-adjusted margin exceeds
+    # 15m, its NR rating no longer reflects current ability — it is consistently
+    # running far behind the level its rating suggests. Dampen the `nr` component
+    # proportionally so the stale rating doesn't anchor the model price.
+    # Formula: mult = max(0.2, 1 - (gap - 15) / 12)
+    #   at 15m: 1.0 (no dampening)   at 20m: ~0.58   at 27m+: 0.2 (floor)
+    # Developmental returns are exempt — their large 2yo margins are class noise,
+    # not evidence that the NR is stale.
+    if not _dev_return and consistency_adj is not None and consistency_adj > 15.0:
+        _nr_mult = max(0.2, 1.0 - (consistency_adj - 15.0) / 12.0)
+    else:
+        _nr_mult = 1.0
+
     return {
         # Developmental returns: consistency from 2yo form is suppressed — large
         # margins in elite 2yo races reflect competition level, not lack of ability.
@@ -432,7 +445,7 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         # finish is a real signal. Winless 2yo horses evaluate to 0.0 naturally.
         "top3_rate":     (top3_rate or 0.0) * w.get("top3_rate", 0.6),
         "competitive_rate": (competitive_rate or 0.0) * w.get("competitive_rate", 0.5),
-        "nr":          _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * w.get("nr", 0.25),
+        "nr":          _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * w.get("nr", 0.25) * _nr_mult,
         # Class signals — lower NR headroom = near top of grade; stake class and
         # class delta capture recent competition level vs today's race.
         "class_pos":   _neg_scale(nr_headroom, divisor=8.0, floor=-2.0, missing=0.0) * w.get("class_pos", 0.15),
