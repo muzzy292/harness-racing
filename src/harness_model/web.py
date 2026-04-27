@@ -1388,16 +1388,16 @@ def build_stats_site(
 
 _KELLY_FRACTION  = 0.25   # quarter-Kelly
 _MAX_BET_PCT     = 0.04   # never more than 4% of current bankroll
-_MIN_EDGE        = 0.10   # minimum 10% edge to bet
+# Odds-based edge bounds: only bet when market_odds / fair_odds is in [1.25, 2.0).
+# Backtest shows 25–100% odds-edge is the profitable zone; >=100% edge bets are
+# large model-vs-market disagreements that consistently lose.
+_MIN_ODDS_EDGE   = 0.25   # market must be at least 25% longer than fair odds
+_MAX_ODDS_EDGE   = 1.00   # cap: do not bet when market is 2× or more our fair odds
 
 
 def _kelly_stake_pct(model_prob: float, market_odds: float, fraction: float = _KELLY_FRACTION) -> float | None:
     """Fractional Kelly stake as a fraction of bankroll, or None if no bet."""
     if market_odds <= 1.0 or model_prob <= 0:
-        return None
-    market_prob = 1.0 / market_odds
-    edge = model_prob - market_prob
-    if edge < _MIN_EDGE:
         return None
     b = market_odds - 1.0
     full_kelly = (b * model_prob - (1.0 - model_prob)) / b
@@ -1494,6 +1494,19 @@ def _compute_bet_records(
                 market_odds = float(result["starting_price"])
                 finish_pos = result["finish_position"]
 
+                # Odds-based edge: how much longer is the market than our fair price?
+                fair_odds_raw = row.get("fair_odds")
+                if fair_odds_raw is None or float(fair_odds_raw) <= 1.0:
+                    continue
+                fair_odds = float(fair_odds_raw)
+                odds_edge = market_odds / fair_odds - 1.0
+
+                # Only bet in the 25–100% odds-edge window.
+                # Below 25%: insufficient value. Above 100%: extreme model-vs-market
+                # disagreement — consistently a false positive in backtesting.
+                if odds_edge < _MIN_ODDS_EDGE or odds_edge >= _MAX_ODDS_EDGE:
+                    continue
+
                 # Halve units once if bankroll drops 25% from start
                 if not unit_halved and bankroll < starting_bankroll * 0.75:
                     unit_halved = True
@@ -1508,8 +1521,8 @@ def _compute_bet_records(
                 profit = round(stake * (market_odds - 1), 2) if won else round(-stake, 2)
                 bankroll = round(bankroll + profit, 2)
 
-                edge_pct = (model_prob - 1.0 / market_odds) * 100
-                tier = "Max" if edge_pct >= 35 else "Standard" if edge_pct >= 20 else "Small"
+                edge_pct = odds_edge * 100
+                tier = "Strong" if edge_pct >= 50 else "Value"
                 meta = meeting_meta.get(mc, {})
                 fair_odds = row.get("fair_odds")
 
@@ -1660,9 +1673,8 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
     tr.bet-loss:hover {{ background:var(--highlight); }}
     .tier {{ display:inline-block; padding:2px 8px; border-radius:4px;
       font-size:11px; font-weight:700; text-transform:uppercase; }}
-    .tier-small    {{ background:#e0f2fe; color:#0369a1; }}
-    .tier-standard {{ background:#ecfdf5; color:#059669; }}
-    .tier-max      {{ background:#fef3c7; color:#b45309; }}
+    .tier-value    {{ background:#ecfdf5; color:#059669; }}
+    .tier-strong   {{ background:#fef3c7; color:#b45309; }}
     .footer {{ margin-top:40px; text-align:center; color:var(--secondary); font-size:13px; }}
   </style>
 </head>
@@ -1680,8 +1692,8 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
   <div class="wrap">
     <div class="summary-grid">{summary_html}</div>
     <div class="params">
-      <span><strong>Strategy:</strong> Quarter-Kelly (0.25×)</span>
-      <span><strong>Min Edge:</strong> 10%</span>
+      <span><strong>Strategy:</strong> Quarter-Kelly (0.25×) &middot; Edge filter: 25%–100% odds</span>
+      <span><strong>Edge window:</strong> 25%–100% odds</span>
       <span><strong>Max Bet:</strong> 4% of bank</span>
       <span><strong>Halve Units:</strong> if bank falls 25%</span>
       <span><strong>Tracks:</strong> All</span>
