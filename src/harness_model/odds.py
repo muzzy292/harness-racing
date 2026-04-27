@@ -420,17 +420,18 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         "market":      _neg_log_scale(avg_sp, missing=0.0) * market_wt,
         # win_rate reduced; supplemented by top3_rate and competitive_rate which
         # are less distorted by field quality and bad luck runs.
-        # Developmental returns: zeroed — 0 wins in elite 2yo fields is expected.
-        "win_rate":      0.0 if _dev_return else (win_rate or 0.0) * w.get("win_rate", 0.7),
+        # NOT suppressed for developmental returns: a 2yo win IS a real signal.
+        # For winless 2yo horses these are already 0.0 naturally.
+        "win_rate":      (win_rate or 0.0) * w.get("win_rate", 0.7),
         # Career win rate — centred at 12%, capped ±1.5, requires ≥5 starts.
         # Discounted by last-10 win rate when recent form diverges from career avg.
         # Developmental returns: zeroed — career win rate of 0% from 2yo starts
         # penalises horses for competing in top-tier age-restricted races.
         "career_win_rate": 0.0 if _dev_return else max(-1.5, min(1.5, _pos_scale(adjusted_career_win_rate, center=0.12, divisor=0.08, missing=0.0))) * w.get("career_win_rate", 0.6),
-        # Developmental returns: zeroed — no top-3 or competitive finishes in
-        # championship 2yo races is normal, not a signal of poor ability.
-        "top3_rate":     0.0 if _dev_return else (top3_rate or 0.0) * w.get("top3_rate", 0.6),
-        "competitive_rate": 0.0 if _dev_return else (competitive_rate or 0.0) * w.get("competitive_rate", 0.5),
+        # NOT suppressed for developmental returns: a 2yo top-3 or competitive
+        # finish is a real signal. Winless 2yo horses evaluate to 0.0 naturally.
+        "top3_rate":     (top3_rate or 0.0) * w.get("top3_rate", 0.6),
+        "competitive_rate": (competitive_rate or 0.0) * w.get("competitive_rate", 0.5),
         "nr":          _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * w.get("nr", 0.25),
         # Class signals — lower NR headroom = near top of grade; stake class and
         # class delta capture recent competition level vs today's race.
