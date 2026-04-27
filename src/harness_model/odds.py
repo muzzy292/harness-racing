@@ -378,6 +378,13 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         step = (market_max - market_min) / 10.0
         market_wt = round(market_max - step * (career_starts - 5), 2)
 
+    # Developmental return: horse raced exclusively as a 2yo and is returning to
+    # open/3yo+ racing after a seasonal break. S1 rate and consistency signals
+    # are uninformative — 0 wins / poor margins in top-tier 2yo championship
+    # races reflect competition level, not lack of ability. Zero them so the
+    # model falls back on stake_class, class_delta, ceiling, and market weight.
+    _dev_return = _to_int(row.get("developmental_return")) or 0
+
     # --- ceiling (multi-step: soft cap + reliability + recency) ---
     _ceiling_support_rate = _to_float(row.get("ceiling_support_rate"))
     _ceiling_best_run_index = _to_int(row.get("ceiling_best_run_index"))
@@ -394,7 +401,9 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
     ceiling_score = _raw_ceiling * _ceiling_reliability * _ceiling_recency * w.get("ceiling", 1.2)
 
     return {
-        "consistency": _neg_scale(consistency_adj, divisor=12.0, floor=-4.0, missing=0.0) * w.get("consistency", 1.8),
+        # Developmental returns: consistency from 2yo form is suppressed — large
+        # margins in elite 2yo races reflect competition level, not lack of ability.
+        "consistency": 0.0 if _dev_return else _neg_scale(consistency_adj, divisor=12.0, floor=-4.0, missing=0.0) * w.get("consistency", 1.8),
         "ceiling":     ceiling_score,
         "late_speed":  _neg_scale(sec3,            divisor=1.2,  floor=-2.5, missing=0.0) * w.get("late_speed", 1.4),
         # comment_adj removed — the margin adjustments in adjusted_margin already
@@ -411,19 +420,17 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         "market":      _neg_log_scale(avg_sp, missing=0.0) * market_wt,
         # win_rate reduced; supplemented by top3_rate and competitive_rate which
         # are less distorted by field quality and bad luck runs.
-        "win_rate":      (win_rate or 0.0) * w.get("win_rate", 0.7),
-        # Career win rate — a horse that has rarely won over a full career (e.g. 1/32)
-        # should carry a meaningful S1 penalty regardless of recent sectional speed.
-        # Centred at 12% (typical NSW win rate), capped ±1.5 before applying weight
-        # so no single extreme case dominates. Requires ≥5 career starts (None → 0).
-        # Career win rate discounted by last-10 win rate when recent form diverges from
-        # career average. Multiplicative: ratio = last10/career clipped [0.5, 1.2].
-        # Requires ≥8 starts in last-10 window and career ≥ 5% to apply.
-        # VAN BASTEN example: career 23.4%, last10 10% → ratio 0.43 → clipped 0.5
-        # → adjusted 11.7% (vs raw 23.4%), which scores near centre rather than strongly positive.
-        "career_win_rate": max(-1.5, min(1.5, _pos_scale(adjusted_career_win_rate, center=0.12, divisor=0.08, missing=0.0))) * w.get("career_win_rate", 0.6),
-        "top3_rate":     (top3_rate or 0.0) * w.get("top3_rate", 0.6),
-        "competitive_rate": (competitive_rate or 0.0) * w.get("competitive_rate", 0.5),
+        # Developmental returns: zeroed — 0 wins in elite 2yo fields is expected.
+        "win_rate":      0.0 if _dev_return else (win_rate or 0.0) * w.get("win_rate", 0.7),
+        # Career win rate — centred at 12%, capped ±1.5, requires ≥5 starts.
+        # Discounted by last-10 win rate when recent form diverges from career avg.
+        # Developmental returns: zeroed — career win rate of 0% from 2yo starts
+        # penalises horses for competing in top-tier age-restricted races.
+        "career_win_rate": 0.0 if _dev_return else max(-1.5, min(1.5, _pos_scale(adjusted_career_win_rate, center=0.12, divisor=0.08, missing=0.0))) * w.get("career_win_rate", 0.6),
+        # Developmental returns: zeroed — no top-3 or competitive finishes in
+        # championship 2yo races is normal, not a signal of poor ability.
+        "top3_rate":     0.0 if _dev_return else (top3_rate or 0.0) * w.get("top3_rate", 0.6),
+        "competitive_rate": 0.0 if _dev_return else (competitive_rate or 0.0) * w.get("competitive_rate", 0.5),
         "nr":          _pos_scale(nr, center=45.0, divisor=8.0, missing=0.0) * w.get("nr", 0.25),
         # Class signals — lower NR headroom = near top of grade; stake class and
         # class delta capture recent competition level vs today's race.
