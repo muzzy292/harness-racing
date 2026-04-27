@@ -278,5 +278,12 @@
     "meeting_date": "27 Apr 2026",
     "races": 8,
     "winners": 3
+  },
+  {
+    "meeting_code": "PC280426",
+    "track_name": "Menangle",
+    "meeting_date": "28 Apr 2026",
+    "races": 6,
+    "winners": 0
   }
 ]
