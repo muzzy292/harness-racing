@@ -588,6 +588,7 @@ def _build_feature_row(
         ),
         "dist_rge_starts": _summary_part(runner.get("form_dist_rge_summary"), 0),
         "days_since_last_run": days_since_last_run,
+        "developmental_return": 1 if _is_developmental_return(recent_lines, runner.get("class_name"), days_since_last_run) else 0,
         "second_up_improvement": second_up_improvement,
         "race_nr_ceiling": race_nr_ceiling,
         "race_nr_floor": race_nr_floor,
@@ -1328,6 +1329,32 @@ def _second_up_improvement(days_since_last_run: int | None, recent_lines: list[d
         return None
     improvement = round(sum(prior_margins) / len(prior_margins) - first_up_adj, 2)
     return improvement if improvement > 0 else None
+
+
+def _is_developmental_return(
+    recent_lines: list[dict],
+    class_name: str | None,
+    days_since_last_run: int | None,
+) -> bool:
+    """True when a horse is returning from a 2yo seasonal spell into open/3yo+ racing.
+
+    Detects the pattern: raced exclusively as a 2yo, then took an off-season
+    break (≥90 days) and is now returning to open or 3yo+ competition.
+
+    For these horses the fitness penalty is inappropriate (developmental spell,
+    not injury) and the NR grade comparison is unreliable (2yo races are largely
+    NR-exempt). Both signals are suppressed in scoring when this flag is set.
+    """
+    if not recent_lines or days_since_last_run is None or days_since_last_run < 90:
+        return False
+    # All recent lines must carry line_race_age = '2yo'.
+    ages = [line.get("line_race_age") for line in recent_lines if line.get("line_race_age")]
+    if not ages or any(a != "2yo" for a in ages):
+        return False
+    # Today's race must not itself be a 2yo-restricted race.
+    if class_name and "2yo" in class_name.lower():
+        return False
+    return True
 
 
 def _days_since_last_run(recent_lines: list[dict[str, object]], meeting_date: object) -> int | None:

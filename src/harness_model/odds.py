@@ -531,12 +531,19 @@ def _stage2_components(
     field_size = _to_int(row.get("race_field_size")) or 10
     # Field-size scalers: smaller fields → less traffic → wide draws and death
     # seat are less punishing. Capped at 1.0 so large fields keep full penalty.
+    developmental_return = _to_int(row.get("developmental_return")) or 0
     _barrier_field_mult  = min(1.0, field_size / 10.0)
     _death_field_mult    = min(1.0, field_size / 8.0)
-    # Fitness grade-drop dampener: a horse returning from a spell into a much
-    # easier race (nr_grade_delta < -8) has its rustiness partially offset by
-    # weaker opposition — apply 50% of the normal fitness penalty.
-    _fitness_grade_mult  = 0.5 if (nr_grade_delta or 0) < -8 else 1.0
+    # Fitness multiplier:
+    #   developmental_return → 0.0× (2yo seasonal spell, not fitness concern)
+    #   nr_grade_delta < -8  → 0.5× (grade-drop dampener)
+    #   otherwise            → 1.0×
+    if developmental_return:
+        _fitness_grade_mult = 0.0
+    elif (nr_grade_delta or 0) < -8:
+        _fitness_grade_mult = 0.5
+    else:
+        _fitness_grade_mult = 1.0
 
     return {
         "barrier":      _barrier_score(barrier, lead_rate) * w.get("barrier", 1.0) * _barrier_field_mult,
@@ -576,7 +583,9 @@ def _stage2_components(
         # NR grade delta — today's NR ceiling vs avg ceiling of last 5 runs.
         # Negative = dropping in grade → boost. Positive = rising → penalty.
         # ~0.04 per NR point of drop. Requires ≥2 recent lines with NR data (else 0).
-        "nr_grade_delta": max(-1.5, min(1.5, _pos_scale(nr_grade_delta, center=0.0, divisor=-10.0, missing=0.0))) * w.get("nr_grade_delta", 0.4),
+        # Suppressed for developmental returns: 2yo races are largely NR-exempt so
+        # the avg_recent_nr_ceiling comparison to an open race is unreliable.
+        "nr_grade_delta": 0.0 if developmental_return else max(-1.5, min(1.5, _pos_scale(nr_grade_delta, center=0.0, divisor=-10.0, missing=0.0))) * w.get("nr_grade_delta", 0.4),
         # Fitness — graduated penalty by days since last run.
         "fitness":      _fitness_score(days_since_last_run, fw) * _fitness_grade_mult,
         # Second-up improvement — horse showed marked form improvement on first run
