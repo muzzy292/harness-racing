@@ -295,6 +295,21 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             for runner in runners
         ],
     )
+    # Purge stale form-line snapshots before writing fresh ones.
+    # Each ingest re-scrapes the horse's recent form. Without this delete the same
+    # physical run accumulates once per meeting the horse appeared in, keyed on
+    # (meeting_code, race_number, line_index). Deleting old-meeting rows here keeps
+    # exactly one set of form lines per horse — from the most recent ingestion.
+    _runners_with_lines = [r for r in runners if r.recent_lines]
+    if _runners_with_lines:
+        _current_meeting = _runners_with_lines[0].meeting_code
+        _horse_ids = list({r.horse_id for r in _runners_with_lines})
+        _ph = ",".join("?" * len(_horse_ids))
+        conn.execute(
+            f"DELETE FROM runner_recent_lines WHERE horse_id IN ({_ph}) AND meeting_code != ?",
+            (*_horse_ids, _current_meeting),
+        )
+
     conn.executemany(
         """
         INSERT INTO runner_recent_lines(
