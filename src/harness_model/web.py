@@ -890,6 +890,7 @@ def _render_diag_row(row_id: str, row: dict[str, object]) -> str:
         "barrier", "barrier_relief", "map_lead", "map_soft", "map_soft_context",
         "pace_backmarker", "map_wide", "map_death", "dist_strike_rate",
         "nr_grade_delta", "fitness", "second_up", "driver_form", "trainer_form",
+        "hot_driver", "hot_trainer",
     ]
 
     def comp_rows(keys: list[str]) -> str:
