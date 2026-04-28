@@ -1926,6 +1926,21 @@ def build_diagnose_site(
         "SELECT DISTINCT meeting_code FROM race_results ORDER BY meeting_code"
     ).fetchall()]
 
+    # Prefix map: fallback when meetings.track_name is NULL or the meeting isn't
+    # in the meetings table (e.g. manually-added results from older meetings).
+    _PREFIX_TRACK = {
+        "BH": "Bathurst", "CB": "Canberra", "CL": "Canberra",
+        "DU": "Dubbo", "EY": "Wagga", "FB": "Forbes",
+        "JU": "Junee", "LE": "Leeton", "LM": "Goulburn",
+        "NA": "Narrabri", "NR": "Newcastle", "PC": "Menangle",
+        "PE": "Penrith", "PK": "Parkes", "TA": "Tamworth",
+        "TM": "Temora", "UG": "Marburg", "YU": "Young",
+    }
+    meeting_track: dict[str, str] = {}
+    for r in conn.execute("SELECT meeting_code, track_name FROM meetings").fetchall():
+        track = r["track_name"] or _PREFIX_TRACK.get(r["meeting_code"][:2], r["meeting_code"])
+        meeting_track[r["meeting_code"]] = track
+
     results_lookup: dict[tuple, dict] = {}
     for r in conn.execute(
         "SELECT meeting_code, race_number, horse_name, finish_position, starting_price "
@@ -1979,13 +1994,13 @@ def build_diagnose_site(
             race_groups[(meeting_code, race_number)] = group
 
     generated_at = datetime.now().strftime("%d %b %Y %H:%M")
-    html_str = _render_diagnose_html(race_groups, generated_at)
+    html_str = _render_diagnose_html(race_groups, generated_at, meeting_track=meeting_track)
     out_path = out_dir / "diagnose.html"
     out_path.write_text(html_str, encoding="utf-8")
     return out_path
 
 
-def _render_diagnose_html(race_groups: dict, generated_at: str) -> str:
+def _render_diagnose_html(race_groups: dict, generated_at: str, meeting_track: dict | None = None) -> str:
     """Render the full diagnostic page as an HTML string."""
 
     def _avg(lst: list) -> float | None:
@@ -2013,8 +2028,10 @@ def _render_diagnose_html(race_groups: dict, generated_at: str) -> str:
         is_sp_knew    = sp_correct and (winner.get("model_rank") or 0) >= 4
         s1_changed    = s1_top and model_top and s1_top["horse"] != model_top["horse"]
 
+        _track = (meeting_track or {}).get(meeting) or _PREFIX_TRACK.get(meeting[:2], meeting)
         race_rows.append({
             "meeting": meeting,
+            "track": _track,
             "race": race,
             # Winner
             "winner": winner["horse"],
@@ -2048,6 +2065,7 @@ def _render_diagnose_html(race_groups: dict, generated_at: str) -> str:
         if best_map["horse"] != model_top["horse"] and bm_finish and bm_finish <= 3:
             map_rows.append({
                 "meeting": meeting,
+                "track": _track,
                 "race": race,
                 "bm_horse": best_map["horse"],
                 "bm_model_rank": best_map.get("model_rank"),
@@ -2092,10 +2110,14 @@ def _render_diagnose_html(race_groups: dict, generated_at: str) -> str:
     global_stats = _compute_stats(race_rows)
     meetings_list = sorted({r["meeting"] for r in race_rows})
     by_meeting = {m: _compute_stats([r for r in race_rows if r["meeting"] == m]) for m in meetings_list}
+    tracks_list = sorted({r["track"] for r in race_rows})
+    by_track = {t: _compute_stats([r for r in race_rows if r["track"] == t]) for t in tracks_list}
 
     data_json = json.dumps({
         "global": global_stats,
         "by_meeting": by_meeting,
+        "by_track": by_track,
+        "tracks": tracks_list,
         "races": race_rows,
         "map_overrides": map_rows,
     }, separators=(",", ":"))
@@ -2202,10 +2224,10 @@ def _render_diagnose_html(race_groups: dict, generated_at: str) -> str:
         <p>Per-race truth set &middot; {n_races} races with results &middot; Generated {html.escape(generated_at)}</p>
       </div>
       <div class="meeting-select">
-        <label for="meeting-sel">Filter meeting:</label>
-        <select id="meeting-sel">
-          <option value="all">All meetings ({n_races} races)</option>
-          {''.join(f'<option value="{m}">{html.escape(m)}</option>' for m in meetings_list)}
+        <label for="track-sel">Track:</label>
+        <select id="track-sel">
+          <option value="all">All tracks ({n_races} races)</option>
+          {''.join(f'<option value="{html.escape(t)}">{html.escape(t)}</option>' for t in tracks_list)}
         </select>
       </div>
     </div>
@@ -2480,13 +2502,13 @@ function buildMissRows(races) {{
   }}).join('') || '<tr><td colspan="11" class="no-data">No big misses in this selection.</td></tr>';
 }}
 
-function render(meeting) {{
-  const isAll = meeting === 'all';
-  const stats = isAll ? DATA.global : (DATA.by_meeting[meeting] || {{}});
+function render(track) {{
+  const isAll = track === 'all';
+  const stats = isAll ? DATA.global : (DATA.by_track[track] || {{}});
   updateSummary(stats);
 
-  const races   = isAll ? DATA.races       : DATA.races.filter(r => r.meeting === meeting);
-  const mapData = isAll ? DATA.map_overrides : DATA.map_overrides.filter(r => r.meeting === meeting);
+  const races   = isAll ? DATA.races         : DATA.races.filter(r => r.track === track);
+  const mapData = isAll ? DATA.map_overrides : DATA.map_overrides.filter(r => r.track === track);
 
   el('detail-tbody').innerHTML = buildDetailRows(races);
   el('detail-count').textContent = races.length + ' races';
@@ -2504,7 +2526,7 @@ function render(meeting) {{
   el('miss-count').textContent = misses.length + ' races';
 }}
 
-document.getElementById('meeting-sel').addEventListener('change', e => render(e.target.value));
+document.getElementById('track-sel').addEventListener('change', e => render(e.target.value));
 render('all');
 </script>
 </body>
