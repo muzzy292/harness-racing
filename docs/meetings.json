@@ -39,14 +39,14 @@
     "track_name": "Menangle",
     "meeting_date": "7 Apr 2026",
     "races": 6,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "BH080426",
     "track_name": "Bathurst",
     "meeting_date": "8 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 2
   },
   {
     "meeting_code": "PE090426",
@@ -74,7 +74,7 @@
     "track_name": "Dubbo",
     "meeting_date": "10 Apr 2026",
     "races": 6,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "PC110426",
@@ -109,14 +109,14 @@
     "track_name": "Newcastle",
     "meeting_date": "2 Apr 2026",
     "races": 9,
-    "winners": 5
+    "winners": 6
   },
   {
     "meeting_code": "PC310326",
     "track_name": "Menangle",
     "meeting_date": "31 Mar 2026",
     "races": 7,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "PE020426",
@@ -130,14 +130,14 @@
     "track_name": "Menangle",
     "meeting_date": "14 Apr 2026",
     "races": 6,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "LE140426",
     "track_name": "Leeton",
     "meeting_date": "14 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "BH150426",
@@ -158,7 +158,7 @@
     "track_name": "Penrith",
     "meeting_date": "16 Apr 2026",
     "races": 9,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "EY170426",
@@ -179,7 +179,7 @@
     "track_name": "Parkes",
     "meeting_date": "17 Apr 2026",
     "races": 9,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "PC180426",
@@ -221,21 +221,21 @@
     "track_name": "Bathurst",
     "meeting_date": "22 Apr 2026",
     "races": 7,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "PE230426",
     "track_name": "Penrith",
     "meeting_date": "23 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "EY240426",
     "track_name": "Wagga",
     "meeting_date": "24 Apr 2026",
     "races": 7,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "PK240426",
@@ -263,7 +263,7 @@
     "track_name": "Forbes",
     "meeting_date": "26 Apr 2026",
     "races": 9,
-    "winners": 2
+    "winners": 1
   },
   {
     "meeting_code": "CL260426",
@@ -284,7 +284,7 @@
     "track_name": "Menangle",
     "meeting_date": "28 Apr 2026",
     "races": 6,
-    "winners": 0
+    "winners": 4
   },
   {
     "meeting_code": "BH290426",
