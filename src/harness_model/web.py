@@ -2242,7 +2242,7 @@ def _render_diagnose_html(race_groups: dict, generated_at: str, meeting_track: d
     .quad .q-val{{font-size:22px;font-weight:800;}}
     .quad .q-pct{{font-size:12px;font-weight:600;color:var(--secondary);}}
     .quad .q-label{{font-size:11px;color:var(--secondary);margin-top:2px;}}
-    .quad.both-right{{background:#f0fdf4;border:1px solid #bbf7d0;}}
+    .quad.both-right{{background:rgba(34,211,160,0.10);border:1px solid rgba(34,211,160,0.25);}}
     .quad.model-edge{{background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);}}
     .quad.model-fail{{background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);}}
     .quad.both-wrong{{background:var(--surface);border:1px solid var(--border);}}
