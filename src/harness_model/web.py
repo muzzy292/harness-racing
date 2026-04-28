@@ -222,85 +222,100 @@ def _write_index(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Harness Racing Scores</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root {{
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --primary: #0f172a;
-      --secondary: #64748b;
-      --accent: #10b981;
-      --accent-dark: #059669;
-      --border: #e2e8f0;
+      --bg:           #0a0a0a;
+      --card-bg:      #101010;
+      --surface:      #131313;
+      --primary-text: #f0f0f0;
+      --secondary:    #808080;
+      --accent:       #00d4ff;
+      --accent-dark:  #00aacc;
+      --border:       #1f1f1f;
+      --highlight:    #1a1a1a;
     }}
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background-color: var(--bg);
-      color: var(--primary);
+      color: var(--primary-text);
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }}
     .top-nav {{
-      background: var(--primary);
-      padding: 12px 20px;
+      background: #060606;
+      padding: 10px 20px;
       display: flex;
-      gap: 8px;
+      gap: 4px;
       align-items: center;
+      border-bottom: 1px solid var(--border);
     }}
     .top-nav a {{
       color: var(--secondary);
       text-decoration: none;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       padding: 6px 14px;
-      border-radius: 8px;
-      transition: all 0.2s;
+      border-radius: 5px;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
     }}
-    .top-nav a:hover {{ background: rgba(255,255,255,0.1); color: white; }}
-    .top-nav a.active {{ background: rgba(255,255,255,0.12); color: white; }}
+    .top-nav a:hover {{ background: var(--highlight); color: var(--primary-text); }}
+    .top-nav a.active {{ background: rgba(0,212,255,0.08); color: var(--accent); }}
     .hero {{
-      background: var(--primary);
-      color: white;
-      padding: 32px 20px 40px;
+      background: #060606;
+      color: var(--primary-text);
+      padding: 40px 20px 36px;
       text-align: center;
+      border-bottom: 1px solid var(--border);
     }}
     .hero h1 {{
       margin: 0 0 8px;
-      font-size: 40px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
     }}
     .hero p {{
       margin: 0;
       color: var(--secondary);
-      font-size: 16px;
+      font-size: 14px;
     }}
-    .wrap {{ max-width: 960px; margin: 0 auto; padding: 36px 20px 60px; }}
+    .wrap {{ max-width: 960px; margin: 0 auto; padding: 32px 20px 60px; }}
     .grid {{
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 10px;
     }}
     .meeting-card {{
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      padding: 24px;
+      gap: 5px;
+      padding: 18px 20px;
       text-decoration: none;
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      border-radius: 8px;
+      transition: border-color 0.15s, background 0.15s;
     }}
     .meeting-card:hover {{
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+      border-color: var(--accent);
+      background: rgba(0,212,255,0.04);
     }}
-    .meeting-code {{ font-size: 20px; font-weight: 700; color: var(--primary); letter-spacing: 0.02em; }}
-    .meeting-meta {{ color: var(--secondary); font-size: 13px; }}
-    .meeting-stats {{ color: var(--primary); font-size: 13px; font-weight: 600; }}
-    .meeting-link {{ margin-top: 6px; color: var(--accent-dark); font-size: 14px; font-weight: 600; }}
+    .meeting-code {{
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--primary-text);
+      letter-spacing: 0.06em;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      text-transform: uppercase;
+    }}
+    .meeting-meta {{ color: var(--secondary); font-size: 12px; }}
+    .meeting-stats {{ color: var(--primary-text); font-size: 12px; font-weight: 600; }}
+    .meeting-link {{ margin-top: 4px; color: var(--accent); font-size: 13px; font-weight: 600; }}
   </style>
 </head>
 <body>
@@ -371,21 +386,26 @@ def _render_meeting_html(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(meeting_title)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root {{
-      /* Modern Deep & Crisp Palette */
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --primary: #0f172a;    /* Slate 900 */
-      --secondary: #64748b;  /* Slate 500 */
-      --accent: #10b981;     /* Emerald 500 */
-      --accent-dark: #059669;
-      --accent-soft: #ecfdf5;
-      --border: #e2e8f0;     /* Slate 200 */
-      --pick-bg: #f0f9ff;    /* Sky 50 */
-      --pick-text: #0369a1;  /* Sky 700 */
-      --winner-bg: #f0fdf4;
-      --highlight: #f1f5f9;
+      /* MuzzyBet Stealth Theme */
+      --bg:            #0a0a0a;
+      --card-bg:       #101010;
+      --surface:       #131313;
+      --primary-text:  #f0f0f0;
+      --secondary:     #808080;
+      --accent:        #00d4ff;
+      --accent-dark:   #00aacc;
+      --accent-soft:   rgba(0,212,255,0.08);
+      --winner:        #22d3a0;
+      --winner-soft:   rgba(34,211,160,0.08);
+      --pick-bg:       rgba(192,132,252,0.08);
+      --pick-text:     #c084fc;
+      --border:        #1f1f1f;
+      --border-strong: #2e2e2e;
+      --highlight:     #1a1a1a;
+      --winner-bg:     rgba(34,211,160,0.06);
     }}
 
     * {{ box-sizing: border-box; }}
@@ -393,26 +413,27 @@ def _render_meeting_html(
 
     body {{
       margin: 0;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: var(--primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--primary-text);
       background-color: var(--bg);
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }}
 
-    .wrap {{ 
-      max-width: 1200px; 
-      margin: 0 auto; 
-      padding: 40px 20px; 
+    .wrap {{
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 20px;
     }}
 
     /* Hero Section */
     .hero {{
-      background: var(--primary);
-      color: white;
-      border-radius: 24px;
-      padding: 40px;
-      margin-bottom: 32px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      background: #060606;
+      color: var(--primary-text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 28px 32px;
+      margin-bottom: 16px;
       position: relative;
       overflow: hidden;
     }}
@@ -420,66 +441,80 @@ def _render_meeting_html(
     .hero::after {{
       content: "";
       position: absolute;
-      top: 0; right: 0;
-      width: 300px; height: 300px;
-      background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
+      top: -60px; right: -60px;
+      width: 280px; height: 280px;
+      background: radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%);
       pointer-events: none;
     }}
 
     .eyebrow {{
       display: inline-block;
-      padding: 4px 12px;
-      border-radius: 6px;
-      background: rgba(255,255,255,0.1);
+      padding: 3px 10px;
+      border-radius: 3px;
+      background: var(--accent-soft);
       color: var(--accent);
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
+      font-family: 'Roboto Mono', monospace;
     }}
 
-    h1 {{ margin: 0; font-size: 42px; font-weight: 800; letter-spacing: -0.02em; }}
-    .sub {{ color: var(--secondary); font-size: 16px; margin-top: 8px; font-weight: 400; }}
+    h1 {{
+      margin: 0;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      text-transform: uppercase;
+    }}
+
+    .sub {{ color: var(--secondary); font-size: 14px; margin-top: 6px; }}
 
     .summary-grid {{
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 16px;
-      margin-top: 32px;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 20px;
     }}
 
     .summary-card {{
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 12px;
-      padding: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
     }}
 
-    .summary-card .label {{ 
+    .summary-card .label {{
       display: block;
-      font-size: 11px; 
-      color: var(--secondary); 
-      text-transform: uppercase; 
-      letter-spacing: 0.05em;
-      margin-bottom: 4px;
+      font-size: 10px;
+      color: var(--secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 3px;
     }}
-    .summary-card .value {{ font-size: 18px; font-weight: 600; color: white; }}
+
+    .summary-card .value {{
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary-text);
+      font-family: 'Roboto Mono', monospace;
+    }}
 
     /* Navigation */
     .race-nav {{
       position: sticky;
-      top: 16px;
+      top: 0;
       z-index: 50;
-      margin-bottom: 32px;
-      padding: 8px;
+      margin-bottom: 16px;
+      padding: 6px;
       display: flex;
-      gap: 8px;
+      gap: 4px;
       overflow-x: auto;
-      background: rgba(255, 255, 255, 0.8);
+      background: rgba(10,10,10,0.95);
       backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
-      border-radius: 16px;
+      border-bottom: 1px solid var(--border);
       scrollbar-width: none;
     }}
 
@@ -490,46 +525,57 @@ def _render_meeting_html(
       white-space: nowrap;
       color: var(--secondary);
       background: transparent;
-      border-radius: 10px;
-      padding: 8px 16px;
-      font-size: 14px;
+      border-radius: 5px;
+      padding: 6px 14px;
+      font-size: 13px;
       font-weight: 600;
-      transition: all 0.2s;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
     }}
 
     .race-nav a:hover {{
       background: var(--highlight);
-      color: var(--primary);
+      color: var(--primary-text);
     }}
 
     /* Race Cards */
     .race-card {{
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 20px;
+      border-radius: 8px;
       padding: 0;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
       overflow: hidden;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }}
 
     .race-head {{
-      padding: 14px 24px;
+      padding: 12px 20px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: #fafafa;
+      background: var(--surface);
     }}
 
-    .race-head h2 {{ margin: 0; font-size: 24px; font-weight: 700; color: var(--primary); }}
-    .race-head .top-pick {{ 
-      font-size: 14px; 
-      background: var(--accent-soft); 
-      color: var(--accent-dark);
-      padding: 6px 14px;
-      border-radius: 99px;
-      font-weight: 600;
+    .race-head h2 {{
+      margin: 0;
+      font-size: 20px;
+      font-weight: 900;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--primary-text);
+    }}
+
+    .race-head .top-pick {{
+      font-size: 12px;
+      background: var(--pick-bg);
+      color: var(--pick-text);
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      border: 1px solid rgba(192,132,252,0.2);
     }}
 
     /* Tables */
@@ -541,17 +587,17 @@ def _render_meeting_html(
     th, td {{
       padding: 9px 12px;
       text-align: left;
-      font-size: 14px;
+      font-size: 13px;
       border-bottom: 1px solid var(--border);
     }}
 
     th {{
-      background: white;
+      background: var(--surface);
       color: var(--secondary);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
     }}
 
     tr:last-child td {{ border-bottom: none; }}
@@ -559,7 +605,7 @@ def _render_meeting_html(
 
     /* Special Rows */
     tr.top-pick-row {{ background: var(--pick-bg); }}
-    tr.top-pick-row:hover {{ background: #e0f2fe; }}
+    tr.top-pick-row:hover {{ background: rgba(192,132,252,0.12); }}
     tr.result-winner {{ background: var(--winner-bg); }}
 
     .horse-cell {{
@@ -568,22 +614,30 @@ def _render_meeting_html(
       gap: 2px;
     }}
 
-    .horse-cell strong {{ font-size: 15px; color: var(--primary); }}
+    .horse-cell strong {{
+      font-size: 14px;
+      color: var(--primary-text);
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }}
     .horse-cell .meta {{ color: var(--secondary); font-size: 12px; }}
 
     .pill {{
       display: inline-block;
       margin-top: 4px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
+      letter-spacing: 0.06em;
     }}
-    .pill.pick {{ background: var(--pick-text); color: white; }}
-    .pill.win {{ background: var(--accent); color: white; }}
-    .pill.fs {{ background: #7c3aed; color: white; }}
-    .pill.ns {{ background: #ea580c; color: white; }}
+    .pill.pick {{ background: var(--pick-bg); color: var(--pick-text); border: 1px solid rgba(192,132,252,0.25); }}
+    .pill.win {{ background: var(--winner-soft); color: var(--winner); border: 1px solid rgba(34,211,160,0.25); }}
+    .pill.fs {{ background: rgba(124,58,237,0.15); color: #a78bfa; border: 1px solid rgba(124,58,237,0.25); }}
+    .pill.ns {{ background: rgba(234,88,12,0.15); color: #fb923c; border: 1px solid rgba(234,88,12,0.25); }}
 
     .driver-change {{ color: #f59e0b; font-weight: 600; }}
 
@@ -625,9 +679,9 @@ def _render_meeting_html(
     }}
 
     /* ── Diagnostics panel ── */
-    .diag-row td {{ padding: 0; background: #f1f5f9; border-bottom: 2px solid var(--border); }}
+    .diag-row td {{ padding: 0; background: #0d0d0d; border-bottom: 2px solid var(--border); }}
     .diag-panel {{ padding: 14px 18px 6px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }}
-    .diag-group {{ background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }}
+    .diag-group {{ background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }}
     .diag-group h4 {{ margin: 0 0 7px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--secondary); }}
     .diag-kv {{ display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 1px solid var(--border); font-size: 11.5px; }}
     .diag-kv:last-child {{ border-bottom: none; }}
@@ -644,7 +698,7 @@ def _render_meeting_html(
     .comp-pos  {{ color: #16a34a; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }}
     .comp-neg  {{ color: #dc2626; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }}
     .comp-zero {{ color: var(--secondary); opacity: 0.45; font-variant-numeric: tabular-nums; text-align: right; }}
-    .diag-toggle {{ background: none; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 10px; padding: 1px 5px; margin-left: 5px; color: var(--secondary); transition: transform 0.15s; line-height: 1.4; vertical-align: middle; }}
+    .diag-toggle {{ background: none; border: 1px solid var(--border-strong); border-radius: 3px; cursor: pointer; font-size: 10px; padding: 1px 5px; margin-left: 5px; color: var(--secondary); transition: transform 0.15s; line-height: 1.4; vertical-align: middle; }}
     .diag-toggle.open {{ transform: rotate(90deg); color: var(--accent); border-color: var(--accent); }}
   </style>
 </head>
@@ -1177,70 +1231,77 @@ def _render_stats_html(driver_rows: list[dict], trainer_rows: list[dict], meta: 
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Driver &amp; Trainer Stats — Harness Racing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root {{
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --primary: #0f172a;
-      --secondary: #64748b;
-      --accent: #10b981;
-      --accent-dark: #059669;
-      --accent-soft: #ecfdf5;
-      --border: #e2e8f0;
-      --highlight: #f1f5f9;
-      --hot-bg: rgba(245, 158, 11, 0.08);
+      --bg: #0a0a0a;
+      --card-bg: #101010;
+      --surface: #131313;
+      --primary: #f0f0f0;
+      --secondary: #808080;
+      --accent: #00d4ff;
+      --accent-dark: #00aacc;
+      --accent-soft: rgba(0,212,255,0.08);
+      --border: #1f1f1f;
+      --highlight: #1a1a1a;
+      --hot-bg: rgba(240,180,41,0.08);
     }}
     * {{ box-sizing: border-box; }}
     html {{ scroll-behavior: smooth; }}
     body {{
       margin: 0;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       color: var(--primary);
       background-color: var(--bg);
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }}
     .top-nav {{
-      background: var(--primary);
-      padding: 12px 20px;
+      background: #060606;
+      padding: 10px 20px;
       display: flex;
-      gap: 8px;
+      gap: 4px;
       align-items: center;
+      border-bottom: 1px solid var(--border);
     }}
     .top-nav a {{
       color: var(--secondary);
       text-decoration: none;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       padding: 6px 14px;
-      border-radius: 8px;
-      transition: all 0.2s;
+      border-radius: 5px;
+      transition: all 0.15s;
     }}
-    .top-nav a:hover {{ background: rgba(255,255,255,0.1); color: white; }}
-    .top-nav a.active {{ background: rgba(255,255,255,0.12); color: white; }}
+    .top-nav a:hover {{ background: var(--highlight); color: var(--primary); }}
+    .top-nav a.active {{ background: rgba(0,212,255,0.08); color: var(--accent); }}
     .wrap {{ max-width: 1200px; margin: 0 auto; padding: 36px 20px 60px; }}
     .hero {{
-      background: var(--primary);
-      color: white;
-      padding: 40px 20px 32px;
-      text-align: center;
-    }}
-    .hero h1 {{ margin: 0 0 8px; font-size: 36px; font-weight: 800; letter-spacing: -0.02em; }}
-    .hero p {{ margin: 0; color: var(--secondary); font-size: 15px; }}
-    .section-title {{
-      font-size: 22px;
-      font-weight: 700;
+      background: #060606;
       color: var(--primary);
-      margin: 40px 0 16px;
+      padding: 36px 20px 28px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }}
+    .hero h1 {{ margin: 0 0 8px; font-size: 32px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; font-family: 'Barlow Condensed', 'Inter', sans-serif; }}
+    .hero p {{ margin: 0; color: var(--secondary); font-size: 14px; }}
+    .section-title {{
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--primary);
+      margin: 32px 0 12px;
       padding-bottom: 8px;
-      border-bottom: 2px solid var(--accent);
+      border-bottom: 1px solid var(--border);
       display: inline-block;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }}
     .table-wrap {{
       overflow-x: auto;
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 8px;
       background: var(--card-bg);
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
     }}
     table.stats-table {{
       width: 100%;
@@ -1248,31 +1309,31 @@ def _render_stats_html(driver_rows: list[dict], trainer_rows: list[dict], meta: 
       min-width: 700px;
     }}
     th, td {{
-      padding: 10px 14px;
+      padding: 9px 12px;
       text-align: left;
-      font-size: 14px;
+      font-size: 13px;
       border-bottom: 1px solid var(--border);
     }}
     th {{
-      background: #fafafa;
+      background: var(--surface);
       color: var(--secondary);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
     }}
     th:hover {{ color: var(--primary); background: var(--highlight); }}
-    th.sorted-asc::after {{ content: " ▼"; color: var(--accent-dark); }}
-    th.sorted-desc::after {{ content: " ▲"; color: var(--accent-dark); }}
-    td.num {{ text-align: right; }}
+    th.sorted-asc::after {{ content: " ▼"; color: var(--accent); }}
+    th.sorted-desc::after {{ content: " ▲"; color: var(--accent); }}
+    td.num {{ text-align: right; font-family: 'Roboto Mono', monospace; font-size: 12px; }}
     th.num {{ text-align: right; }}
     tr:last-child td {{ border-bottom: none; }}
     tr:hover {{ background: var(--highlight); }}
     tr.hot-row {{ background: var(--hot-bg); }}
-    tr.hot-row:hover {{ background: rgba(245, 158, 11, 0.14); }}
+    tr.hot-row:hover {{ background: rgba(240,180,41,0.12); }}
     .muted {{ color: var(--secondary); opacity: 0.5; }}
     .footer {{
       margin-top: 48px;
@@ -1300,9 +1361,7 @@ def _render_stats_html(driver_rows: list[dict], trainer_rows: list[dict], meta: 
     <div class="section-title">Trainers</div>
     <div class="table-wrap">{trainer_table}</div>
 
-    <div class="footer">
-      Generated {generated} &nbsp;·&nbsp; {total:,} results ingested
-    </div>
+    <div class="footer">Generated {generated} &nbsp;·&nbsp; {total:,} results ingested</div>
   </div>
   <script>
     function parseSortVal(text) {{
@@ -1623,23 +1682,24 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Betting Backtest — Harness Racing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root {{
-      --bg: #f8fafc; --card-bg: #ffffff; --primary: #0f172a;
-      --secondary: #64748b; --accent: #10b981; --accent-dark: #059669;
-      --border: #e2e8f0; --highlight: #f1f5f9;
+      --bg: #0a0a0a; --card-bg: #101010; --surface: #131313; --primary: #f0f0f0;
+      --secondary: #808080; --accent: #00d4ff; --accent-dark: #00aacc;
+      --border: #1f1f1f; --highlight: #1a1a1a;
     }}
     * {{ box-sizing: border-box; }}
     html {{ scroll-behavior: smooth; }}
-    body {{ margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-      color:var(--primary); background:var(--bg); line-height:1.5; }}
-    .top-nav {{ background:var(--primary); padding:12px 20px; display:flex; gap:8px; align-items:center; }}
-    .top-nav a {{ color:var(--secondary); text-decoration:none; font-size:14px; font-weight:600;
-      padding:6px 14px; border-radius:8px; transition:all 0.2s; }}
-    .top-nav a:hover {{ background:rgba(255,255,255,0.1); color:white; }}
-    .top-nav a.active {{ background:rgba(255,255,255,0.12); color:white; }}
-    .hero {{ background:var(--primary); color:white; padding:32px 20px; text-align:center; }}
-    .hero h1 {{ margin:0 0 8px; font-size:34px; font-weight:800; letter-spacing:-0.02em; }}
+    body {{ margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      color:var(--primary); background:var(--bg); line-height:1.5; -webkit-font-smoothing:antialiased; }}
+    .top-nav {{ background:#060606; padding:10px 20px; display:flex; gap:4px; align-items:center; border-bottom:1px solid var(--border); }}
+    .top-nav a {{ color:var(--secondary); text-decoration:none; font-size:13px; font-weight:600;
+      padding:6px 14px; border-radius:5px; transition:all 0.15s; }}
+    .top-nav a:hover {{ background:var(--highlight); color:var(--primary); }}
+    .top-nav a.active {{ background:rgba(0,212,255,0.08); color:var(--accent); }}
+    .hero {{ background:#060606; color:var(--primary); padding:32px 20px; text-align:center; border-bottom:1px solid var(--border); }}
+    .hero h1 {{ margin:0 0 8px; font-size:32px; font-weight:900; letter-spacing:0.04em; text-transform:uppercase; font-family:'Barlow Condensed','Inter',sans-serif; }}
     .hero p {{ margin:0; color:var(--secondary); font-size:14px; }}
     .wrap {{ max-width:1300px; margin:0 auto; padding:32px 20px 60px; }}
     .summary-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:28px; }}
@@ -1662,14 +1722,14 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
       background:var(--card-bg); box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); }}
     table {{ width:100%; border-collapse:collapse; min-width:900px; }}
     th,td {{ padding:9px 12px; text-align:left; font-size:13px; border-bottom:1px solid var(--border); }}
-    th {{ background:#fafafa; color:var(--secondary); font-size:11px; font-weight:700;
+    th {{ background:var(--surface); color:var(--secondary); font-size:11px; font-weight:700;
       text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap; }}
     tr:last-child td {{ border-bottom:none; }}
     td.num {{ text-align:right; }}
     th.num {{ text-align:right; }}
-    tr.bet-win {{ background:#f0fdf4; }}
-    tr.bet-win:hover {{ background:#dcfce7; }}
-    tr.bet-loss {{ background:#fff; }}
+    tr.bet-win {{ background:rgba(34,211,160,0.07); }}
+    tr.bet-win:hover {{ background:rgba(34,211,160,0.12); }}
+    tr.bet-loss {{ background:var(--card-bg); }}
     tr.bet-loss:hover {{ background:var(--highlight); }}
     .tier {{ display:inline-block; padding:2px 8px; border-radius:4px;
       font-size:11px; font-weight:700; text-transform:uppercase; }}
@@ -2130,32 +2190,33 @@ def _render_diagnose_html(race_groups: dict, generated_at: str, meeting_track: d
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Model Diagnostic — Harness Racing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root {{
-      --bg:#f8fafc; --card-bg:#ffffff; --primary:#0f172a;
-      --secondary:#64748b; --accent:#10b981; --accent-dark:#059669;
-      --border:#e2e8f0; --highlight:#f1f5f9;
+      --bg:#0a0a0a; --card-bg:#101010; --surface:#131313; --primary:#f0f0f0;
+      --secondary:#808080; --accent:#00d4ff; --accent-dark:#00aacc;
+      --border:#1f1f1f; --highlight:#1a1a1a;
       --red:#ef4444; --amber:#f59e0b; --blue:#3b82f6;
     }}
     *{{box-sizing:border-box;}}
     html{{scroll-behavior:smooth;}}
-    body{{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-      color:var(--primary);background:var(--bg);line-height:1.5;}}
-    .top-nav{{background:var(--primary);padding:12px 20px;display:flex;gap:8px;align-items:center;}}
-    .top-nav a{{color:var(--secondary);text-decoration:none;font-size:14px;font-weight:600;
-      padding:6px 14px;border-radius:8px;transition:all 0.2s;}}
-    .top-nav a:hover{{background:rgba(255,255,255,0.1);color:white;}}
-    .top-nav a.active{{background:rgba(255,255,255,0.12);color:white;}}
-    .hero{{background:var(--primary);color:white;padding:32px 20px;}}
+    body{{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      color:var(--primary);background:var(--bg);line-height:1.5;-webkit-font-smoothing:antialiased;}}
+    .top-nav{{background:#060606;padding:10px 20px;display:flex;gap:4px;align-items:center;border-bottom:1px solid var(--border);}}
+    .top-nav a{{color:var(--secondary);text-decoration:none;font-size:13px;font-weight:600;
+      padding:6px 14px;border-radius:5px;transition:all 0.15s;}}
+    .top-nav a:hover{{background:var(--highlight);color:var(--primary);}}
+    .top-nav a.active{{background:rgba(0,212,255,0.08);color:var(--accent);}}
+    .hero{{background:#060606;color:var(--primary);padding:28px 20px;border-bottom:1px solid var(--border);}}
     .hero-inner{{max-width:1300px;margin:0 auto;display:flex;align-items:center;gap:24px;flex-wrap:wrap;}}
-    .hero h1{{margin:0;font-size:28px;font-weight:800;letter-spacing:-0.02em;}}
+    .hero h1{{margin:0;font-size:26px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;font-family:'Barlow Condensed','Inter',sans-serif;}}
     .hero p{{margin:4px 0 0;color:var(--secondary);font-size:13px;}}
     .meeting-select{{margin-left:auto;display:flex;align-items:center;gap:10px;}}
-    .meeting-select label{{color:rgba(255,255,255,0.7);font-size:13px;font-weight:600;white-space:nowrap;}}
-    .meeting-select select{{padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);
-      background:rgba(255,255,255,0.08);color:white;font-size:14px;font-weight:600;cursor:pointer;
+    .meeting-select label{{color:var(--secondary);font-size:13px;font-weight:600;white-space:nowrap;}}
+    .meeting-select select{{padding:8px 12px;border-radius:6px;border:1px solid var(--border);
+      background:var(--surface);color:var(--primary);font-size:13px;font-weight:600;cursor:pointer;
       appearance:none;-webkit-appearance:none;min-width:180px;}}
-    .meeting-select select option{{background:#1e293b;color:white;}}
+    .meeting-select select option{{background:#131313;color:var(--primary);}}
     .wrap{{max-width:1300px;margin:0 auto;padding:28px 20px 60px;}}
     /* Summary cards */
     .cards-row{{display:grid;gap:14px;margin-bottom:24px;}}
@@ -2182,9 +2243,9 @@ def _render_diagnose_html(race_groups: dict, generated_at: str, meeting_track: d
     .quad .q-pct{{font-size:12px;font-weight:600;color:var(--secondary);}}
     .quad .q-label{{font-size:11px;color:var(--secondary);margin-top:2px;}}
     .quad.both-right{{background:#f0fdf4;border:1px solid #bbf7d0;}}
-    .quad.model-edge{{background:#f0f9ff;border:1px solid #bae6fd;}}
-    .quad.model-fail{{background:#fff1f2;border:1px solid #fecdd3;}}
-    .quad.both-wrong{{background:#fafafa;border:1px solid var(--border);}}
+    .quad.model-edge{{background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);}}
+    .quad.model-fail{{background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);}}
+    .quad.both-wrong{{background:var(--surface);border:1px solid var(--border);}}
     /* Section header */
     .section-header{{display:flex;align-items:baseline;gap:12px;margin:28px 0 12px;}}
     .section-title{{font-size:16px;font-weight:700;}}
@@ -2194,13 +2255,13 @@ def _render_diagnose_html(race_groups: dict, generated_at: str, meeting_track: d
       background:var(--card-bg);box-shadow:0 2px 4px rgba(0,0,0,0.04);}}
     table{{width:100%;border-collapse:collapse;min-width:700px;}}
     th,td{{padding:8px 12px;text-align:left;font-size:12px;border-bottom:1px solid var(--border);}}
-    th{{background:#fafafa;color:var(--secondary);font-size:10px;font-weight:700;
+    th{{background:var(--surface);color:var(--secondary);font-size:10px;font-weight:700;
       text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;}}
     tr:last-child td{{border-bottom:none;}}
     td.num{{text-align:right;font-variant-numeric:tabular-nums;}}
     th.num{{text-align:right;}}
-    tr.model-win{{background:#f0fdf4;}}
-    tr.model-win:hover{{background:#dcfce7;}}
+    tr.model-win{{background:rgba(34,211,160,0.07);}}
+    tr.model-win:hover{{background:rgba(34,211,160,0.12);}}
     tr.model-loss:hover{{background:var(--highlight);}}
     .badge{{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;}}
     .badge.win{{background:#dcfce7;color:#15803d;}}
