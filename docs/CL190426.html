@@ -4,21 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Coolamon — 19 Apr 2026</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root {
-      /* Modern Deep & Crisp Palette */
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --primary: #0f172a;    /* Slate 900 */
-      --secondary: #64748b;  /* Slate 500 */
-      --accent: #10b981;     /* Emerald 500 */
-      --accent-dark: #059669;
-      --accent-soft: #ecfdf5;
-      --border: #e2e8f0;     /* Slate 200 */
-      --pick-bg: #f0f9ff;    /* Sky 50 */
-      --pick-text: #0369a1;  /* Sky 700 */
-      --winner-bg: #f0fdf4;
-      --highlight: #f1f5f9;
+      /* MuzzyBet Stealth Theme */
+      --bg:            #0a0a0a;
+      --card-bg:       #101010;
+      --surface:       #131313;
+      --primary-text:  #f0f0f0;
+      --secondary:     #808080;
+      --accent:        #00d4ff;
+      --accent-dark:   #00aacc;
+      --accent-soft:   rgba(0,212,255,0.08);
+      --winner:        #22d3a0;
+      --winner-soft:   rgba(34,211,160,0.08);
+      --pick-bg:       rgba(192,132,252,0.08);
+      --pick-text:     #c084fc;
+      --border:        #1f1f1f;
+      --border-strong: #2e2e2e;
+      --highlight:     #1a1a1a;
+      --winner-bg:     rgba(34,211,160,0.06);
     }
 
     * { box-sizing: border-box; }
@@ -26,26 +31,27 @@
 
     body {
       margin: 0;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: var(--primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--primary-text);
       background-color: var(--bg);
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
 
-    .wrap { 
-      max-width: 1200px; 
-      margin: 0 auto; 
-      padding: 40px 20px; 
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 20px;
     }
 
     /* Hero Section */
     .hero {
-      background: var(--primary);
-      color: white;
-      border-radius: 24px;
-      padding: 40px;
-      margin-bottom: 32px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      background: #060606;
+      color: var(--primary-text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 28px 32px;
+      margin-bottom: 16px;
       position: relative;
       overflow: hidden;
     }
@@ -53,66 +59,80 @@
     .hero::after {
       content: "";
       position: absolute;
-      top: 0; right: 0;
-      width: 300px; height: 300px;
-      background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
+      top: -60px; right: -60px;
+      width: 280px; height: 280px;
+      background: radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%);
       pointer-events: none;
     }
 
     .eyebrow {
       display: inline-block;
-      padding: 4px 12px;
-      border-radius: 6px;
-      background: rgba(255,255,255,0.1);
+      padding: 3px 10px;
+      border-radius: 3px;
+      background: var(--accent-soft);
       color: var(--accent);
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
+      font-family: 'Roboto Mono', monospace;
     }
 
-    h1 { margin: 0; font-size: 42px; font-weight: 800; letter-spacing: -0.02em; }
-    .sub { color: var(--secondary); font-size: 16px; margin-top: 8px; font-weight: 400; }
+    h1 {
+      margin: 0;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      text-transform: uppercase;
+    }
+
+    .sub { color: var(--secondary); font-size: 14px; margin-top: 6px; }
 
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 16px;
-      margin-top: 32px;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 20px;
     }
 
     .summary-card {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 12px;
-      padding: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
     }
 
-    .summary-card .label { 
+    .summary-card .label {
       display: block;
-      font-size: 11px; 
-      color: var(--secondary); 
-      text-transform: uppercase; 
-      letter-spacing: 0.05em;
-      margin-bottom: 4px;
+      font-size: 10px;
+      color: var(--secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 3px;
     }
-    .summary-card .value { font-size: 18px; font-weight: 600; color: white; }
+
+    .summary-card .value {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary-text);
+      font-family: 'Roboto Mono', monospace;
+    }
 
     /* Navigation */
     .race-nav {
       position: sticky;
-      top: 16px;
+      top: 0;
       z-index: 50;
-      margin-bottom: 32px;
-      padding: 8px;
+      margin-bottom: 16px;
+      padding: 6px;
       display: flex;
-      gap: 8px;
+      gap: 4px;
       overflow-x: auto;
-      background: rgba(255, 255, 255, 0.8);
+      background: rgba(10,10,10,0.95);
       backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
-      border-radius: 16px;
+      border-bottom: 1px solid var(--border);
       scrollbar-width: none;
     }
 
@@ -123,46 +143,57 @@
       white-space: nowrap;
       color: var(--secondary);
       background: transparent;
-      border-radius: 10px;
-      padding: 8px 16px;
-      font-size: 14px;
+      border-radius: 5px;
+      padding: 6px 14px;
+      font-size: 13px;
       font-weight: 600;
-      transition: all 0.2s;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
     }
 
     .race-nav a:hover {
       background: var(--highlight);
-      color: var(--primary);
+      color: var(--primary-text);
     }
 
     /* Race Cards */
     .race-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 20px;
+      border-radius: 8px;
       padding: 0;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
       overflow: hidden;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
 
     .race-head {
-      padding: 14px 24px;
+      padding: 12px 20px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: #fafafa;
+      background: var(--surface);
     }
 
-    .race-head h2 { margin: 0; font-size: 24px; font-weight: 700; color: var(--primary); }
-    .race-head .top-pick { 
-      font-size: 14px; 
-      background: var(--accent-soft); 
-      color: var(--accent-dark);
-      padding: 6px 14px;
-      border-radius: 99px;
-      font-weight: 600;
+    .race-head h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 900;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--primary-text);
+    }
+
+    .race-head .top-pick {
+      font-size: 12px;
+      background: var(--pick-bg);
+      color: var(--pick-text);
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      border: 1px solid rgba(192,132,252,0.2);
     }
 
     /* Tables */
@@ -174,17 +205,17 @@
     th, td {
       padding: 9px 12px;
       text-align: left;
-      font-size: 14px;
+      font-size: 13px;
       border-bottom: 1px solid var(--border);
     }
 
     th {
-      background: white;
+      background: var(--surface);
       color: var(--secondary);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
     }
 
     tr:last-child td { border-bottom: none; }
@@ -192,7 +223,7 @@
 
     /* Special Rows */
     tr.top-pick-row { background: var(--pick-bg); }
-    tr.top-pick-row:hover { background: #e0f2fe; }
+    tr.top-pick-row:hover { background: rgba(192,132,252,0.12); }
     tr.result-winner { background: var(--winner-bg); }
 
     .horse-cell {
@@ -201,22 +232,30 @@
       gap: 2px;
     }
 
-    .horse-cell strong { font-size: 15px; color: var(--primary); }
+    .horse-cell strong {
+      font-size: 14px;
+      color: var(--primary-text);
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
     .horse-cell .meta { color: var(--secondary); font-size: 12px; }
 
     .pill {
       display: inline-block;
       margin-top: 4px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
+      letter-spacing: 0.06em;
     }
-    .pill.pick { background: var(--pick-text); color: white; }
-    .pill.win { background: var(--accent); color: white; }
-    .pill.fs { background: #7c3aed; color: white; }
-    .pill.ns { background: #ea580c; color: white; }
+    .pill.pick { background: var(--pick-bg); color: var(--pick-text); border: 1px solid rgba(192,132,252,0.25); }
+    .pill.win { background: var(--winner-soft); color: var(--winner); border: 1px solid rgba(34,211,160,0.25); }
+    .pill.fs { background: rgba(124,58,237,0.15); color: #a78bfa; border: 1px solid rgba(124,58,237,0.25); }
+    .pill.ns { background: rgba(234,88,12,0.15); color: #fb923c; border: 1px solid rgba(234,88,12,0.25); }
 
     .driver-change { color: #f59e0b; font-weight: 600; }
 
@@ -258,9 +297,9 @@
     }
 
     /* ── Diagnostics panel ── */
-    .diag-row td { padding: 0; background: #f1f5f9; border-bottom: 2px solid var(--border); }
+    .diag-row td { padding: 0; background: #0d0d0d; border-bottom: 2px solid var(--border); }
     .diag-panel { padding: 14px 18px 6px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
-    .diag-group { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+    .diag-group { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
     .diag-group h4 { margin: 0 0 7px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--secondary); }
     .diag-kv { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 1px solid var(--border); font-size: 11.5px; }
     .diag-kv:last-child { border-bottom: none; }
@@ -277,7 +316,7 @@
     .comp-pos  { color: #16a34a; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
     .comp-neg  { color: #dc2626; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
     .comp-zero { color: var(--secondary); opacity: 0.45; font-variant-numeric: tabular-nums; text-align: right; }
-    .diag-toggle { background: none; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 10px; padding: 1px 5px; margin-left: 5px; color: var(--secondary); transition: transform 0.15s; line-height: 1.4; vertical-align: middle; }
+    .diag-toggle { background: none; border: 1px solid var(--border-strong); border-radius: 3px; cursor: pointer; font-size: 10px; padding: 1px 5px; margin-left: 5px; color: var(--secondary); transition: transform 0.15s; line-height: 1.4; vertical-align: middle; }
     .diag-toggle.open { transform: rotate(90deg); color: var(--accent); border-color: var(--accent); }
   </style>
 </head>
@@ -320,7 +359,7 @@
         
         <div class="summary-card">
           <span class="label">Generated</span>
-          <span class="value">28 Apr 2026 19:18</span>
+          <span class="value">28 Apr 2026 19:58</span>
         </div>
         </div>
     </section>

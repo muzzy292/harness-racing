@@ -4,70 +4,77 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Driver &amp; Trainer Stats — Harness Racing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --primary: #0f172a;
-      --secondary: #64748b;
-      --accent: #10b981;
-      --accent-dark: #059669;
-      --accent-soft: #ecfdf5;
-      --border: #e2e8f0;
-      --highlight: #f1f5f9;
-      --hot-bg: rgba(245, 158, 11, 0.08);
+      --bg: #0a0a0a;
+      --card-bg: #101010;
+      --surface: #131313;
+      --primary: #f0f0f0;
+      --secondary: #808080;
+      --accent: #00d4ff;
+      --accent-dark: #00aacc;
+      --accent-soft: rgba(0,212,255,0.08);
+      --border: #1f1f1f;
+      --highlight: #1a1a1a;
+      --hot-bg: rgba(240,180,41,0.08);
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       color: var(--primary);
       background-color: var(--bg);
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
     .top-nav {
-      background: var(--primary);
-      padding: 12px 20px;
+      background: #060606;
+      padding: 10px 20px;
       display: flex;
-      gap: 8px;
+      gap: 4px;
       align-items: center;
+      border-bottom: 1px solid var(--border);
     }
     .top-nav a {
       color: var(--secondary);
       text-decoration: none;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       padding: 6px 14px;
-      border-radius: 8px;
-      transition: all 0.2s;
+      border-radius: 5px;
+      transition: all 0.15s;
     }
-    .top-nav a:hover { background: rgba(255,255,255,0.1); color: white; }
-    .top-nav a.active { background: rgba(255,255,255,0.12); color: white; }
+    .top-nav a:hover { background: var(--highlight); color: var(--primary); }
+    .top-nav a.active { background: rgba(0,212,255,0.08); color: var(--accent); }
     .wrap { max-width: 1200px; margin: 0 auto; padding: 36px 20px 60px; }
     .hero {
-      background: var(--primary);
-      color: white;
-      padding: 40px 20px 32px;
-      text-align: center;
-    }
-    .hero h1 { margin: 0 0 8px; font-size: 36px; font-weight: 800; letter-spacing: -0.02em; }
-    .hero p { margin: 0; color: var(--secondary); font-size: 15px; }
-    .section-title {
-      font-size: 22px;
-      font-weight: 700;
+      background: #060606;
       color: var(--primary);
-      margin: 40px 0 16px;
+      padding: 36px 20px 28px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 32px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; font-family: 'Barlow Condensed', 'Inter', sans-serif; }
+    .hero p { margin: 0; color: var(--secondary); font-size: 14px; }
+    .section-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--primary);
+      margin: 32px 0 12px;
       padding-bottom: 8px;
-      border-bottom: 2px solid var(--accent);
+      border-bottom: 1px solid var(--border);
       display: inline-block;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
     .table-wrap {
       overflow-x: auto;
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 8px;
       background: var(--card-bg);
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
     }
     table.stats-table {
       width: 100%;
@@ -75,31 +82,31 @@
       min-width: 700px;
     }
     th, td {
-      padding: 10px 14px;
+      padding: 9px 12px;
       text-align: left;
-      font-size: 14px;
+      font-size: 13px;
       border-bottom: 1px solid var(--border);
     }
     th {
-      background: #fafafa;
+      background: var(--surface);
       color: var(--secondary);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
     }
     th:hover { color: var(--primary); background: var(--highlight); }
-    th.sorted-asc::after { content: " ▼"; color: var(--accent-dark); }
-    th.sorted-desc::after { content: " ▲"; color: var(--accent-dark); }
-    td.num { text-align: right; }
+    th.sorted-asc::after { content: " ▼"; color: var(--accent); }
+    th.sorted-desc::after { content: " ▲"; color: var(--accent); }
+    td.num { text-align: right; font-family: 'Roboto Mono', monospace; font-size: 12px; }
     th.num { text-align: right; }
     tr:last-child td { border-bottom: none; }
     tr:hover { background: var(--highlight); }
     tr.hot-row { background: var(--hot-bg); }
-    tr.hot-row:hover { background: rgba(245, 158, 11, 0.14); }
+    tr.hot-row:hover { background: rgba(240,180,41,0.12); }
     .muted { color: var(--secondary); opacity: 0.5; }
     .footer {
       margin-top: 48px;
@@ -5117,9 +5124,7 @@
         </tbody>
       </table></div>
 
-    <div class="footer">
-      Generated 28 Apr 2026 19:18 &nbsp;·&nbsp; 4,509 results ingested
-    </div>
+    <div class="footer">Generated 28 Apr 2026 19:58 &nbsp;·&nbsp; 4,509 results ingested</div>
   </div>
   <script>
     function parseSortVal(text) {

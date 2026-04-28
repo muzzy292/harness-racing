@@ -4,85 +4,100 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Harness Racing Scores</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --primary: #0f172a;
-      --secondary: #64748b;
-      --accent: #10b981;
-      --accent-dark: #059669;
-      --border: #e2e8f0;
+      --bg:           #0a0a0a;
+      --card-bg:      #101010;
+      --surface:      #131313;
+      --primary-text: #f0f0f0;
+      --secondary:    #808080;
+      --accent:       #00d4ff;
+      --accent-dark:  #00aacc;
+      --border:       #1f1f1f;
+      --highlight:    #1a1a1a;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background-color: var(--bg);
-      color: var(--primary);
+      color: var(--primary-text);
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
     .top-nav {
-      background: var(--primary);
-      padding: 12px 20px;
+      background: #060606;
+      padding: 10px 20px;
       display: flex;
-      gap: 8px;
+      gap: 4px;
       align-items: center;
+      border-bottom: 1px solid var(--border);
     }
     .top-nav a {
       color: var(--secondary);
       text-decoration: none;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       padding: 6px 14px;
-      border-radius: 8px;
-      transition: all 0.2s;
+      border-radius: 5px;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
     }
-    .top-nav a:hover { background: rgba(255,255,255,0.1); color: white; }
-    .top-nav a.active { background: rgba(255,255,255,0.12); color: white; }
+    .top-nav a:hover { background: var(--highlight); color: var(--primary-text); }
+    .top-nav a.active { background: rgba(0,212,255,0.08); color: var(--accent); }
     .hero {
-      background: var(--primary);
-      color: white;
-      padding: 32px 20px 40px;
+      background: #060606;
+      color: var(--primary-text);
+      padding: 40px 20px 36px;
       text-align: center;
+      border-bottom: 1px solid var(--border);
     }
     .hero h1 {
       margin: 0 0 8px;
-      font-size: 40px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
     }
     .hero p {
       margin: 0;
       color: var(--secondary);
-      font-size: 16px;
+      font-size: 14px;
     }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 36px 20px 60px; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 60px; }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 10px;
     }
     .meeting-card {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      padding: 24px;
+      gap: 5px;
+      padding: 18px 20px;
       text-decoration: none;
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      border-radius: 8px;
+      transition: border-color 0.15s, background 0.15s;
     }
     .meeting-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+      border-color: var(--accent);
+      background: rgba(0,212,255,0.04);
     }
-    .meeting-code { font-size: 20px; font-weight: 700; color: var(--primary); letter-spacing: 0.02em; }
-    .meeting-meta { color: var(--secondary); font-size: 13px; }
-    .meeting-stats { color: var(--primary); font-size: 13px; font-weight: 600; }
-    .meeting-link { margin-top: 6px; color: var(--accent-dark); font-size: 14px; font-weight: 600; }
+    .meeting-code {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--primary-text);
+      letter-spacing: 0.06em;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      text-transform: uppercase;
+    }
+    .meeting-meta { color: var(--secondary); font-size: 12px; }
+    .meeting-stats { color: var(--primary-text); font-size: 12px; font-weight: 600; }
+    .meeting-link { margin-top: 4px; color: var(--accent); font-size: 13px; font-weight: 600; }
   </style>
 </head>
 <body>
