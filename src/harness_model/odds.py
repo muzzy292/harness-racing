@@ -41,6 +41,8 @@ _DEFAULT_WEIGHTS: dict = {
         "nr_grade_delta": 0.7,
         "driver_form": 0.3,
         "trainer_form_manual": 0.6,
+        "hot_driver": 0.5,
+        "hot_trainer": 0.4,
     },
     "fitness": {
         "tier_15_28": -0.35,
@@ -546,6 +548,10 @@ def _stage2_components(
     driver_form_manual = _to_int(row.get("driver_form_manual")) or 0
     trainer_change_manual = _to_float(row.get("trainer_change_manual"))
     trainer_form_manual = _to_int(row.get("trainer_form_manual")) or 0
+    driver_last_30_starts = _to_int(row.get("driver_last_30_starts"))
+    driver_last_30_win_rate = _to_float(row.get("driver_last_30_win_rate"))
+    trainer_last_30_starts = _to_int(row.get("trainer_last_30_starts"))
+    trainer_last_30_win_rate = _to_float(row.get("trainer_last_30_win_rate"))
     class_delta = _to_float(row.get("class_delta"))
     nr_headroom = _to_float(row.get("nr_headroom"))
     second_up_improvement = _to_float(row.get("second_up_improvement"))
@@ -622,6 +628,10 @@ def _stage2_components(
         # Trainer form — manual input only (+1 good form / 0 neutral / -1 poor form).
         # Set via set-trainer-form CLI or web UI button. No automated scraping.
         "trainer_form": trainer_form_manual * w.get("trainer_form_manual", 0.6),
+        # Hot driver/trainer boost — automated from last-30-day stats.
+        # Requires >=5 starts, >25% win rate. Proportional: 0 at 25%, 1.0 at 50%.
+        "hot_driver":  _hot_form_score(driver_last_30_starts, driver_last_30_win_rate) * w.get("hot_driver", 0.5),
+        "hot_trainer": _hot_form_score(trainer_last_30_starts, trainer_last_30_win_rate) * w.get("hot_trainer", 0.4),
         "stable_change": 0.0,
     }
 
@@ -783,6 +793,19 @@ def _fitness_score(days: float | None, fw: dict | None = None) -> float:
     if days > 14:
         return f.get("tier_15_28", -0.35)
     return 0.0
+
+
+def _hot_form_score(starts: int | None, win_rate: float | None) -> float:
+    """Proportional boost for hot in-form drivers/trainers.
+
+    Requires >=5 starts and >25% win rate over last 30 days.
+    Score: 0.5 at the 25% threshold (entry floor), 1.0 at 50%+ win rate.
+    The floor ensures qualifying operators receive a meaningful boost immediately
+    rather than near-zero at 26%.
+    """
+    if not starts or not win_rate or starts < 5 or win_rate <= 0.25:
+        return 0.0
+    return 1.0 + (win_rate - 0.25) / 0.25
 
 
 def _trainer_form_score(page_win_rate: float | None, win_rate_30: float | None, win_rate_90: float | None, w: dict | None = None) -> float:

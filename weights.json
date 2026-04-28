@@ -36,6 +36,8 @@
     "nr_grade_delta": 1.4,
     "driver_form": 0.6,
     "trainer_form_manual": 0.6,
+    "hot_driver": 0.5,
+    "hot_trainer": 0.4,
     "second_up": 1.5,
     "barrier_relief": 0.4
   },
