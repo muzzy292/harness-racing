@@ -206,7 +206,7 @@ tr.r-void{opacity:.4}
       <button class="btn btn-surface" id="ocr-btn" onclick="document.getElementById('img-input').click()">Screenshot OCR</button>
       <input type="file" id="img-input" accept="image/*" hidden onchange="runOCR(this)">
     </div>
-    <p class="hint">Accepts TAB, Betfair, or any format with horse name + decimal odds</p>
+    <p class="hint">Paste TAB text odds above, or press Ctrl+V anywhere on the page to paste a screenshot directly</p>
   </div>
 
   <!-- Qualifying bets -->
@@ -488,12 +488,10 @@ function renderHistory() {
 const OCR_MODE = '%%OCR_MODE%%';  // 'local' or 'hosted'
 const OCR_PROMPT = 'Extract horse names and decimal odds from this TAB/betting screenshot. Return a JSON array only: [{"name":"HORSE NAME","odds":3.50},...]. Uppercase names, decimal odds only. No explanation, just the JSON array.';
 
-async function runOCR(input) {
-  if (!input.files.length) return;
+async function runOCRFromFile(file) {
   const btn = document.getElementById('ocr-btn');
   btn.textContent = 'Analysing...'; btn.disabled = true;
   try {
-    const file = input.files[0];
     const b64 = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
     let data;
     if (OCR_MODE === 'local') {
@@ -502,7 +500,7 @@ async function runOCR(input) {
       data = await resp.json();
     } else {
       const apiKey = localStorage.getItem('muzzybet_anthropic_key');
-      if (!apiKey) { openSettings(); throw new Error('Enter your Anthropic API key in the OCR Settings panel'); }
+      if (!apiKey) { openSettings(); throw new Error('Enter your Anthropic API key in OCR Settings'); }
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -531,9 +529,28 @@ async function runOCR(input) {
     alert('OCR failed: '+e.message);
     btn.textContent = 'Screenshot OCR';
   } finally {
-    btn.disabled = false; input.value = '';
+    btn.disabled = false;
   }
 }
+
+// File picker trigger
+function runOCR(input) {
+  if (!input.files.length) return;
+  runOCRFromFile(input.files[0]).finally(() => { input.value = ''; });
+}
+
+// Paste anywhere on the page — intercepts clipboard images (Ctrl+V / Cmd+V)
+document.addEventListener('paste', (e) => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault();
+      runOCRFromFile(item.getAsFile());
+      return;
+    }
+  }
+});
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 function openSettings() {
