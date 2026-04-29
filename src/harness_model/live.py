@@ -139,6 +139,17 @@ tr.r-void{opacity:.4}
 
 .empty{color:var(--secondary);text-align:center;padding:24px;font-style:italic;font-size:12px}
 .hint{color:var(--secondary);font-size:11px;margin-top:6px}
+
+/* Settings overlay */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.settings-box{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:24px;width:420px;max-width:95vw}
+.settings-box h3{font-family:"Barlow Condensed",sans-serif;font-size:18px;font-weight:800;color:var(--accent);margin-bottom:16px;letter-spacing:1px;text-transform:uppercase}
+.settings-box label{display:block;color:var(--secondary);font-size:11px;margin-bottom:4px;font-family:"Barlow Condensed",sans-serif;letter-spacing:.5px;text-transform:uppercase}
+.settings-box input{width:100%;background:var(--surface);color:var(--primary-text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:"Roboto Mono",monospace;font-size:12px;margin-bottom:12px}
+.settings-box input:focus{outline:none;border-color:var(--accent)}
+.settings-note{color:var(--secondary);font-size:11px;line-height:1.5;margin-bottom:14px}
+.key-ok{color:var(--winner);font-size:11px;margin-top:-8px;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -150,7 +161,24 @@ tr.r-void{opacity:.4}
   <a href="/betting.html">Betting</a>
   <a href="/diagnose.html">Diagnose</a>
   <a class="active" href="#">Live</a>
+  <button class="btn btn-muted btn-sm" style="margin-left:auto" onclick="openSettings()">⚙ OCR Settings</button>
 </nav>
+
+<!-- Settings overlay -->
+<div class="overlay" id="settings-overlay" onclick="if(event.target===this)closeSettings()">
+  <div class="settings-box">
+    <h3>OCR Settings</h3>
+    <label>Anthropic API Key</label>
+    <input type="password" id="api-key-input" placeholder="sk-ant-..." autocomplete="off">
+    <div id="key-status"></div>
+    <p class="settings-note">Your key is stored only in this browser (localStorage). It is never sent anywhere except directly to Anthropic's API for screenshot OCR.<br><br>Get a key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent)">console.anthropic.com</a></p>
+    <div class="row" style="gap:8px">
+      <button class="btn btn-accent" onclick="saveKey()">Save Key</button>
+      <button class="btn btn-muted" onclick="clearKey()">Clear Key</button>
+      <button class="btn btn-surface" onclick="closeSettings()" style="margin-left:auto">Close</button>
+    </div>
+  </div>
+</div>
 
 <div class="page">
 
@@ -175,7 +203,7 @@ tr.r-void{opacity:.4}
     <textarea id="tab-input" placeholder="Paste TAB odds here, e.g.&#10;1 HORSE NAME $4.50&#10;2 ANOTHER HORSE $7.00&#10;&#10;Accepts most copy-paste formats."></textarea>
     <div class="row" style="margin-top:10px">
       <button class="btn btn-accent" onclick="calcBets()">Calculate Bets</button>
-      <button class="btn btn-surface" id="ocr-btn" %%OCR_STYLE%% onclick="document.getElementById('img-input').click()">Screenshot OCR</button>
+      <button class="btn btn-surface" id="ocr-btn" onclick="document.getElementById('img-input').click()">Screenshot OCR</button>
       <input type="file" id="img-input" accept="image/*" hidden onchange="runOCR(this)">
     </div>
     <p class="hint">Accepts TAB, Betfair, or any format with horse name + decimal odds</p>
@@ -456,7 +484,10 @@ function renderHistory() {
   document.getElementById('hist-panel').innerHTML = h;
 }
 
-// ── OCR via local server ──────────────────────────────────────────────────────
+// ── OCR ───────────────────────────────────────────────────────────────────────
+const OCR_MODE = '%%OCR_MODE%%';  // 'local' or 'hosted'
+const OCR_PROMPT = 'Extract horse names and decimal odds from this TAB/betting screenshot. Return a JSON array only: [{"name":"HORSE NAME","odds":3.50},...]. Uppercase names, decimal odds only. No explanation, just the JSON array.';
+
 async function runOCR(input) {
   if (!input.files.length) return;
   const btn = document.getElementById('ocr-btn');
@@ -464,9 +495,35 @@ async function runOCR(input) {
   try {
     const file = input.files[0];
     const b64 = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
-    const resp = await fetch('/api/ocr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({image:b64,media_type:file.type})});
-    if (!resp.ok) throw new Error(await resp.text());
-    const data = await resp.json();
+    let data;
+    if (OCR_MODE === 'local') {
+      const resp = await fetch('/api/ocr', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({image:b64, media_type:file.type})});
+      if (!resp.ok) throw new Error(await resp.text());
+      data = await resp.json();
+    } else {
+      const apiKey = localStorage.getItem('muzzybet_anthropic_key');
+      if (!apiKey) { openSettings(); throw new Error('Enter your Anthropic API key in the OCR Settings panel'); }
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5',
+          max_tokens: 1024,
+          messages: [{role:'user', content:[
+            {type:'image', source:{type:'base64', media_type:file.type, data:b64}},
+            {type:'text', text:OCR_PROMPT}
+          ]}]
+        })
+      });
+      if (!resp.ok) { const e=await resp.json(); throw new Error(e.error?.message||resp.statusText); }
+      const result = await resp.json();
+      data = JSON.parse(result.content[0].text);
+    }
     if (data.error) throw new Error(data.error);
     document.getElementById('tab-input').value = data.map(h=>`${h.name} ${h.odds}`).join('\n');
     btn.textContent = `OCR: ${data.length} horses found`;
@@ -478,6 +535,28 @@ async function runOCR(input) {
   }
 }
 
+// ── Settings ──────────────────────────────────────────────────────────────────
+function openSettings() {
+  const saved = localStorage.getItem('muzzybet_anthropic_key');
+  document.getElementById('api-key-input').value = saved || '';
+  document.getElementById('key-status').textContent = saved ? '✓ Key saved' : '';
+  document.getElementById('key-status').className = saved ? 'key-ok' : '';
+  document.getElementById('settings-overlay').classList.add('open');
+}
+function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); }
+function saveKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) { alert('Enter an API key first'); return; }
+  localStorage.setItem('muzzybet_anthropic_key', key);
+  document.getElementById('key-status').textContent = '✓ Key saved';
+  document.getElementById('key-status').className = 'key-ok';
+}
+function clearKey() {
+  localStorage.removeItem('muzzybet_anthropic_key');
+  document.getElementById('api-key-input').value = '';
+  document.getElementById('key-status').textContent = '';
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 populateMeetings();
 refreshBank();
@@ -487,17 +566,42 @@ renderHistory();
 </html>"""
 
 
-def _build_html(races: list[dict], has_anthropic: bool) -> str:
-    ocr_style = "" if has_anthropic else 'style="display:none"'
+def _build_html(races: list[dict], mode: str = "local") -> str:
+    """Build the live page HTML.
+
+    mode='local'  — OCR calls /api/ocr on the local server.
+    mode='hosted' — OCR calls Anthropic API directly from the browser
+                    using a key the user stores in localStorage.
+    """
     return (
         _HTML_TEMPLATE
         .replace("%%RACES_JSON%%", json.dumps(races))
-        .replace("%%OCR_STYLE%%", ocr_style)
+        .replace("%%OCR_MODE%%", mode)
         .replace("%%MIN_EDGE%%", str(_MIN_EDGE))
         .replace("%%KELLY%%", str(_KELLY_FRACTION))
         .replace("%%MAX_STK%%", str(_MAX_STAKE_PCT))
         .replace("%%START_BANK%%", str(_STARTING_BANK))
     )
+
+
+def build_live_site(
+    csv_path: str,
+    weights_path: str | None = None,
+    out_dir: str = "docs",
+) -> Path:
+    """Build docs/live.html for GitHub Pages hosting.
+
+    Embeds all scored races as JSON. OCR calls Anthropic directly from
+    the browser using a key the user saves in their browser's localStorage.
+    """
+    print("Loading and scoring races for live page...")
+    races = _score_all_races(csv_path, weights_path)
+    html = _build_html(races, mode="hosted")
+    out_path = Path(out_dir) / "live.html"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(html, encoding="utf-8")
+    print(f"  {len(races)} races embedded -> {out_path}")
+    return out_path
 
 
 # ---------------------------------------------------------------------------
@@ -578,20 +682,17 @@ def serve_live(
     host: str = "127.0.0.1",
     port: int = 8001,
 ) -> None:
-    has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
     print("Loading and scoring races...")
     races = _score_all_races(csv_path, weights_path)
-    html = _build_html(races, has_anthropic).encode("utf-8")
+    html = _build_html(races, mode="local").encode("utf-8")
     print(f"  {len(races)} races loaded")
 
     handler = type("LiveHandler", (_LiveHandler,), {"_html": html})
     server = ThreadingHTTPServer((host, port), handler)
 
+    has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
     print(f"\nMuzzyBet Live: http://{host}:{port}")
-    if has_anthropic:
-        print("  OCR: enabled (ANTHROPIC_API_KEY found)")
-    else:
-        print("  OCR: disabled (set ANTHROPIC_API_KEY to enable)")
+    print(f"  OCR: {'enabled (ANTHROPIC_API_KEY found)' if has_anthropic else 'disabled (set ANTHROPIC_API_KEY to enable)'}")
     print("  Bet tracking: browser localStorage (persists across sessions)")
     print("  Starting bank: $100.00")
     print("\nPress Ctrl+C to stop.\n")

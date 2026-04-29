@@ -324,6 +324,7 @@ def _write_index(
     <a href="stats.html">Stats</a>
     <a href="betting.html">Betting</a>
     <a href="diagnose.html">Diagnose</a>
+    <a href="live.html">Live</a>
   </nav>
   <div class="hero">
     <h1>Harness Racing Scores</h1>
@@ -715,6 +716,7 @@ def _render_meeting_html(
       <a href="stats.html">Stats</a>
       <a href="betting.html">Betting</a>
       <a href="diagnose.html">Diagnose</a>
+    <a href="live.html">Live</a>
       {race_nav}
     </nav>
     {''.join(sections) if sections else '<div class="race-card"><p>No races found for this meeting.</p></div>'}
@@ -1350,6 +1352,7 @@ def _render_stats_html(driver_rows: list[dict], trainer_rows: list[dict], meta: 
     <a href="stats.html" class="active">Stats</a>
     <a href="betting.html">Betting</a>
     <a href="diagnose.html">Diagnose</a>
+    <a href="live.html">Live</a>
   </nav>
   <div class="hero">
     <h1>Driver &amp; Trainer Stats</h1>
@@ -1745,6 +1748,7 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
     <a href="stats.html">Stats</a>
     <a href="betting.html" class="active">Betting</a>
     <a href="diagnose.html">Diagnose</a>
+    <a href="live.html">Live</a>
   </nav>
   <div class="hero">
     <h1>Betting Backtest</h1>
@@ -1931,6 +1935,13 @@ def republish_all_meetings(
     # Write updated manifest and rebuild index
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     _write_index(docs)
+
+    # Rebuild live page so hosted race data stays current
+    try:
+        from .live import build_live_site
+        build_live_site(str(csv_path), out_dir=str(docs))
+    except Exception as exc:  # noqa: BLE001
+        print(f"  Warning: live page rebuild failed — {exc}")
 
     print(f"\nRepublished {published}/{len(meeting_codes)} meetings.")
 

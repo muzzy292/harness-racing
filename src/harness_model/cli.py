@@ -36,7 +36,7 @@ from .odds import (
     write_scored_rows_csv,
 )
 from .web import build_betting_site, build_diagnose_site, build_meeting_site, build_stats_site, publish_scored_meeting, republish_all_meetings, serve_site
-from .live import serve_live
+from .live import build_live_site, serve_live
 
 
 _DEFAULT_WEIGHTS_PATH = Path("weights.json")
@@ -545,7 +545,12 @@ def main() -> None:
     serve_site_parser.add_argument("--host", default="127.0.0.1")
     serve_site_parser.add_argument("--port", type=int, default=8000)
 
-    serve_live_parser = subparsers.add_parser("serve-live", help="Start the live betting page (paste TAB odds, track bets, OCR screenshots)")
+    build_live_parser = subparsers.add_parser("build-live-site", help="Build docs/live.html for GitHub Pages hosting")
+    build_live_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    build_live_parser.add_argument("--weights", default=None)
+    build_live_parser.add_argument("--out", default="docs")
+
+    serve_live_parser = subparsers.add_parser("serve-live", help="Start the live betting page locally (paste TAB odds, track bets, OCR screenshots)")
     serve_live_parser.add_argument("--csv", default="data/features/runner_features.csv")
     serve_live_parser.add_argument("--weights", default=None)
     serve_live_parser.add_argument("--host", default="127.0.0.1")
@@ -770,6 +775,8 @@ def main() -> None:
         print(f"Built meeting site page at {page_path}")
     elif args.command == "serve-site":
         serve_site(args.site_dir, host=args.host, port=args.port)
+    elif args.command == "build-live-site":
+        build_live_site(args.csv, weights_path=args.weights, out_dir=args.out)
     elif args.command == "serve-live":
         serve_live(args.csv, weights_path=args.weights, host=args.host, port=args.port)
     elif args.command == "republish-all":
