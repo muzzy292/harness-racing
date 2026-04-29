@@ -506,7 +506,7 @@ function renderHistory() {
 
 // ── OCR ───────────────────────────────────────────────────────────────────────
 const OCR_MODE = '%%OCR_MODE%%';  // 'local' or 'hosted'
-const OCR_PROMPT = 'Extract horse names and decimal odds from this TAB/betting screenshot. Return a JSON array only: [{"name":"HORSE NAME","odds":3.50},...]. Uppercase names, decimal odds only. No explanation, just the JSON array.';
+const OCR_PROMPT = 'Extract horse names and decimal odds from this TAB/betting screenshot. Return a JSON array only: [{"name":"HORSE NAME","odds":3.50},...]. Uppercase names, decimal odds only. If you cannot find any odds, return an empty array []. Never return text — always return a valid JSON array.';
 
 async function runOCRFromFile(file) {
   const btn = document.getElementById('ocr-btn');
@@ -541,9 +541,11 @@ async function runOCRFromFile(file) {
       if (!resp.ok) { const e=await resp.json(); throw new Error(e.error?.message||resp.statusText); }
       const result = await resp.json();
       const raw = result.content[0].text.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
-      data = JSON.parse(raw);
+      try { data = JSON.parse(raw); }
+      catch { throw new Error('Could not read odds from image — make sure the screenshot shows TAB odds clearly'); }
     }
     if (data.error) throw new Error(data.error);
+    if (!Array.isArray(data) || !data.length) throw new Error('No odds found in image — make sure the screenshot shows TAB odds clearly');
     document.getElementById('tab-input').value = data.map(h=>`${h.name} ${h.odds}`).join('\n');
     btn.textContent = `OCR: ${data.length} horses found`;
   } catch(e) {
