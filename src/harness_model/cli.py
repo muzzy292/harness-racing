@@ -36,6 +36,7 @@ from .odds import (
     write_scored_rows_csv,
 )
 from .web import build_betting_site, build_diagnose_site, build_meeting_site, build_stats_site, publish_scored_meeting, republish_all_meetings, serve_site
+from .live import serve_live
 
 
 _DEFAULT_WEIGHTS_PATH = Path("weights.json")
@@ -544,6 +545,12 @@ def main() -> None:
     serve_site_parser.add_argument("--host", default="127.0.0.1")
     serve_site_parser.add_argument("--port", type=int, default=8000)
 
+    serve_live_parser = subparsers.add_parser("serve-live", help="Start the live betting page (paste TAB odds, track bets, OCR screenshots)")
+    serve_live_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    serve_live_parser.add_argument("--weights", default=None)
+    serve_live_parser.add_argument("--host", default="127.0.0.1")
+    serve_live_parser.add_argument("--port", type=int, default=8001)
+
     build_stats_parser = subparsers.add_parser("build-stats-site", help="Build driver and trainer stats page from ingested results")
     build_stats_parser.add_argument("--db", default="data/harness.db")
     build_stats_parser.add_argument("--out", default="docs", help="Output directory for stats.html (default: docs)")
@@ -763,6 +770,8 @@ def main() -> None:
         print(f"Built meeting site page at {page_path}")
     elif args.command == "serve-site":
         serve_site(args.site_dir, host=args.host, port=args.port)
+    elif args.command == "serve-live":
+        serve_live(args.csv, weights_path=args.weights, host=args.host, port=args.port)
     elif args.command == "republish-all":
         weights = _resolve_weights(getattr(args, "weights", None))
         republish_all_meetings(args.csv, args.db, args.out, weights=weights)
