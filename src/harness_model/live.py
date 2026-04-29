@@ -156,10 +156,10 @@ tr.r-void{opacity:.4}
 
 <nav>
   <span class="nav-brand">MUZZYBET LIVE</span>
-  <a href="/">Races</a>
-  <a href="/stats.html">Stats</a>
-  <a href="/betting.html">Betting</a>
-  <a href="/diagnose.html">Diagnose</a>
+  <a href="index.html">Races</a>
+  <a href="stats.html">Stats</a>
+  <a href="betting.html">Betting</a>
+  <a href="diagnose.html">Diagnose</a>
   <a class="active" href="#">Live</a>
   <button class="btn btn-muted btn-sm" style="margin-left:auto" onclick="openSettings()">⚙ OCR Settings</button>
 </nav>
