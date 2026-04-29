@@ -239,9 +239,22 @@ const START_BANK  = %%START_BANK%%;
 const LS_KEY      = 'muzzybet_live_v1';
 
 // ── Race data helpers ─────────────────────────────────────────────────────────
+function mcToDate(mc) {
+  // Meeting codes: 2-letter track prefix + DDMMYY  e.g. NR290426 = 29 Apr 2026
+  if (mc.length < 8) return null;
+  const dd = mc.slice(2, 4), mm = mc.slice(4, 6), yy = mc.slice(6, 8);
+  const d = new Date(`20${yy}-${mm}-${dd}`);
+  return isNaN(d) ? null : d;
+}
+
 function getMeetings() {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const seen = new Set(), out = [];
-  for (const r of RACES) { if (!seen.has(r.meeting_code)) { seen.add(r.meeting_code); out.push(r.meeting_code); } }
+  for (const r of RACES) {
+    if (seen.has(r.meeting_code)) continue;
+    const d = mcToDate(r.meeting_code);
+    if (d === null || d >= today) { seen.add(r.meeting_code); out.push(r.meeting_code); }
+  }
   return out;
 }
 function getRaces(mc) { return RACES.filter(r => r.meeting_code === mc).sort((a,b)=>a.race_number-b.race_number); }
@@ -250,7 +263,14 @@ function getRace(mc, rn) { return RACES.find(r => r.meeting_code === mc && r.rac
 // ── Race selector ─────────────────────────────────────────────────────────────
 function populateMeetings() {
   const sel = document.getElementById('mc-sel');
-  for (const mc of getMeetings()) {
+  const meetings = getMeetings();
+  if (!meetings.length) {
+    const o = document.createElement('option');
+    o.disabled = true; o.textContent = 'No upcoming meetings — run build-features and republish-all';
+    sel.appendChild(o);
+    return;
+  }
+  for (const mc of meetings) {
     const o = document.createElement('option'); o.value = mc; o.textContent = mc; sel.appendChild(o);
   }
 }
