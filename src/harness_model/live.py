@@ -633,6 +633,22 @@ function clearKey() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+
+// Migrate any bets recorded before $0.50 rounding was introduced
+(function migrateStakes() {
+  const bets = loadBets();
+  let changed = false;
+  for (const b of bets) {
+    const rounded = roundStake(b.stake);
+    if (rounded !== b.stake) {
+      b.payout = parseFloat((rounded * b.tab_odds).toFixed(2));
+      b.stake = rounded;
+      changed = true;
+    }
+  }
+  if (changed) saveBets(bets);
+})();
+
 populateMeetings();
 refreshBank();
 renderHistory();
