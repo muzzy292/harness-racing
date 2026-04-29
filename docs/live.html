@@ -308,10 +308,16 @@ function bestMatch(tabName, runners) {
 // ── Edge + Kelly ──────────────────────────────────────────────────────────────
 function edge(tab, fair) { return fair>0 ? tab/fair-1 : null; }
 
+function roundStake(raw) {
+  // Round to nearest $0.50, minimum $1.00
+  return Math.max(1.00, Math.round(raw * 2) / 2);
+}
+
 function kellyStake(e, tabOdds, bank) {
   if (e<=0 || tabOdds<=1) return 0;
   const k = (e/(tabOdds-1))*KELLY;
-  return Math.min(Math.max(k*bank, 0.50), bank*MAX_STK_PCT);
+  const raw = Math.min(k*bank, bank*MAX_STK_PCT);
+  return roundStake(raw);
 }
 
 // ── Calculate + render bets ───────────────────────────────────────────────────
@@ -391,7 +397,7 @@ function currentBank() {
 function placeBet(btn, enc) {
   const d = JSON.parse(decodeURIComponent(enc));
   const bank = currentBank();
-  const stake = parseFloat(Math.min(d.stake, bank*MAX_STK_PCT).toFixed(2));
+  const stake = roundStake(Math.min(d.stake, bank*MAX_STK_PCT));
   const bets = loadBets();
   bets.push({id:Date.now(), placed_at:new Date().toISOString(), mc:d.mc, rn:d.rn, horse:d.horse, model_odds:d.model_odds, tab_odds:d.tab_odds, edge:d.edge, stake, payout:parseFloat((stake*d.tab_odds).toFixed(2)), result:'pending'});
   saveBets(bets);
