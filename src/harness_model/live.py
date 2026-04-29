@@ -520,7 +520,8 @@ async function runOCRFromFile(file) {
       });
       if (!resp.ok) { const e=await resp.json(); throw new Error(e.error?.message||resp.statusText); }
       const result = await resp.json();
-      data = JSON.parse(result.content[0].text);
+      const raw = result.content[0].text.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
+      data = JSON.parse(raw);
     }
     if (data.error) throw new Error(data.error);
     document.getElementById('tab-input').value = data.map(h=>`${h.name} ${h.odds}`).join('\n');
@@ -679,7 +680,10 @@ class _LiveHandler(BaseHTTPRequestHandler):
                     ],
                 }],
             )
-            result = json.loads(response.content[0].text)
+            import re
+            raw = re.sub(r'^```[\w]*\n?', '', response.content[0].text.strip())
+            raw = re.sub(r'\n?```$', '', raw).strip()
+            result = json.loads(raw)
             self._send(200, "application/json", json.dumps(result).encode())
         except Exception as exc:
             self._send(200, "application/json", json.dumps({"error": str(exc)}).encode())
