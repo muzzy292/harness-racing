@@ -200,7 +200,7 @@ tr.r-void{opacity:.4}
   <!-- TAB odds input -->
   <div class="card">
     <div class="card-title">TAB Odds</div>
-    <textarea id="tab-input" placeholder="Paste TAB odds here, e.g.&#10;1 HORSE NAME $4.50&#10;2 ANOTHER HORSE $7.00&#10;&#10;Accepts most copy-paste formats."></textarea>
+    <textarea id="tab-input" oninput="saveTabOdds()" placeholder="Paste TAB odds here, e.g.&#10;1 HORSE NAME $4.50&#10;2 ANOTHER HORSE $7.00&#10;&#10;Accepts most copy-paste formats."></textarea>
     <div class="row" style="margin-top:10px">
       <button class="btn btn-accent" onclick="calcBets()">Calculate Bets</button>
       <button class="btn btn-surface" id="ocr-btn" onclick="document.getElementById('img-input').click()">Screenshot OCR</button>
@@ -287,17 +287,45 @@ function onMcChange() {
   }
 }
 
+function tabOddsKey(mc, rn) { return `muzzybet_tab_${mc}_${rn}`; }
+
 function onRnChange() {
   const mc = document.getElementById('mc-sel').value;
   const rn = document.getElementById('rn-sel').value;
-  if (mc && rn) renderModelTable(mc, +rn);
+  if (!mc || !rn) return;
+  renderModelTable(mc, +rn);
+  // Restore any previously saved TAB odds for this race
+  const saved = localStorage.getItem(tabOddsKey(mc, rn));
+  document.getElementById('tab-input').value = saved || '';
+  document.getElementById('qual-panel').innerHTML = '<div class="empty">Paste TAB odds and click Calculate Bets</div>';
 }
+
+function saveTabOdds() {
+  const mc = document.getElementById('mc-sel').value;
+  const rn = document.getElementById('rn-sel').value;
+  if (!mc || !rn) return;
+  const val = document.getElementById('tab-input').value;
+  if (val.trim()) localStorage.setItem(tabOddsKey(mc, rn), val);
+  else localStorage.removeItem(tabOddsKey(mc, rn));
+}
+
+let _modelSort = 'number';  // 'number' or 'odds'
 
 function renderModelTable(mc, rn) {
   const race = getRace(mc, rn);
   if (!race) return;
-  let h = '<table><thead><tr><th>#</th><th>Horse</th><th>Bar</th><th>Model $</th></tr></thead><tbody>';
-  for (const r of race.runners) {
+  const runners = [...race.runners];
+  if (_modelSort === 'number') {
+    runners.sort((a,b) => (a.runner_number??99) - (b.runner_number??99));
+  }
+  // 'odds' keeps original order (already sorted by probability desc from scoring)
+  const numActive = _modelSort==='number';
+  let h = `<div style="display:flex;gap:6px;margin-bottom:10px">
+    <button class="btn btn-sm ${numActive?'btn-accent':'btn-surface'}" onclick="_modelSort='number';renderModelTable('${mc}',${rn})"># Runner No.</button>
+    <button class="btn btn-sm ${!numActive?'btn-accent':'btn-surface'}" onclick="_modelSort='odds';renderModelTable('${mc}',${rn})">Model Price</button>
+  </div>`;
+  h += '<table><thead><tr><th>#</th><th>Horse</th><th>Bar</th><th>Model $</th></tr></thead><tbody>';
+  for (const r of runners) {
     h += `<tr><td>${r.runner_number??'-'}</td><td class="name">${r.horse_name}</td><td>${r.barrier??'-'}</td><td class="c">${r.fair_odds?'$'+r.fair_odds.toFixed(2):'-'}</td></tr>`;
   }
   h += '</tbody></table>';
@@ -547,6 +575,7 @@ async function runOCRFromFile(file) {
     if (data.error) throw new Error(data.error);
     if (!Array.isArray(data) || !data.length) throw new Error('No odds found in image — make sure the screenshot shows TAB odds clearly');
     document.getElementById('tab-input').value = data.map(h=>`${h.name} ${h.odds}`).join('\n');
+    saveTabOdds();
     btn.textContent = `OCR: ${data.length} horses found`;
   } catch(e) {
     alert('OCR failed: '+e.message);
