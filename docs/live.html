@@ -247,8 +247,8 @@ function parseTabText(text) {
     if (!line) continue;
     // Strip leading runner number: "1." "1)" "1 " "No. 1"
     const stripped = line.replace(/^(?:No[.]?\s*)?\d+[.):\s]+/, '').trim();
-    // Decimal odds at end: "HORSE NAME $4.50" or "HORSE NAME 4.50"
-    let m = stripped.match(/^(.+?)\s+\$?([\d]+\.[\d]+)\s*$/);
+    // Decimal or integer odds at end: "HORSE NAME $4.50" or "HORSE NAME 10"
+    let m = stripped.match(/^(.+?)\s+\$?(\d+(?:[.]\d+)?)\s*$/);
     if (m) { const name=m[1].trim().toUpperCase().replace(/\s+/g,' '); const odds=+m[2]; if(odds>1) out.push({name,odds}); continue; }
     // Fractional: "HORSE NAME 5/2"
     m = stripped.match(/^(.+?)\s+(\d+)\/(\d+)\s*$/);
