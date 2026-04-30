@@ -313,5 +313,12 @@
     "meeting_date": "1 May 2026",
     "races": 8,
     "winners": 0
+  },
+  {
+    "meeting_code": "NR010526",
+    "track_name": "Newcastle",
+    "meeting_date": "1 May 2026",
+    "races": 9,
+    "winners": 0
   }
 ]
