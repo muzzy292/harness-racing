@@ -4,7 +4,7 @@
     "track_name": "Narrabri",
     "meeting_date": "5 Apr 2026",
     "races": 7,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "NR060426",
@@ -60,14 +60,14 @@
     "track_name": "Young",
     "meeting_date": "10 Apr 2026",
     "races": 7,
-    "winners": 3
+    "winners": 2
   },
   {
     "meeting_code": "NR100426",
     "track_name": "Newcastle",
     "meeting_date": "10 Apr 2026",
     "races": 9,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "DU100426",
@@ -88,7 +88,7 @@
     "track_name": "Narrabri",
     "meeting_date": "12 Apr 2026",
     "races": 6,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "CB130426",
@@ -109,7 +109,7 @@
     "track_name": "Newcastle",
     "meeting_date": "2 Apr 2026",
     "races": 9,
-    "winners": 6
+    "winners": 5
   },
   {
     "meeting_code": "PC310326",
@@ -172,7 +172,7 @@
     "track_name": "Newcastle",
     "meeting_date": "17 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "PK170426",
@@ -207,7 +207,7 @@
     "track_name": "Newcastle",
     "meeting_date": "20 Apr 2026",
     "races": 7,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "PC210426",
@@ -277,7 +277,7 @@
     "track_name": "Goulburn",
     "meeting_date": "27 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "PC280426",
@@ -298,14 +298,14 @@
     "track_name": "Tamworth",
     "meeting_date": "30 Apr 2026",
     "races": 8,
-    "winners": 0
+    "winners": 3
   },
   {
     "meeting_code": "PE300426",
     "track_name": "Penrith",
     "meeting_date": "30 Apr 2026",
     "races": 7,
-    "winners": 0
+    "winners": 3
   },
   {
     "meeting_code": "AL010526",
