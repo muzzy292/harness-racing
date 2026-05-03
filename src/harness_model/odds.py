@@ -43,6 +43,8 @@ _DEFAULT_WEIGHTS: dict = {
         "trainer_form_manual": 0.6,
         "hot_driver": 0.5,
         "hot_trainer": 0.4,
+        "cold_driver": 0.5,
+        "cold_trainer": 0.4,
     },
     "fitness": {
         "tier_15_28": -0.35,
@@ -632,6 +634,8 @@ def _stage2_components(
         # Requires >=5 starts, >25% win rate. Proportional: 0 at 25%, 1.0 at 50%.
         "hot_driver":  _hot_form_score(driver_last_30_starts, driver_last_30_win_rate) * w.get("hot_driver", 0.5),
         "hot_trainer": _hot_form_score(trainer_last_30_starts, trainer_last_30_win_rate) * w.get("hot_trainer", 0.4),
+        "cold_driver":  _cold_form_score(driver_last_30_starts, driver_last_30_win_rate) * w.get("cold_driver", 0.5),
+        "cold_trainer": _cold_form_score(trainer_last_30_starts, trainer_last_30_win_rate) * w.get("cold_trainer", 0.4),
         "stable_change": 0.0,
     }
 
@@ -806,6 +810,23 @@ def _hot_form_score(starts: int | None, win_rate: float | None) -> float:
     if not starts or not win_rate or starts < 5 or win_rate <= 0.25:
         return 0.0
     return 1.0 + (win_rate - 0.25) / 0.25
+
+
+def _cold_form_score(starts: int | None, win_rate: float | None) -> float:
+    """Scaled penalty for winless drivers/trainers over last 30 starts.
+
+    Fires when starts >= 5 and win_rate == 0 (zero wins).
+    Scales with streak length: -1.0 at 5-9, -1.5 at 10-19, -2.0 at 20+.
+    """
+    if starts is None or win_rate is None:
+        return 0.0
+    if win_rate != 0.0 or starts < 5:
+        return 0.0
+    if starts >= 20:
+        return -2.0
+    if starts >= 10:
+        return -1.5
+    return -1.0
 
 
 def _trainer_form_score(page_win_rate: float | None, win_rate_30: float | None, win_rate_90: float | None, w: dict | None = None) -> float:

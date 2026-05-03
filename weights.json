@@ -38,6 +38,8 @@
     "trainer_form_manual": 0.6,
     "hot_driver": 0.5,
     "hot_trainer": 0.4,
+    "cold_driver": 0.5,
+    "cold_trainer": 0.4,
     "second_up": 1.5,
     "barrier_relief": 0.4
   },
