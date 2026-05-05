@@ -25,7 +25,7 @@
     "track_name": "Parkes",
     "meeting_date": "4 Apr 2026",
     "races": 9,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "TM060426",
@@ -144,7 +144,7 @@
     "track_name": "Bathurst",
     "meeting_date": "15 Apr 2026",
     "races": 8,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "TA160426",
@@ -214,14 +214,14 @@
     "track_name": "Menangle",
     "meeting_date": "21 Apr 2026",
     "races": 5,
-    "winners": 2
+    "winners": 1
   },
   {
     "meeting_code": "BH220426",
     "track_name": "Bathurst",
     "meeting_date": "22 Apr 2026",
     "races": 7,
-    "winners": 5
+    "winners": 6
   },
   {
     "meeting_code": "PE230426",
@@ -277,14 +277,14 @@
     "track_name": "Goulburn",
     "meeting_date": "27 Apr 2026",
     "races": 8,
-    "winners": 6
+    "winners": 7
   },
   {
     "meeting_code": "PC280426",
     "track_name": "Menangle",
     "meeting_date": "28 Apr 2026",
     "races": 6,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "BH290426",
@@ -347,14 +347,14 @@
     "track_name": "Menangle",
     "meeting_date": "5 May 2026",
     "races": 7,
-    "winners": 0
+    "winners": 3
   },
   {
     "meeting_code": "EY050526",
     "track_name": "Wagga",
     "meeting_date": "5 May 2026",
     "races": 8,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "BH060526",
