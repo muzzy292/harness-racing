@@ -95,7 +95,7 @@
     "track_name": "Canberra",
     "meeting_date": "13 Apr 2026",
     "races": 9,
-    "winners": 6
+    "winners": 7
   },
   {
     "meeting_code": "LM300326",
@@ -123,7 +123,7 @@
     "track_name": "Penrith",
     "meeting_date": "2 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "PC140426",
@@ -200,7 +200,7 @@
     "track_name": "Canberra",
     "meeting_date": "19 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "NR200426",
@@ -228,7 +228,7 @@
     "track_name": "Penrith",
     "meeting_date": "23 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "EY240426",
@@ -242,7 +242,7 @@
     "track_name": "Parkes",
     "meeting_date": "24 Apr 2026",
     "races": 8,
-    "winners": 5
+    "winners": 4
   },
   {
     "meeting_code": "NR240426",
@@ -305,7 +305,7 @@
     "track_name": "Penrith",
     "meeting_date": "30 Apr 2026",
     "races": 7,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "AL010526",
@@ -361,7 +361,7 @@
     "track_name": "Bathurst",
     "meeting_date": "6 May 2026",
     "races": 8,
-    "winners": 0
+    "winners": 2
   },
   {
     "meeting_code": "TA070526",
