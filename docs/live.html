@@ -743,49 +743,89 @@ function _venuePrefix(name) {
 }
 
 function parseTabStatement(text) {
+  // The TAB statement is tab-separated with columns:
+  //   Date | Time | Type | Description | Detail | Odds | Result | Debit | Credit | Balance
+  //
+  // IMPORTANT: =Return:$X in the Description is the POTENTIAL return printed on every bet
+  // regardless of outcome — it is NOT the actual result. Result is in col[6] ("Lost"/"Credit"/blank).
+  // Winning bets receive a separate "SGL" credit row with the actual payout amount.
+  // We match SGL rows to bet rows by their shared Transaction number.
+
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  // Pass 1: collect SGL credit rows → Map<transaction_number, actual_payout>
+  const sglCredits = new Map();
+  for (const line of lines) {
+    if (line.includes('@Price:')) continue;   // skip bet rows
+    const cols = line.split('\t');
+    // SGL credit rows have "SGL" in the Detail column (col[4]) and credit > 0 in col[8]
+    if (cols.length < 9) continue;
+    const detail = (cols[4] || '').trim().toUpperCase();
+    if (detail !== 'SGL') continue;
+    const txnM = (cols[3] || '').match(/Transaction number:\s*(\d+)/);
+    if (!txnM) continue;
+    const credit = parseFloat((cols[8] || '').replace(/[^0-9.]/g, ''));
+    if (!isNaN(credit) && credit > 0) sglCredits.set(txnM[1], credit);
+  }
+
+  // Pass 2: parse bet rows
   const bets = [];
-  for (const raw of text.split(/\n/)) {
-    const line = raw.trim();
+  for (const line of lines) {
     if (!line.includes('@Price:')) continue;
 
-    const m = line.match(_descRe);
+    const cols = line.split('\t');
+    if (cols.length < 8) continue;
+
+    const time      = (cols[1] || '12:00:00').trim();
+    const desc      = (cols[3] || '').trim();
+    const resultCol = (cols[6] || '').trim().toLowerCase();  // "lost" / "credit" / ""
+
+    const m = desc.match(_descRe);
     if (!m) continue;
 
-    const venueRaw  = m[1];
-    const rn        = parseInt(m[2]);
-    const dd        = m[3], mm = m[4];
-    const horse     = m[5].trim().toUpperCase();
-    const tabOdds   = parseFloat(m[6]);
-    const returnAmt = m[7] ? parseFloat(m[7]) : null;
+    const venueRaw = m[1];
+    const rn       = parseInt(m[2]);
+    const dd       = m[3], mm = m[4];
+    const horse    = m[5].trim().toUpperCase();
+    const tabOdds  = parseFloat(m[6]);
+    // m[7] = potential return shown on all bets — only used as payout fallback
 
-    const prefix = _venuePrefix(venueRaw);
-    const mc     = `${prefix}${dd}${mm}26`;
-
-    // Use time from statement row for accurate placed_at (AEST +10:00)
-    const timeM    = line.match(/\b(\d{2}:\d{2}:\d{2})\b/);
-    const time     = timeM ? timeM[1] : '12:00:00';
+    const prefix   = _venuePrefix(venueRaw);
+    const mc       = `${prefix}${dd}${mm}26`;
     const placedAt = `2026-${mm}-${dd}T${time}+10:00`;
 
-    // Stake first — need it to distinguish a win return from a $0 loss return
-    const dollars = [...line.matchAll(/\$(\d+\.\d{2})/g)].map(x => parseFloat(x[1]));
+    // Stake from Debit column (col[7])
     let stake = 1.0;
-    if (dollars.length >= 3) stake = dollars[dollars.length - 3];
-    if (stake <= 0) stake = 1.0;
+    const debitStr = parseFloat((cols[7] || '').replace(/[^0-9.]/g, ''));
+    if (!isNaN(debitStr) && debitStr > 0) stake = debitStr;
 
-    // Result: TAB includes =Return:$0.00 on losses too, so check returnAmt > stake
-    const afterPrice = line.slice(line.indexOf('@Price:'));
+    // Match to SGL credit row by transaction number
+    const txnM = desc.match(/Transaction number:\s*(\d+)/);
+    const txn  = txnM ? txnM[1] : null;
+    const sglCredit = txn !== null ? sglCredits.get(txn) : undefined;
+
+    // Determine result:
+    //   SGL credit > stake  → won (actual payout = SGL credit, may differ from stated return due to deductions)
+    //   SGL credit ≈ stake  → void (stake refunded)
+    //   resultCol = "lost"  → lost
+    //   resultCol = "credit" but no SGL match → treat as won using stated potential return
+    //   blank               → pending
     let result = 'pending', payout = null;
-    if (returnAmt !== null && returnAmt > stake) {
-      // Genuine win: return exceeds what was staked
-      result = 'won';
-      payout = returnAmt;
-    } else if (/\bLost\b/i.test(afterPrice) || (returnAmt !== null && returnAmt === 0)) {
+    if (sglCredit !== undefined) {
+      if (sglCredit > stake * 1.001) {
+        result = 'won';
+        payout = sglCredit;
+      } else {
+        result = 'void';   // credit ≈ stake = refund
+      }
+    } else if (resultCol === 'lost') {
       result = 'lost';
-    } else if (/\bCredit\b/i.test(afterPrice) || (returnAmt !== null && Math.abs(returnAmt - stake) < 0.01)) {
-      result = 'void';   // debit row credited back at cost = refund/void
+    } else if (resultCol === 'credit') {
+      // Credit result but no SGL row in this paste — use potential return as estimate
+      result = 'won';
+      payout = m[7] ? parseFloat(m[7]) : null;
     }
-
-    if (payout === null) payout = parseFloat((stake * tabOdds).toFixed(2));
+    if (!payout) payout = parseFloat((stake * tabOdds).toFixed(2));
 
     // Auto-fill model odds if race is in current RACES data
     const raceData = getRace(mc, rn);
