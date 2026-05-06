@@ -34,6 +34,9 @@ select:focus{outline:none;border-color:var(--accent)}
 
 table{width:100%;border-collapse:collapse}
 th{font-family:"Barlow Condensed",sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--secondary);text-transform:uppercase;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{color:var(--primary-text)}
+th.sort-asc,th.sort-desc{color:var(--accent)}
 td{padding:7px 8px;border-bottom:1px solid var(--border);font-family:"Roboto Mono",monospace}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--highlight)}
@@ -568,15 +571,77 @@ function refreshBank() {
 }
 
 // ── Bet history ───────────────────────────────────────────────────────────────
+let _histSort = { col: 'date', dir: 'desc' };
+
+function sortHistory(col) {
+  if (_histSort.col === col) {
+    _histSort.dir = _histSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _histSort.col = col;
+    _histSort.dir = col === 'date' ? 'desc' : 'asc';
+  }
+  renderHistory();
+}
+
+function _betSortKey(b, col) {
+  switch (col) {
+    case 'date':   return b.placed_at || '';
+    case 'race':   return (b.mc || '') + String(b.rn || 0).padStart(3, '0');
+    case 'horse':  return b.horse || '';
+    case 'model':  return b.model_odds ?? 9999;
+    case 'tab':    return b.tab_odds ?? 0;
+    case 'edge':   return b.edge ?? -999;
+    case 'stake':  return b.stake ?? 0;
+    case 'return': {
+      if (b.result === 'won')  return (b.payout ?? 0) - (b.stake ?? 0);
+      if (b.result === 'lost') return -(b.stake ?? 0);
+      return 0;
+    }
+    case 'result': return b.result || 'z';
+    default:       return 0;
+  }
+}
+
+function _thSort(col, label) {
+  const active = _histSort.col === col;
+  const arrow  = active ? (_histSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+  const cls    = active ? (_histSort.dir === 'asc' ? 'sort-asc' : 'sort-desc') : '';
+  return `<th class="sortable ${cls}" onclick="sortHistory('${col}')">${label}${arrow}</th>`;
+}
+
 function renderHistory() {
-  const bets = loadBets();
-  if (!bets.length) { document.getElementById('hist-panel').innerHTML='<div class="empty">No bets recorded yet</div>'; return; }
-  let h=`<table><thead><tr><th>Date</th><th>Race</th><th>Horse</th><th>Model $</th><th>TAB $</th><th>Edge</th><th>Stake</th><th>Return</th><th>Result</th><th></th></tr></thead><tbody>`;
-  for (const b of [...bets].reverse()) {
-    const dt = new Date(b.placed_at).toLocaleDateString('en-AU',{day:'2-digit',month:'short'});
-    const rClass = b.result==='won'?'r-won':b.result==='lost'?'r-lost':b.result==='void'?'r-void':'';
-    const retStr = b.result==='won'  ? `<span class="g">+$${(b.payout-b.stake).toFixed(2)}</span>`
-                 : b.result==='lost' ? `<span class="r">−$${b.stake.toFixed(2)}</span>` : '—';
+  const raw = loadBets();
+  if (!raw.length) {
+    document.getElementById('hist-panel').innerHTML = '<div class="empty">No bets recorded yet</div>';
+    return;
+  }
+
+  // Sort a copy — default (date desc) = newest first
+  const bets = [...raw].sort((a, b) => {
+    const ka = _betSortKey(a, _histSort.col);
+    const kb = _betSortKey(b, _histSort.col);
+    const cmp = ka < kb ? -1 : ka > kb ? 1 : 0;
+    return _histSort.dir === 'asc' ? cmp : -cmp;
+  });
+
+  let h = `<table><thead><tr>
+    ${_thSort('date',   'Date')}
+    ${_thSort('race',   'Race')}
+    ${_thSort('horse',  'Horse')}
+    ${_thSort('model',  'Model $')}
+    ${_thSort('tab',    'TAB $')}
+    ${_thSort('edge',   'Edge')}
+    ${_thSort('stake',  'Stake')}
+    ${_thSort('return', 'Return')}
+    ${_thSort('result', 'Result')}
+    <th></th>
+  </tr></thead><tbody>`;
+
+  for (const b of bets) {
+    const dt = new Date(b.placed_at).toLocaleDateString('en-AU', {day:'2-digit', month:'short'});
+    const rClass  = b.result==='won' ? 'r-won' : b.result==='lost' ? 'r-lost' : b.result==='void' ? 'r-void' : '';
+    const retStr  = b.result==='won'  ? `<span class="g">+$${((b.payout??0)-(b.stake??0)).toFixed(2)}</span>`
+                  : b.result==='lost' ? `<span class="r">−$${(b.stake??0).toFixed(2)}</span>` : '—';
     const resBtns = b.result==='pending'
       ? `<div class="row" style="gap:4px">
            <button class="btn btn-win btn-sm"  onclick="setResult(${b.id},'won')">Won</button>
@@ -588,10 +653,10 @@ function renderHistory() {
       <td>${dt}</td>
       <td>${b.mc} R${b.rn}</td>
       <td class="name">${b.horse}</td>
-      <td class="c">$${(b.model_odds??0).toFixed(2)}</td>
+      <td class="c">${b.model_odds!=null?'$'+b.model_odds.toFixed(2):'—'}</td>
       <td>$${(b.tab_odds??0).toFixed(2)}</td>
       <td><span class="edge-pill ${b.edge!=null?'edge-q':'edge-n'}">${b.edge!=null?(b.edge*100).toFixed(1)+'%':'—'}</span></td>
-      <td>$${b.stake.toFixed(2)}</td>
+      <td>$${(b.stake??0).toFixed(2)}</td>
       <td>${retStr}</td>
       <td>${resBtns}</td>
       <td><button class="btn btn-muted btn-sm" onclick="deleteBet(${b.id})">✕</button></td>
