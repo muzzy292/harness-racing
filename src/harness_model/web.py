@@ -1455,7 +1455,6 @@ _MAX_BET_PCT     = 0.04   # never more than 4% of current bankroll
 # Backtest shows 25–100% odds-edge is the profitable zone; >=100% edge bets are
 # large model-vs-market disagreements that consistently lose.
 _MIN_ODDS_EDGE   = 0.25   # market must be at least 25% longer than fair odds
-_MAX_ODDS_EDGE   = 1.00   # cap: do not bet when market is 2× or more our fair odds
 
 
 def _kelly_stake_pct(model_prob: float, market_odds: float, fraction: float = _KELLY_FRACTION) -> float | None:
@@ -1564,10 +1563,8 @@ def _compute_bet_records(
                 fair_odds = float(fair_odds_raw)
                 odds_edge = market_odds / fair_odds - 1.0
 
-                # Only bet in the 25–100% odds-edge window.
-                # Below 25%: insufficient value. Above 100%: extreme model-vs-market
-                # disagreement — consistently a false positive in backtesting.
-                if odds_edge < _MIN_ODDS_EDGE or odds_edge >= _MAX_ODDS_EDGE:
+                # Only bet when edge >= 25%.
+                if odds_edge < _MIN_ODDS_EDGE:
                     continue
 
                 # Halve units once if bankroll drops 25% from start
@@ -1627,6 +1624,8 @@ def _compute_bet_records(
 
 
 def _render_betting_html(records: list[dict], summary: dict, generated_at: str) -> str:
+    import json as _json
+
     start_bank = summary["starting_bankroll"]
     curr_bank  = summary["current_bankroll"]
     profit     = summary["total_profit"]
@@ -1654,31 +1653,39 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
         _sc("Total Staked",   f"${summary['total_staked']:,.2f}"),
     ])
 
-    # Table rows — most recent first
-    tr_parts: list[str] = []
-    for r in reversed(records):
-        won = r["won"]
-        row_class = "bet-win" if won else "bet-loss"
-        tier_class = f"tier-{r['tier'].lower()}"
-        result_str = f"1st" if won else f"{r['finish_pos']}"
-        profit_str = f"+${r['profit']:.2f}" if won else f"-${abs(r['profit']):.2f}"
-        tr_parts.append(f"""<tr class="{row_class}">
-          <td>{html.escape(r['meeting_date'])}</td>
-          <td>{html.escape(r['track_name'] or r['meeting_code'])}</td>
-          <td>R{r['race_number']}</td>
-          <td>{html.escape(r['horse_name'])}</td>
-          <td class="num">{r['model_prob']:.1f}%</td>
-          <td class="num">${r['market_odds']:.2f}</td>
-          <td class="num">{r['edge_pct']:.1f}%</td>
-          <td class="num"><span class="tier {tier_class}">{html.escape(r['tier'])}</span></td>
-          <td class="num">${r['stake']:.2f}</td>
-          <td class="num">{result_str}</td>
-          <td class="num" style="color:{'#10b981' if won else '#ef4444'}">{profit_str}</td>
-          <td class="num">${r['bankroll']:,.2f}</td>
-        </tr>""")
-
-    table_body = "\n".join(tr_parts)
     unit_note = " · Units halved (bank fell 25%)" if summary.get("unit_halved") else ""
+
+    # Add a numeric date_sort key so JS can sort chronologically without parsing
+    _MONTHS = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
+                "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
+    def _date_sort_key(d: str) -> int:
+        parts = str(d).split()
+        if len(parts) == 3:
+            try:
+                return int(parts[2]) * 10000 + _MONTHS.get(parts[1], 0) * 100 + int(parts[0])
+            except (ValueError, KeyError):
+                pass
+        return 0
+
+    serialisable = []
+    for r in records:
+        serialisable.append({
+            "date":        r["meeting_date"],
+            "date_sort":   _date_sort_key(r["meeting_date"]),
+            "track":       r["track_name"] or r["meeting_code"],
+            "race":        r["race_number"],
+            "horse":       r["horse_name"],
+            "model_prob":  r["model_prob"],
+            "sp":          r["market_odds"],
+            "edge":        r["edge_pct"],
+            "tier":        r["tier"],
+            "stake":       r["stake"],
+            "pos":         r["finish_pos"],
+            "won":         r["won"],
+            "profit":      r["profit"],
+            "bank":        r["bankroll"],
+        })
+    records_json = _json.dumps(serialisable)
 
     return f"""<!doctype html>
 <html lang="en">
@@ -1722,12 +1729,24 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
     .params strong {{ color:var(--primary); }}
     .section-title {{ font-size:20px; font-weight:700; margin:0 0 14px;
       padding-bottom:6px; border-bottom:2px solid var(--accent); display:inline-block; }}
+    .table-toolbar {{ display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:10px; flex-wrap:wrap; gap:10px; }}
+    .page-info {{ font-size:13px; color:var(--secondary); }}
+    .page-controls {{ display:flex; gap:6px; align-items:center; }}
+    .page-btn {{ background:var(--surface); border:1px solid var(--border); color:var(--primary);
+      padding:5px 14px; border-radius:6px; font-size:13px; cursor:pointer; transition:all 0.15s; }}
+    .page-btn:hover:not(:disabled) {{ background:var(--highlight); border-color:var(--accent); }}
+    .page-btn:disabled {{ opacity:0.35; cursor:default; }}
     .table-wrap {{ overflow-x:auto; border:1px solid var(--border); border-radius:16px;
       background:var(--card-bg); box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); }}
     table {{ width:100%; border-collapse:collapse; min-width:900px; }}
     th,td {{ padding:9px 12px; text-align:left; font-size:13px; border-bottom:1px solid var(--border); }}
     th {{ background:var(--surface); color:var(--secondary); font-size:11px; font-weight:700;
-      text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap; }}
+      text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap;
+      cursor:pointer; user-select:none; transition:color 0.15s; }}
+    th:hover {{ color:var(--primary); }}
+    th.sort-asc::after  {{ content:' ▲'; color:var(--accent); font-size:9px; }}
+    th.sort-desc::after {{ content:' ▼'; color:var(--accent); font-size:9px; }}
     tr:last-child td {{ border-bottom:none; }}
     td.num {{ text-align:right; }}
     th.num {{ text-align:right; }}
@@ -1769,22 +1788,166 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
       {chart_svg if chart_svg else '<p style="color:var(--secondary)">No bets yet.</p>'}
     </div>
     <div class="section-title">Bet History</div>
+    <div class="table-toolbar">
+      <span class="page-info" id="pageInfo"></span>
+      <div class="page-controls">
+        <button class="page-btn" id="btnFirst" onclick="goPage(0)">«</button>
+        <button class="page-btn" id="btnPrev"  onclick="goPage(_page-1)">‹ Prev</button>
+        <span class="page-info" id="pageNum"></span>
+        <button class="page-btn" id="btnNext"  onclick="goPage(_page+1)">Next ›</button>
+        <button class="page-btn" id="btnLast"  onclick="goPage(_totalPages-1)">»</button>
+      </div>
+    </div>
     <div class="table-wrap">
-      <table>
+      <table id="betTable">
         <thead>
           <tr>
-            <th>Date</th><th>Track</th><th>Race</th><th>Horse</th>
-            <th class="num">Model%</th><th class="num">SP</th>
-            <th class="num">Edge%</th><th class="num">Tier</th>
-            <th class="num">Stake</th><th class="num">Result</th>
-            <th class="num">P&amp;L</th><th class="num">Bank</th>
+            <th data-col="date_sort">Date</th>
+            <th data-col="track">Track</th>
+            <th data-col="race" class="num">Race</th>
+            <th data-col="horse">Horse</th>
+            <th data-col="model_prob" class="num">Model%</th>
+            <th data-col="sp" class="num">SP</th>
+            <th data-col="edge" class="num">Edge%</th>
+            <th data-col="tier" class="num">Tier</th>
+            <th data-col="stake" class="num">Stake</th>
+            <th data-col="pos" class="num">Result</th>
+            <th data-col="profit" class="num">P&amp;L</th>
+            <th data-col="bank" class="num">Bank</th>
           </tr>
         </thead>
-        <tbody>{table_body if table_body else '<tr><td colspan="12" style="text-align:center;color:var(--secondary);padding:32px;">No bets recorded yet — run build-features then build-betting-site.</td></tr>'}</tbody>
+        <tbody id="betBody"></tbody>
       </table>
+    </div>
+    <div class="table-toolbar" style="margin-top:10px;">
+      <span class="page-info" id="pageInfo2"></span>
+      <div class="page-controls">
+        <button class="page-btn" id="btnFirst2" onclick="goPage(0)">«</button>
+        <button class="page-btn" id="btnPrev2"  onclick="goPage(_page-1)">‹ Prev</button>
+        <span class="page-info" id="pageNum2"></span>
+        <button class="page-btn" id="btnNext2"  onclick="goPage(_page+1)">Next ›</button>
+        <button class="page-btn" id="btnLast2"  onclick="goPage(_totalPages-1)">»</button>
+      </div>
     </div>
     <div class="footer">Generated {html.escape(generated_at)}</div>
   </div>
+<script>
+const _RECORDS = {records_json};
+const _PAGE_SIZE = 200;
+let _sortCol = 'date_sort';
+let _sortDir = -1;   // -1 = desc (newest first by default)
+let _page = 0;
+let _sorted = [];
+let _totalPages = 1;
+
+function _esc(s) {{
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}}
+
+function _sortKey(r, col) {{
+  const v = r[col];
+  if (typeof v === 'string') return v.toLowerCase();
+  return v ?? -Infinity;
+}}
+
+function _doSort() {{
+  _sorted = [..._RECORDS];
+  _sorted.sort((a, b) => {{
+    const ka = _sortKey(a, _sortCol), kb = _sortKey(b, _sortCol);
+    if (ka < kb) return _sortDir;
+    if (ka > kb) return -_sortDir;
+    // secondary: date desc, then race asc
+    if (_sortCol !== 'date_sort') {{
+      if (a.date_sort !== b.date_sort) return b.date_sort - a.date_sort;
+    }}
+    return a.race - b.race;
+  }});
+  _totalPages = Math.max(1, Math.ceil(_sorted.length / _PAGE_SIZE));
+  if (_page >= _totalPages) _page = _totalPages - 1;
+}}
+
+function _renderPage() {{
+  const start = _page * _PAGE_SIZE;
+  const slice = _sorted.slice(start, start + _PAGE_SIZE);
+  const rows = slice.map(r => {{
+    const won = r.won;
+    const rowCls = won ? 'bet-win' : 'bet-loss';
+    const profStr = won ? '+$' + r.profit.toFixed(2) : '-$' + Math.abs(r.profit).toFixed(2);
+    const profCol = won ? '#10b981' : '#ef4444';
+    const resultStr = won ? '1st' : String(r.pos);
+    const tierCls = r.tier === 'Strong' ? 'tier-strong' : 'tier-value';
+    return `<tr class="${{rowCls}}">
+      <td>${{_esc(r.date)}}</td>
+      <td>${{_esc(r.track)}}</td>
+      <td class="num">R${{r.race}}</td>
+      <td>${{_esc(r.horse)}}</td>
+      <td class="num">${{r.model_prob.toFixed(1)}}%</td>
+      <td class="num">$${{r.sp.toFixed(2)}}</td>
+      <td class="num">${{r.edge.toFixed(1)}}%</td>
+      <td class="num"><span class="tier ${{tierCls}}">${{_esc(r.tier)}}</span></td>
+      <td class="num">$${{r.stake.toFixed(2)}}</td>
+      <td class="num">${{resultStr}}</td>
+      <td class="num" style="color:${{profCol}}">${{profStr}}</td>
+      <td class="num">$${{r.bank.toLocaleString('en-AU', {{minimumFractionDigits:2, maximumFractionDigits:2}})}}</td>
+    </tr>`;
+  }}).join('');
+  document.getElementById('betBody').innerHTML = rows ||
+    '<tr><td colspan="12" style="text-align:center;color:var(--secondary);padding:32px;">No bets recorded yet.</td></tr>';
+
+  // Update pagination controls (top + bottom)
+  const from = _sorted.length ? start + 1 : 0;
+  const to   = Math.min(start + _PAGE_SIZE, _sorted.length);
+  const info = `Showing ${{from}}–${{to}} of ${{_sorted.length}} bets`;
+  const pg   = `Page ${{_page + 1}} / ${{_totalPages}}`;
+  ['pageInfo','pageInfo2'].forEach(id => {{ const el=document.getElementById(id); if(el) el.textContent=info; }});
+  ['pageNum','pageNum2'].forEach(id  => {{ const el=document.getElementById(id);  if(el) el.textContent=pg;   }});
+
+  const atFirst = _page === 0;
+  const atLast  = _page >= _totalPages - 1;
+  [['btnFirst','btnFirst2'], ['btnPrev','btnPrev2']].forEach(([a,b]) => {{
+    [a,b].forEach(id => {{ const el=document.getElementById(id); if(el) el.disabled=atFirst; }});
+  }});
+  [['btnNext','btnNext2'], ['btnLast','btnLast2']].forEach(([a,b]) => {{
+    [a,b].forEach(id => {{ const el=document.getElementById(id); if(el) el.disabled=atLast; }});
+  }});
+
+  // Update header sort indicators
+  document.querySelectorAll('#betTable thead th').forEach(th => {{
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.dataset.col === _sortCol) {{
+      th.classList.add(_sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    }}
+  }});
+}}
+
+function goPage(n) {{
+  _page = Math.max(0, Math.min(n, _totalPages - 1));
+  _renderPage();
+  document.getElementById('betTable').scrollIntoView({{behavior:'smooth', block:'start'}});
+}}
+
+// Wire up header clicks
+document.querySelectorAll('#betTable thead th[data-col]').forEach(th => {{
+  th.addEventListener('click', () => {{
+    const col = th.dataset.col;
+    if (_sortCol === col) {{
+      _sortDir = -_sortDir;
+    }} else {{
+      _sortCol = col;
+      // numeric cols default desc, text cols default asc
+      const numCols = new Set(['date_sort','race','model_prob','sp','edge','stake','pos','profit','bank']);
+      _sortDir = numCols.has(col) ? -1 : 1;
+    }}
+    _page = 0;
+    _doSort();
+    _renderPage();
+  }});
+}});
+
+// Initial render
+_doSort();
+_renderPage();
+</script>
 </body>
 </html>
 """
@@ -1939,7 +2102,7 @@ def republish_all_meetings(
     # Rebuild live page so hosted race data stays current
     try:
         from .live import build_live_site
-        build_live_site(str(csv_path), out_dir=str(docs))
+        build_live_site(str(csv_path), weights=weights, out_dir=str(docs))
     except Exception as exc:  # noqa: BLE001
         print(f"  Warning: live page rebuild failed — {exc}")
 
