@@ -766,23 +766,24 @@ function parseTabStatement(text) {
     const time     = timeM ? timeM[1] : '12:00:00';
     const placedAt = `2026-${mm}-${dd}T${time}+10:00`;
 
-    // Determine result from text after @Price: in the line
-    const afterPrice = line.slice(line.indexOf('@Price:'));
-    let result = 'pending', payout = null;
-    if (returnAmt !== null) {
-      result = 'won';
-      payout = returnAmt;
-    } else if (/\bLost\b/i.test(afterPrice)) {
-      result = 'lost';
-    } else if (/\bCredit\b/i.test(afterPrice)) {
-      result = 'void';   // debit row marked Credit = refund/void
-    }
-
-    // Stake: dollar amounts in the line — last 3 are debit / credit / balance
+    // Stake first — need it to distinguish a win return from a $0 loss return
     const dollars = [...line.matchAll(/\$(\d+\.\d{2})/g)].map(x => parseFloat(x[1]));
     let stake = 1.0;
     if (dollars.length >= 3) stake = dollars[dollars.length - 3];
     if (stake <= 0) stake = 1.0;
+
+    // Result: TAB includes =Return:$0.00 on losses too, so check returnAmt > stake
+    const afterPrice = line.slice(line.indexOf('@Price:'));
+    let result = 'pending', payout = null;
+    if (returnAmt !== null && returnAmt > stake) {
+      // Genuine win: return exceeds what was staked
+      result = 'won';
+      payout = returnAmt;
+    } else if (/\bLost\b/i.test(afterPrice) || (returnAmt !== null && returnAmt === 0)) {
+      result = 'lost';
+    } else if (/\bCredit\b/i.test(afterPrice) || (returnAmt !== null && Math.abs(returnAmt - stake) < 0.01)) {
+      result = 'void';   // debit row credited back at cost = refund/void
+    }
 
     if (payout === null) payout = parseFloat((stake * tabOdds).toFixed(2));
 
