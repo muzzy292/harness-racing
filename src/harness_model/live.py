@@ -956,7 +956,7 @@ function parseTabStatement(text) {
     const venueRaw = m[1];
     const rn       = parseInt(m[2]);
     const dd       = m[3], mm = m[4];
-    const horse    = m[5].trim().toUpperCase();
+    const horse    = m[5].trim().replace(/\s+Deductions\s+Apply\s*/i, '').trim().toUpperCase();
     const tabOdds  = parseFloat(m[6]);
     // m[7] = potential return shown on all bets — only used as payout fallback
 
