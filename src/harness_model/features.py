@@ -6,7 +6,7 @@ import math
 import re
 import sqlite3
 import statistics
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from .track_pars import _nr_to_grade_band, lookup_race_par
@@ -16,6 +16,23 @@ from .track_pars import _nr_to_grade_band, lookup_race_par
 # Calibration starting point — adjust against results once ≥30 grade-drop winners
 # have been observed.
 _NR_MARGIN_FACTOR = 0.7
+
+# Module-level date parser — avoids re-creating the month map on every call.
+_DATE_MONTHS = {
+    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
+}
+
+
+def _parse_date(text: object):
+    """Parse 'D Mon YYYY' → date, or None on failure."""
+    parts = str(text or "").split()
+    if len(parts) != 3:
+        return None
+    try:
+        return date(int(parts[2]), _DATE_MONTHS.get(parts[1], 0), int(parts[0]))
+    except (ValueError, KeyError):
+        return None
 
 
 def install_sqlite_helpers(conn: sqlite3.Connection) -> None:
@@ -82,36 +99,95 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
         if row["avg_nr"] is not None:
             field_avg_nrs[(row["meeting_code"], row["race_number"])] = round(float(row["avg_nr"]), 1)
 
-    # Pre-compute rolling stats for every unique driver/trainer across all runners.
-    # Many runners share the same person — caching avoids redundant DB queries.
+    # ── Bulk pre-fetches ────────────────────────────────────────────────────────
+    # All large per-runner DB lookups are replaced with a single query per table
+    # followed by Python grouping/sorting. This collapses ~28k per-runner queries
+    # (the original bottleneck) down to ~10 total queries.
+
+    # runner_recent_lines — form lines used for consistency, ceiling, sectionals etc.
+    _recent_lines_by_horse: dict[str, list[dict]] = {}
+    for row in conn.execute("SELECT * FROM runner_recent_lines").fetchall():
+        hid = str(row["horse_id"])
+        _recent_lines_by_horse.setdefault(hid, []).append(dict(row))
+    for lines in _recent_lines_by_horse.values():
+        lines.sort(key=lambda r: _sort_run_date(r.get("run_date")), reverse=True)
+
+    # horse_runs — used for last-win ceiling extension AND rolling person stats.
+    # Fetch all non-trial runs once; re-use for both purposes.
+    _horse_runs_by_horse: dict[str, list[dict]] = {}
+    _driver_runs_grouped: dict[str, list[dict]] = {}
+    _trainer_runs_grouped: dict[str, list[dict]] = {}
+    for row in conn.execute(
+        "SELECT * FROM horse_runs WHERE COALESCE(race_type, 'RACE') <> 'TRIAL'"
+    ).fetchall():
+        r = dict(row)
+        hid = str(r["horse_id"])
+        _horse_runs_by_horse.setdefault(hid, []).append(r)
+        # Group by driver and trainer for rolling stats (avoids per-person DB scans).
+        for field, grouped in [("driver_name", _driver_runs_grouped), ("trainer_name", _trainer_runs_grouped)]:
+            name_key = str(r.get(field) or "").strip().upper()
+            if name_key:
+                grouped.setdefault(name_key, []).append(r)
+    for runs in _horse_runs_by_horse.values():
+        runs.sort(key=lambda r: _sort_run_date(r.get("run_date")), reverse=True)
+    for runs in _driver_runs_grouped.values():
+        runs.sort(key=lambda r: _sort_run_date(r.get("run_date")), reverse=True)
+    for runs in _trainer_runs_grouped.values():
+        runs.sort(key=lambda r: _sort_run_date(r.get("run_date")), reverse=True)
+
+    # Rolling person stats — computed from pre-fetched runs (no per-person DB query).
     _driver_cache: dict[str, dict] = {}
     _trainer_cache: dict[str, dict] = {}
     for runner in runners:
-        for name, cache, field in [
-            (runner["nominated_driver"], _driver_cache, "driver_name"),
-            (runner["nominated_trainer"], _trainer_cache, "trainer_name"),
+        for name, cache, grouped in [
+            (runner["nominated_driver"], _driver_cache, _driver_runs_grouped),
+            (runner["nominated_trainer"], _trainer_cache, _trainer_runs_grouped),
         ]:
             key = str(name or "").strip().upper()
             if key and key not in cache:
-                cache[key] = _rolling_person_stats(conn, field, name)
+                cache[key] = _rolling_person_stats_from_runs(grouped.get(key, []))
+
+    # Pre-fetch driver and trainer page win rates — avoids 8k+ simple indexed lookups
+    # inside _build_feature_row (one per runner each).
+    _driver_page_wr: dict[str, float | None] = {}
+    for row in conn.execute("SELECT driver_slug, season_win_rate FROM driver_stats").fetchall():
+        _driver_page_wr[row["driver_slug"]] = (
+            float(row["season_win_rate"]) if row["season_win_rate"] is not None else None
+        )
+    _trainer_page_wr: dict[str, float | None] = {}
+    for row in conn.execute("SELECT trainer_slug, season_win_rate FROM trainer_stats").fetchall():
+        _trainer_page_wr[row["trainer_slug"]] = (
+            float(row["season_win_rate"]) if row["season_win_rate"] is not None else None
+        )
+
+    # Pre-fetch historical barriers per horse — avoids 4k+ complex queries (JOIN +
+    # correlated subquery) inside _build_feature_row. Sorted newest meeting first.
+    # field_sizes already available above; meeting_date sourced from meetings join.
+    _hist_barriers_by_horse: dict[str, list[dict]] = {}
+    for row in conn.execute(
+        """
+        SELECT rr.horse_id, rr.meeting_code, rr.race_number, rr.barrier, m.meeting_date
+        FROM race_runners rr
+        JOIN meetings m ON m.meeting_code = rr.meeting_code
+        WHERE COALESCE(rr.scratched, 0) = 0
+        """
+    ).fetchall():
+        hid = str(row["horse_id"])
+        _hist_barriers_by_horse.setdefault(hid, []).append({
+            "meeting_code": row["meeting_code"],
+            "barrier":      row["barrier"],
+            "field_size":   field_sizes.get((row["meeting_code"], row["race_number"])),
+            "meeting_date_key": _sort_run_date(row["meeting_date"]),
+        })
+    for barriers in _hist_barriers_by_horse.values():
+        barriers.sort(key=lambda r: r["meeting_date_key"], reverse=True)
 
     rows: list[dict[str, object]] = []
     for runner in runners:
-        all_recent_lines = conn.execute(
-            """
-            SELECT *
-            FROM runner_recent_lines
-            WHERE horse_id = ?
-            ORDER BY _sort_run_date(run_date) DESC
-            """,
-            (runner["horse_id"],),
-        ).fetchall()
-        # Deduplicate by (run_date, track_code, distance) — the same run is written
-        # each time the horse appears in an ingested meeting, so without dedup the
-        # same start is counted multiple times in averages and rate calculations.
+        hid = str(runner["horse_id"])
         seen: set[tuple] = set()
         recent_lines: list[dict] = []
-        for line in [dict(row) for row in all_recent_lines]:
+        for line in _recent_lines_by_horse.get(hid, []):
             key = (line.get("run_date"), line.get("track_code"), line.get("distance"))
             if key not in seen:
                 seen.add(key)
@@ -131,6 +207,10 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
                 race_field_avg_nr=race_field_avg_nr,
                 driver_stats=_driver_cache.get(driver_key),
                 trainer_stats=_trainer_cache.get(trainer_key),
+                horse_runs=_horse_runs_by_horse.get(hid, []),
+                driver_page_wr=_driver_page_wr,
+                trainer_page_wr=_trainer_page_wr,
+                hist_barriers=_hist_barriers_by_horse.get(hid, []),
             )
         )
     return rows
@@ -159,7 +239,14 @@ def _build_feature_row(
     race_field_avg_nr: float | None = None,
     driver_stats: dict | None = None,
     trainer_stats: dict | None = None,
+    horse_runs: list[dict[str, object]] | None = None,
+    driver_page_wr: dict[str, float | None] | None = None,
+    trainer_page_wr: dict[str, float | None] | None = None,
+    hist_barriers: list[dict] | None = None,
 ) -> dict[str, object]:
+    """Pre-fetched caches (horse_runs, driver/trainer page win rates, hist_barriers)
+    replace per-runner DB queries when provided. Falls back to DB queries for
+    backward compatibility when None."""
     if driver_stats is None:
         driver_stats = _rolling_person_stats(conn, "driver_name", runner["nominated_driver"])
     if trainer_stats is None:
@@ -201,6 +288,7 @@ def _build_feature_row(
     bmr_secs = _parse_bmr_secs(runner.get("form_bmr"))
     bmr_dist_rge_secs = _parse_bmr_secs(runner.get("form_bmr_dist_rge"))
     days_since_last_run = _days_since_last_run(recent_lines, runner.get("meeting_date"))
+    recent_form_run_count_365 = _recent_form_run_count(recent_lines, runner.get("meeting_date"), 365)
     second_up_improvement = _second_up_improvement(days_since_last_run, recent_lines)
     race_nr_ceiling = _parse_race_nr_ceiling(runner.get("class_name"))
     race_nr_floor = _parse_race_nr_floor(runner.get("class_name"))
@@ -310,67 +398,87 @@ def _build_feature_row(
     last_win_class_adj_margin: float | None = None
     last_win_run_index: int | None = None
     if _class_ref_nr is not None and runner.get("horse_id"):
-        _last_win_row = conn.execute(
-            """
-            SELECT adjusted_margin, margin, stake, run_date, track_code
-            FROM horse_runs
-            WHERE horse_id = ?
-              AND finish_position = 1
-              AND COALESCE(race_type, 'RACE') <> 'TRIAL'
-              AND COALESCE(null_run, 0) = 0
-              AND margin IS NOT NULL
-              AND _sort_run_date(run_date) < _sort_run_date(?)
-            ORDER BY _sort_run_date(run_date) DESC
-            LIMIT 1
-            """,
-            (runner["horse_id"], runner.get("meeting_date")),
-        ).fetchone()
+        # Use pre-fetched horse_runs (sorted newest-first, non-trial only) when available.
+        # Falls back to DB queries for backward compatibility (e.g. callers outside the
+        # main build pipeline that don't pass horse_runs).
+        _meeting_date_key = _sort_run_date(runner.get("meeting_date"))
+        if horse_runs is not None:
+            # Find most recent win before today's meeting entirely in Python.
+            _last_win_row = next(
+                (
+                    r for r in horse_runs
+                    if r.get("finish_position") == 1
+                    and not r.get("null_run")
+                    and r.get("margin") is not None
+                    and _sort_run_date(r.get("run_date")) < _meeting_date_key
+                ),
+                None,
+            )
+        else:
+            _last_win_row = conn.execute(
+                """
+                SELECT adjusted_margin, margin, stake, run_date, track_code
+                FROM horse_runs
+                WHERE horse_id = ?
+                  AND finish_position = 1
+                  AND COALESCE(race_type, 'RACE') <> 'TRIAL'
+                  AND COALESCE(null_run, 0) = 0
+                  AND margin IS NOT NULL
+                  AND _sort_run_date(run_date) < _sort_run_date(?)
+                ORDER BY _sort_run_date(run_date) DESC
+                LIMIT 1
+                """,
+                (runner["horse_id"], runner.get("meeting_date")),
+            ).fetchone()
         if _last_win_row:
             # Use raw margin (not adjusted_margin) for the ceiling — trip quality adjustments
             # belong in consistency, not in peak-ability measurement. horse_runs.margin stores
             # the physical winning margin as positive (e.g. won by 3.2m → margin=3.2).
             # Negate so the ceiling follows the convention where negative = better.
-            _win_margin = float(_last_win_row["margin"] if _last_win_row["margin"] is not None else (_last_win_row["adjusted_margin"] or 0.0))
+            _win_margin = float(_last_win_row["margin"] if _last_win_row["margin"] is not None else (_last_win_row.get("adjusted_margin") or 0.0))
             _win_class_adj = -_win_margin
             # Class-adjust using the actual NR ceiling from runner_recent_lines when available
-            # (horse_runs has no line_nr_ceiling column). Only fall back to _no_nr_proxy for
-            # genuine no-NR races — the proxy is too coarse for NR races.
-            _win_nr_row = conn.execute(
-                """
-                SELECT line_nr_ceiling FROM runner_recent_lines
-                WHERE horse_id = ?
-                  AND run_date = ?
-                  AND track_code = ?
-                  AND finish_position = 1
-                  AND line_nr_ceiling IS NOT NULL
-                LIMIT 1
-                """,
-                (runner["horse_id"], _last_win_row["run_date"], _last_win_row["track_code"]),
-            ).fetchone()
-            if _win_nr_row is not None:
-                _win_nr = float(_win_nr_row["line_nr_ceiling"])
-                _win_class_adj -= (_win_nr - _class_ref_nr) * _NR_MARGIN_FACTOR
+            # (horse_runs has no line_nr_ceiling column). Use the deduplicated recent_lines
+            # list — it's already in memory, no extra query needed.
+            _win_date = _last_win_row["run_date"]
+            _win_track = _last_win_row["track_code"]
+            _win_nr_val = next(
+                (
+                    line.get("line_nr_ceiling") for line in recent_lines
+                    if line.get("run_date") == _win_date
+                    and line.get("track_code") == _win_track
+                    and line.get("finish_position") == 1
+                    and line.get("line_nr_ceiling") is not None
+                ),
+                None,
+            )
+            if _win_nr_val is not None:
+                _win_class_adj -= (float(_win_nr_val) - _class_ref_nr) * _NR_MARGIN_FACTOR
             else:
-                _win_proxy = _no_nr_proxy(_last_win_row["stake"], None)
+                _win_proxy = _no_nr_proxy(_last_win_row.get("stake"), None)
                 if _win_proxy is not None:
                     _win_nr, _win_reliability = _win_proxy
                     _win_class_adj -= (_win_nr - _class_ref_nr) * _NR_MARGIN_FACTOR * _win_reliability
             last_win_class_adj_margin = round(_win_class_adj, 4)
-            # Find how many starts back this win was in the full career sequence.
-            _all_run_dates = [
-                r["run_date"] for r in conn.execute(
+            # Count runs after the win date — done in Python using pre-fetched data.
+            if horse_runs is not None:
+                _win_date_key = _sort_run_date(_win_date)
+                last_win_run_index = sum(
+                    1 for r in horse_runs
+                    if _win_date_key < _sort_run_date(r.get("run_date")) < _meeting_date_key
+                )
+            else:
+                _runs_since_row = conn.execute(
                     """
-                    SELECT run_date FROM horse_runs
+                    SELECT COUNT(*) FROM horse_runs
                     WHERE horse_id = ?
                       AND COALESCE(race_type, 'RACE') <> 'TRIAL'
+                      AND _sort_run_date(run_date) > _sort_run_date(?)
                       AND _sort_run_date(run_date) < _sort_run_date(?)
-                    ORDER BY _sort_run_date(run_date) DESC
                     """,
-                    (runner["horse_id"], runner.get("meeting_date")),
-                ).fetchall()
-            ]
-            _win_date = _last_win_row["run_date"]
-            last_win_run_index = _all_run_dates.index(_win_date) if _win_date in _all_run_dates else None
+                    (runner["horse_id"], _win_date, runner.get("meeting_date")),
+                ).fetchone()
+                last_win_run_index = int(_runs_since_row[0]) if _runs_since_row else None
             # Update ceiling if the win is the best run seen.
             _current_ceiling = min(_ceiling_margins) if _ceiling_margins else None
             if _current_ceiling is None or _win_class_adj < _current_ceiling:
@@ -470,27 +578,35 @@ def _build_feature_row(
     today_barrier_score = _barrier_field_score(
         runner.get("barrier"), race_field_size, lead_rate_for_barrier
     )
-    historical_barriers = conn.execute(
-        """
-        SELECT rr.barrier,
-               (SELECT COUNT(*) FROM race_runners rr2
-                WHERE rr2.meeting_code = rr.meeting_code
-                  AND rr2.race_number = rr.race_number
-                  AND COALESCE(rr2.scratched, 0) = 0) AS field_size
-        FROM race_runners rr
-        JOIN meetings m ON m.meeting_code = rr.meeting_code
-        WHERE rr.horse_id = ?
-          AND rr.meeting_code != ?
-          AND COALESCE(rr.scratched, 0) = 0
-        ORDER BY m.meeting_date DESC
-        LIMIT 5
-        """,
-        (runner["horse_id"], runner["meeting_code"]),
-    ).fetchall()
-    recent_barrier_scores = [
-        s for row in historical_barriers
-        if (s := _barrier_field_score(row["barrier"], row["field_size"], lead_rate_for_barrier)) is not None
-    ]
+    if hist_barriers is not None:
+        # Use pre-fetched barriers (sorted newest-first, field_size embedded), exclude current meeting.
+        _hist_rows = [r for r in hist_barriers if r["meeting_code"] != runner["meeting_code"]][:5]
+        recent_barrier_scores = [
+            s for r in _hist_rows
+            if (s := _barrier_field_score(r["barrier"], r.get("field_size"), lead_rate_for_barrier)) is not None
+        ]
+    else:
+        historical_barriers = conn.execute(
+            """
+            SELECT rr.barrier,
+                   (SELECT COUNT(*) FROM race_runners rr2
+                    WHERE rr2.meeting_code = rr.meeting_code
+                      AND rr2.race_number = rr.race_number
+                      AND COALESCE(rr2.scratched, 0) = 0) AS field_size
+            FROM race_runners rr
+            JOIN meetings m ON m.meeting_code = rr.meeting_code
+            WHERE rr.horse_id = ?
+              AND rr.meeting_code != ?
+              AND COALESCE(rr.scratched, 0) = 0
+            ORDER BY m.meeting_date DESC
+            LIMIT 5
+            """,
+            (runner["horse_id"], runner["meeting_code"]),
+        ).fetchall()
+        recent_barrier_scores = [
+            s for row in historical_barriers
+            if (s := _barrier_field_score(row["barrier"], row["field_size"], lead_rate_for_barrier)) is not None
+        ]
     if today_barrier_score is not None and len(recent_barrier_scores) >= 3:
         avg_recent_barrier = sum(recent_barrier_scores) / len(recent_barrier_scores)
         barrier_relief_score = round(today_barrier_score - avg_recent_barrier, 4)
@@ -576,10 +692,18 @@ def _build_feature_row(
         "trainer_last_90_starts": trainer_stats["starts_90"],
         "trainer_last_90_wins": trainer_stats["wins_90"],
         "trainer_last_90_win_rate": trainer_stats["win_rate_90"],
-        "trainer_page_season_win_rate": _trainer_page_win_rate(conn, runner["nominated_trainer"]),
+        "trainer_page_season_win_rate": (
+            trainer_page_wr.get(str(runner["nominated_trainer"] or "").lower().strip().replace(" ", "-"))
+            if trainer_page_wr is not None
+            else _trainer_page_win_rate(conn, runner["nominated_trainer"])
+        ),
         "trainer_change_manual": int(runner["trainer_change_manual"]) if runner.get("trainer_change_manual") is not None else 0,
         "trainer_form_manual": int(runner["trainer_form_manual"]) if runner.get("trainer_form_manual") is not None else 0,
-        "driver_page_season_win_rate": _driver_page_win_rate(conn, runner["nominated_driver"]),
+        "driver_page_season_win_rate": (
+            driver_page_wr.get(str(runner["nominated_driver"] or "").lower().strip().replace(" ", "-"))
+            if driver_page_wr is not None
+            else _driver_page_win_rate(conn, runner["nominated_driver"])
+        ),
         "form_bmr_secs": bmr_secs,
         "form_bmr_dist_rge_secs": bmr_dist_rge_secs,
         "dist_strike_rate_ratio": _dist_strike_rate_ratio(
@@ -588,6 +712,7 @@ def _build_feature_row(
         ),
         "dist_rge_starts": _summary_part(runner.get("form_dist_rge_summary"), 0),
         "days_since_last_run": days_since_last_run,
+        "recent_form_run_count_365": recent_form_run_count_365,
         "developmental_return": 1 if _is_developmental_return(recent_lines, runner.get("class_name"), days_since_last_run) else 0,
         "second_up_improvement": second_up_improvement,
         "race_nr_ceiling": race_nr_ceiling,
@@ -737,6 +862,27 @@ def _sp_features(lines: list[dict], race_nr_ceiling: float | None) -> dict[str, 
         "sp_best_prob_similar_grade":round(best_similar,  4) if best_similar  is not None else None,
         "sp_short_count_last10":     short_count,
         "sp_reliability_rate":       reliability,
+    }
+
+
+def _rolling_person_stats_from_runs(runs: list[dict]) -> dict[str, object]:
+    """Compute rolling person stats from a pre-sorted (newest-first) list of runs.
+
+    Identical output to _rolling_person_stats but uses pre-fetched data instead
+    of a per-person DB query, eliminating full-table scans on horse_runs.
+    """
+    runs200 = runs[:200]
+    starts_30 = min(len(runs200), 30)
+    starts_90 = min(len(runs200), 90)
+    wins_30 = sum(1 for r in runs200[:starts_30] if r.get("finish_position") == 1)
+    wins_90 = sum(1 for r in runs200[:starts_90] if r.get("finish_position") == 1)
+    return {
+        "starts_30": starts_30,
+        "wins_30": wins_30,
+        "win_rate_30": round(wins_30 / starts_30, 4) if starts_30 else None,
+        "starts_90": starts_90,
+        "wins_90": wins_90,
+        "win_rate_90": round(wins_90 / starts_90, 4) if starts_90 else None,
     }
 
 
@@ -1365,28 +1511,13 @@ def _days_since_last_run(recent_lines: list[dict[str, object]], meeting_date: ob
     Both dates are expected in 'D Mon YYYY' format (e.g. '29 Mar 2026').
     Returns None if either date cannot be parsed or no lines exist.
     """
-    MONTHS = {
-        "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
-        "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
-    }
-    import datetime
-
-    def _parse(text: object):
-        parts = str(text or "").split()
-        if len(parts) != 3:
-            return None
-        try:
-            return datetime.date(int(parts[2]), MONTHS.get(parts[1], 0), int(parts[0]))
-        except (ValueError, KeyError):
-            return None
-
-    race_date = _parse(meeting_date)
+    race_date = _parse_date(meeting_date)
     if race_date is None:
         return None
 
     latest = None
     for line in recent_lines:
-        d = _parse(line.get("run_date"))
+        d = _parse_date(line.get("run_date"))
         if d is None:
             continue
         if latest is None or d > latest:
@@ -1395,6 +1526,30 @@ def _days_since_last_run(recent_lines: list[dict[str, object]], meeting_date: ob
     if latest is None:
         return None
     return (race_date - latest).days
+
+
+def _recent_form_run_count(recent_lines: list[dict[str, object]], meeting_date: object, days: int) -> int | None:
+    """Count recent form lines whose run_date falls within `days` of meeting_date.
+
+    Used to determine how much recent form a horse has even if their last run
+    was short ago (2nd/3rd run back from a long absence). Returns None if
+    meeting_date cannot be parsed (graceful fallback — caller treats None as
+    'no recent data'). recent_lines must be sorted newest-first so we can
+    stop early once we go past the cutoff.
+    """
+    race_date = _parse_date(meeting_date)
+    if race_date is None:
+        return None
+    cutoff = race_date - timedelta(days=days)
+    count = 0
+    for line in recent_lines:
+        d = _parse_date(line.get("run_date"))
+        if d is None:
+            continue
+        if d < cutoff:
+            break  # sorted newest-first — nothing older will qualify
+        count += 1
+    return count
 
 
 def _cap_outlier_stakes(stakes: list[float]) -> list[float]:
