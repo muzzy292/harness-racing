@@ -22,7 +22,8 @@
     "sp_class_ceiling": 0.45,
     "sp_avg_market": 0.25,
     "sp_reliability": 0.25,
-    "sp_similar_grade": 0.0
+    "sp_similar_grade": 0.0,
+    "form_staleness": 1.5
   },
   "stage2": {
     "map_lead": 3.0,

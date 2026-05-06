@@ -325,6 +325,19 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
     career_win_rate = _to_float(row.get("career_win_rate"))
     last_10_win_rate = _to_float(row.get("last_10_win_rate"))
     last_10_starts = _to_int(row.get("last_10_starts"))
+    days_since_last_run_s1 = _to_float(row.get("days_since_last_run"))
+
+    # Form staleness: 365-729 days → score -1.0; 730+ days → -1.5.
+    # Multiplied by form_staleness weight in the return dict.
+    # All Stage 1 form signals (consistency, ceiling, win rate, etc.) are based on
+    # runs that may be over a year old — this discounts S1 to reflect that staleness.
+    # On top of the Stage 2 fitness penalty (tier_150_plus: -2.0 in weights.json).
+    if days_since_last_run_s1 is not None and days_since_last_run_s1 >= 730:
+        _form_stale = -1.5
+    elif days_since_last_run_s1 is not None and days_since_last_run_s1 >= 365:
+        _form_stale = -1.0
+    else:
+        _form_stale = 0.0
 
     # Adjust career_win_rate using last_10 as a reality check.
     # If recent wins are worse than career average, discount proportionally.
@@ -510,6 +523,11 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         # Apply a fixed S1 penalty for debut runners so they sit near the field
         # mean rather than above every horse with actual (negative) form history.
         "debut_adj": -1.0 * w.get("debut_adj", 2.0) if career_starts == 0 else 0.0,
+        # Form staleness: historical form is stale after a 12+ month absence.
+        # Score -1.0 (365-729d) or -1.5 (730+d), multiplied by weight.
+        # Complements the Stage 2 fitness penalty — S1 discounts form ability,
+        # S2 fitness discounts race readiness.
+        "form_staleness": _form_stale * w.get("form_staleness", 1.5),
     }
 
 
@@ -935,3 +953,93 @@ def sweep_temperature(
 
     results.sort(key=lambda r: r["log_loss"])
     return results
+
+
+def fit_component_weights(
+    rows: list[dict[str, str]],
+    winners: dict[tuple[str, int], str],
+    weights: dict | None = None,
+) -> dict[str, float]:
+    """Fit logistic regression on unit-weighted components vs actual outcomes.
+
+    Scores every race in ``winners`` with all S1/S2 weights set to 1.0 so each
+    component's raw contribution is exposed.  Features are centred within each
+    race (approximates conditional logit, removes race-level intercepts) before
+    fitting.  Returns a dict of fitted coefficients keyed by component name.
+
+    Requires scikit-learn: pip install scikit-learn
+    """
+    try:
+        from sklearn.linear_model import LogisticRegression
+    except ImportError:
+        raise RuntimeError("scikit-learn required — run: pip install scikit-learn")
+
+    from collections import defaultdict
+
+    w = weights if weights is not None else _DEFAULT_WEIGHTS
+
+    # Unit weights — S1/S2 multipliers all 1.0, fitness tiers unchanged
+    unit_w: dict = {
+        "stage1":  {k: 1.0 for k in w.get("stage1", {})},
+        "stage2":  {k: 1.0 for k in w.get("stage2", {})},
+        "fitness": w.get("fitness", {}),
+        "softmax": w.get("softmax", {}),
+    }
+
+    race_keys = sorted({
+        (row["meeting_code"], int(row["race_number"]))
+        for row in rows
+        if row.get("meeting_code") and row.get("race_number")
+    })
+
+    comp_rows:  list[dict[str, float]] = []
+    won_flags:  list[int]              = []
+    race_ids:   list[tuple]            = []
+    col_names:  list[str] | None       = None
+
+    for key in race_keys:
+        if key not in winners:
+            continue
+        winner_key = winners[key].strip().upper()
+        scored = score_race_rows(rows, key[0], key[1], weights=unit_w)
+        if not scored:
+            continue
+        for runner in scored:
+            comps = runner.get("components")
+            if not comps:
+                continue
+            if col_names is None:
+                # Exclude components with zero variance (e.g. stable_change placeholder)
+                col_names = sorted(comps.keys())
+            horse_key = str(runner.get("horse_name", "")).strip().upper()
+            won = 1 if horse_key == winner_key else 0
+            comp_rows.append(comps)
+            won_flags.append(won)
+            race_ids.append(key)
+
+    if not col_names or not comp_rows:
+        return {}
+
+    # Build raw feature matrix
+    X_raw = [[r.get(k, 0.0) or 0.0 for k in col_names] for r in comp_rows]
+
+    # Centre each feature within its race — removes race-level intercepts and
+    # approximates conditional logit without needing a specialised solver.
+    race_idx: dict[tuple, list[int]] = defaultdict(list)
+    for i, rk in enumerate(race_ids):
+        race_idx[rk].append(i)
+
+    X = [list(row) for row in X_raw]
+    for indices in race_idx.values():
+        n = len(indices)
+        for j in range(len(col_names)):
+            mean_j = sum(X_raw[i][j] for i in indices) / n
+            for i in indices:
+                X[i][j] = X_raw[i][j] - mean_j
+
+    model = LogisticRegression(
+        C=1.0, max_iter=2000, solver="lbfgs", fit_intercept=False
+    )
+    model.fit(X, won_flags)
+
+    return dict(zip(col_names, model.coef_[0]))
