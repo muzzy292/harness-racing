@@ -40,7 +40,7 @@
     "hot_trainer": 0.4,
     "cold_driver": 0.5,
     "cold_trainer": 0.4,
-    "second_up": 1.5,
+    "second_up": 0.0,
     "barrier_relief": 0.4
   },
   "fitness": {
