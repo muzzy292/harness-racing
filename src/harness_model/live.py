@@ -1046,26 +1046,37 @@ function renderImportPreview(bets) {
   </div>`;
 
   h += '<div class="import-preview"><table><thead><tr>';
-  h += '<th>Race</th><th>Horse</th><th>Model $</th><th>TAB $</th><th>Edge</th><th>Stake</th><th>Result</th><th>Status</th>';
+  h += '<th>Race</th><th>Horse</th><th>Model $</th><th>TAB $</th><th>Edge %</th><th>Stake</th><th>Result</th><th>Status</th>';
   h += '</tr></thead><tbody>';
 
-  for (const b of bets) {
-    const dup     = isDup(b);
-    const rowCls  = dup ? 'import-dup' : b.result === 'won' ? 'import-won' : b.result === 'lost' ? 'import-lost' : '';
-    const modStr  = b.model_odds ? '$' + b.model_odds.toFixed(2) : '—';
-    const edgeStr = b.edge != null ? (b.edge * 100).toFixed(0) + '%' : '—';
-    const resTxt  = b.result === 'won'     ? '<span class="imp-res">WON</span>'
-                  : b.result === 'lost'    ? '<span class="imp-res">LOST</span>'
-                  : b.result === 'void'    ? '<span style="color:var(--secondary)">VOID</span>'
-                  : '<span style="color:var(--secondary)">PENDING</span>';
-    const status  = dup ? '<span style="color:var(--secondary)">skip (dup)</span>'
-                        : '<span class="match-ok">import</span>';
+  for (let i = 0; i < bets.length; i++) {
+    const b      = bets[i];
+    const dup    = isDup(b);
+    const rowCls = dup ? 'import-dup' : b.result === 'won' ? 'import-won' : b.result === 'lost' ? 'import-lost' : '';
+    const modStr = b.model_odds ? '$' + b.model_odds.toFixed(2) : '—';
+    const resTxt = b.result === 'won'  ? '<span class="imp-res">WON</span>'
+                 : b.result === 'lost' ? '<span class="imp-res">LOST</span>'
+                 : b.result === 'void' ? '<span style="color:var(--secondary)">VOID</span>'
+                 : '<span style="color:var(--secondary)">PENDING</span>';
+    const status = dup ? '<span style="color:var(--secondary)">skip (dup)</span>'
+                       : '<span class="match-ok">import</span>';
+
+    // Edge: editable input for new bets (auto-filled where model data exists),
+    //       static text for duplicates (they won't be imported)
+    const edgePct = b.edge != null ? (b.edge * 100).toFixed(1) : '';
+    const edgeCell = dup
+      ? `<td style="color:var(--secondary)">${edgePct ? edgePct + '%' : '—'}</td>`
+      : `<td><input class="imp-edge-in" data-idx="${i}" type="number" step="0.1"
+            value="${edgePct}" placeholder="—"
+            style="width:64px;background:var(--surface);color:var(--primary-text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;font-family:'Roboto Mono',monospace"
+            title="Edge % — auto-filled where model data available; type manually if needed"></td>`;
+
     h += `<tr class="${rowCls}">
       <td>${b.mc} R${b.rn}</td>
       <td class="name">${b.horse}</td>
       <td class="c">${modStr}</td>
       <td>$${b.tab_odds.toFixed(2)}</td>
-      <td>${edgeStr}</td>
+      ${edgeCell}
       <td>$${b.stake.toFixed(2)}</td>
       <td>${resTxt}</td>
       <td>${status}</td>
@@ -1076,7 +1087,7 @@ function renderImportPreview(bets) {
   if (newCount > 0) {
     h += `<div style="margin-top:12px;display:flex;align-items:center;gap:10px">
       <button class="btn btn-accent" onclick="confirmImport()">Import ${newCount} New Bet${newCount !== 1 ? 's' : ''}</button>
-      <span style="color:var(--secondary);font-size:11px">Duplicates skipped · Model $ filled where race data available</span>
+      <span style="color:var(--secondary);font-size:11px">Duplicates skipped · Edge auto-filled where model data available — edit any cell to override</span>
     </div>`;
   } else {
     h += '<div style="margin-top:10px;color:var(--secondary);font-size:11px">All parsed bets are already in the tracker.</div>';
@@ -1086,6 +1097,13 @@ function renderImportPreview(bets) {
 }
 
 function confirmImport() {
+  // Read any manually entered / overridden edge values from the preview inputs
+  document.querySelectorAll('.imp-edge-in').forEach(input => {
+    const idx = parseInt(input.dataset.idx);
+    const val = parseFloat(input.value);
+    _importParsed[idx].edge = isNaN(val) ? null : val / 100;  // convert % → decimal
+  });
+
   const existing = loadBets();
   const isDup = b => existing.some(e =>
     e.mc === b.mc && e.rn === b.rn &&
