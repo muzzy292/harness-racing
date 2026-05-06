@@ -22,9 +22,14 @@ _STARTING_BANK = 100.0
 # Data: score all races from the feature CSV
 # ---------------------------------------------------------------------------
 
-def _score_all_races(csv_path: str, weights_path: str | None) -> list[dict]:
+def _score_all_races(csv_path: str, weights_path: str | None, weights: dict | None = None) -> list[dict]:
     rows = load_feature_rows(csv_path)
-    w = load_weights(weights_path) if weights_path and Path(weights_path).exists() else None
+    if weights is not None:
+        w = weights
+    elif weights_path and Path(weights_path).exists():
+        w = load_weights(weights_path)
+    else:
+        w = None
 
     combos: set[tuple[str, int]] = set()
     for row in rows:
@@ -41,6 +46,10 @@ def _score_all_races(csv_path: str, weights_path: str | None) -> list[dict]:
         scored = score_race_rows(rows, mc, rn, weights=w)
         if not scored:
             continue
+        def _f(v):
+            try: return round(float(v), 3) if v not in (None, "") else None
+            except (TypeError, ValueError): return None
+
         races.append({
             "meeting_code": mc,
             "race_number": rn,
@@ -50,6 +59,37 @@ def _score_all_races(csv_path: str, weights_path: str | None) -> list[dict]:
                     "horse_name": r.get("horse_name", ""),
                     "barrier": r.get("barrier", ""),
                     "fair_odds": r.get("fair_odds"),
+                    "stage1_score": r.get("stage1_score"),
+                    "stage2_score": r.get("stage2_score"),
+                    # Key features for AI analysis
+                    "feat": {
+                        "last_5_win_rate":   _f(r.get("last_5_win_rate")),
+                        "season_wins":        _f(r.get("season_wins")),
+                        "season_starts":      _f(r.get("season_starts")),
+                        "career_wins":        _f(r.get("career_wins")),
+                        "career_starts":      _f(r.get("career_starts")),
+                        "career_win_rate":    _f(r.get("career_win_rate")),
+                        "days_since_last_run": _f(r.get("days_since_last_run")),
+                        "nr_rating":          _f(r.get("nr_rating")),
+                        "nr_headroom":        _f(r.get("nr_headroom")),
+                        "race_nr_ceiling":    _f(r.get("race_nr_ceiling")),
+                        "nr_grade_delta":     _f(r.get("nr_grade_delta")),
+                        "class_delta":        _f(r.get("class_delta")),
+                        "consistency":        _f(r.get("recent_line_avg_class_adj_margin")),
+                        "ceiling":            _f(r.get("recent_line_best_class_adj_margin")),
+                        "driver_last_30_starts":   _f(r.get("driver_last_30_starts")),
+                        "driver_last_30_wins":     _f(r.get("driver_last_30_wins")),
+                        "driver_last_30_win_rate": _f(r.get("driver_last_30_win_rate")),
+                        "trainer_last_30_starts":  _f(r.get("trainer_last_30_starts")),
+                        "trainer_last_30_wins":    _f(r.get("trainer_last_30_wins")),
+                        "trainer_last_30_win_rate":_f(r.get("trainer_last_30_win_rate")),
+                    },
+                    # Top components by absolute value for the prompt
+                    "components": {
+                        k: round(v, 3) for k, v in
+                        sorted((r.get("components") or {}).items(),
+                               key=lambda x: abs(x[1]), reverse=True)[:10]
+                    },
                 }
                 for r in scored
                 if not r.get("scratched")
@@ -134,6 +174,14 @@ textarea::placeholder{color:var(--secondary)}
 .match-x{color:var(--danger);font-size:11px}
 
 tr.r-won td{background:rgba(34,211,160,.05)}
+
+.ai-flag{margin-top:4px;padding:8px 12px;border-radius:6px;font-size:12px;line-height:1.5;border-left:3px solid var(--accent)}
+.ai-flag.loading{color:var(--secondary);border-color:var(--secondary)}
+.ai-flag.result{background:rgba(0,212,255,.06);color:var(--primary-text)}
+.ai-flag.error{background:rgba(239,68,68,.08);color:var(--danger);border-color:var(--danger)}
+.ai-flag .ai-category{font-weight:700;color:var(--accent);margin-bottom:3px}
+.btn-analyse{background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.3);border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;white-space:nowrap}
+.btn-analyse:hover{background:rgba(0,212,255,.2)}
 tr.r-lost td{background:rgba(239,68,68,.04)}
 tr.r-void{opacity:.4}
 
@@ -418,6 +466,12 @@ function renderQual(mc, rn, rows, bank) {
     const modelStr = r.runner?.fair_odds ? '$'+r.runner.fair_odds.toFixed(2) : '-';
     const edgeStr  = r.edge!==null ? (r.edge*100).toFixed(1)+'%' : '-';
     const eClass   = r.edge!==null && r.edge>=MIN_EDGE ? 'edge-q' : 'edge-n';
+    // Show Analyse button for big divergences: model >> market (big value) or market >> model (model missing favourite)
+    const bigDivergence = r.runner && r.edge !== null && (r.edge >= 1.0 || r.edge <= -0.5);
+    const runnerEnc = r.runner ? encodeURIComponent(JSON.stringify(r.runner)) : null;
+    const analyseBtn = bigDivergence
+      ? `<button class="btn-analyse" onclick="analyseRunner(this,${runnerEnc},'${mc}',${rn},${r.tabOdds},${r.edge})">AI</button>`
+      : '';
     if (r.edge!==null && r.edge>=MIN_EDGE && r.stake!==null) {
       anyQ = true;
       const betJson = encodeURIComponent(JSON.stringify({mc,rn,horse:r.runner.horse_name,model_odds:r.runner.fair_odds,tab_odds:r.tabOdds,edge:r.edge,stake:parseFloat(r.stake.toFixed(2))}));
@@ -428,8 +482,12 @@ function renderQual(mc, rn, rows, bank) {
         <td>${r.tabOdds.toFixed(2)}</td>
         <td><span class="edge-pill ${eClass}">${edgeStr}</span></td>
         <td class="g">$${r.stake.toFixed(2)}</td>
-        <td><button class="btn btn-accent btn-sm" onclick="placeBet(this,'${betJson}')">Place</button></td>
-      </tr>`;
+        <td style="display:flex;gap:4px;align-items:center">
+          <button class="btn btn-accent btn-sm" onclick="placeBet(this,'${betJson}')">Place</button>
+          ${analyseBtn}
+        </td>
+      </tr>
+      <tr class="ai-row-${r.runner.horse_name.replace(/\s+/g,'_')}"><td colspan="7" style="padding:0 8px 6px"></td></tr>`;
     } else {
       h += `<tr style="opacity:.4">
         <td class="name">${r.tabName}</td>
@@ -437,13 +495,100 @@ function renderQual(mc, rn, rows, bank) {
         <td class="c">${modelStr}</td>
         <td>${r.tabOdds.toFixed(2)}</td>
         <td><span class="edge-pill ${eClass}">${edgeStr}</span></td>
-        <td>—</td><td></td>
-      </tr>`;
+        <td>—</td>
+        <td>${analyseBtn}</td>
+      </tr>
+      ${bigDivergence ? `<tr class="ai-row-${r.runner.horse_name.replace(/\s+/g,'_')}"><td colspan="7" style="padding:0 8px 6px"></td></tr>` : ''}`;
     }
   }
   if (!anyQ) h += `<tr><td colspan="7"><div class="empty">No qualifying bets (edge &lt; ${(MIN_EDGE*100).toFixed(0)}%)</div></td></tr>`;
   h += '</tbody></table>';
   document.getElementById('qual-panel').innerHTML = h;
+}
+
+// ── AI race narrative analysis ────────────────────────────────────────────────
+function buildAnalysisPrompt(runner, mc, rn, tabOdds, edgeVal) {
+  const f = runner.feat || {};
+  const comps = runner.components || {};
+  const edgePct = (edgeVal * 100).toFixed(1);
+  const direction = edgeVal >= 0 ? `Model ${edgePct}% longer than market (potential value)` : `Market ${(-edgeVal*100).toFixed(1)}% shorter than model (model missing favourite)`;
+
+  const featLines = [
+    `Last 5 win rate: ${f.last_5_win_rate!=null ? (f.last_5_win_rate*100).toFixed(0)+'%' : 'n/a'}`,
+    `Season: ${f.season_wins??'?'}/${f.season_starts??'?'} wins`,
+    `Career: ${f.career_wins??'?'}/${f.career_starts??'?'} (${f.career_win_rate!=null?(f.career_win_rate*100).toFixed(0)+'%':'n/a'})`,
+    `Days since last run: ${f.days_since_last_run??'n/a'}`,
+    `NR rating: ${f.nr_rating??'n/a'} | Race ceiling: ${f.race_nr_ceiling??'n/a'} | Headroom: ${f.nr_headroom!=null?(f.nr_headroom>0?'+':'')+f.nr_headroom:'n/a'}`,
+    `Grade delta: ${f.nr_grade_delta!=null?(f.nr_grade_delta>0?'+':'')+f.nr_grade_delta.toFixed(1)+' (positive = dropping in grade)':'n/a'}`,
+    `Class delta: ${f.class_delta!=null?'$'+(f.class_delta>0?'+':'')+f.class_delta.toFixed(0)+' (positive = higher purse race)':'n/a'}`,
+    `Avg class-adj margin: ${f.consistency!=null?f.consistency.toFixed(1)+'m':'n/a'} | Best: ${f.ceiling!=null?f.ceiling.toFixed(1)+'m':'n/a'}`,
+    `Driver last 30: ${f.driver_last_30_wins??'?'}/${f.driver_last_30_starts??'?'} (${f.driver_last_30_win_rate!=null?(f.driver_last_30_win_rate*100).toFixed(0)+'%':'n/a'})`,
+    `Trainer last 30: ${f.trainer_last_30_wins??'?'}/${f.trainer_last_30_starts??'?'} (${f.trainer_last_30_win_rate!=null?(f.trainer_last_30_win_rate*100).toFixed(0)+'%':'n/a'})`,
+  ].join('\n');
+
+  const compLines = Object.entries(comps).slice(0,8)
+    .map(([k,v]) => `  ${k}: ${v>0?'+':''}${v.toFixed(3)}`).join('\n');
+
+  return `You are a harness racing analyst. A pricing model has significantly disagreed with the market. Identify the most likely reason from the data below.
+
+Horse: ${runner.horse_name} | Meeting: ${mc} R${rn}
+Model: $${runner.fair_odds?.toFixed(2)??'?'} | Market: $${tabOdds.toFixed(2)} | ${direction}
+S1 score: ${runner.stage1_score??'n/a'} | S2 score: ${runner.stage2_score??'n/a'}
+
+FORM:
+${featLines}
+
+TOP MODEL COMPONENTS (by magnitude):
+${compLines}
+
+Respond in EXACTLY this format, nothing else:
+FLAG: [one of: Grade drop underpriced | Declining form | Cold operator | Fitness concern | Thin data | Class mismatch | Market overreaction | No clear reason]
+REASON: [1-2 sentences identifying the specific issue in the data]`;
+}
+
+async function analyseRunner(btn, runner, mc, rn, tabOdds, edgeVal) {
+  const key = localStorage.getItem('muzzybet_anthropic_key');
+  if (!key) { alert('No API key — open Settings and enter your Anthropic API key'); return; }
+
+  const rowKey = runner.horse_name.replace(/\s+/g,'_');
+  const aiRow = document.querySelector(`.ai-row-${rowKey} td`);
+  if (!aiRow) return;
+
+  btn.disabled = true;
+  btn.textContent = '...';
+  aiRow.innerHTML = '<div class="ai-flag loading">Analysing...</div>';
+
+  try {
+    const prompt = buildAnalysisPrompt(runner, mc, rn, tabOdds, edgeVal);
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!resp.ok) throw new Error(`API error ${resp.status}`);
+    const data = await resp.json();
+    const text = data.content?.[0]?.text?.trim() ?? '';
+    const flagMatch   = text.match(/FLAG:\s*(.+)/i);
+    const reasonMatch = text.match(/REASON:\s*(.+)/i);
+    const flag   = flagMatch?.[1]?.trim() ?? 'Unknown';
+    const reason = reasonMatch?.[1]?.trim() ?? text;
+    aiRow.innerHTML = `<div class="ai-flag result"><div class="ai-category">${flag}</div>${reason}</div>`;
+    btn.textContent = 'AI';
+    btn.disabled = false;
+  } catch(e) {
+    aiRow.innerHTML = `<div class="ai-flag error">Analysis failed: ${e.message}</div>`;
+    btn.textContent = 'AI';
+    btn.disabled = false;
+  }
 }
 
 // ── localStorage bet store ────────────────────────────────────────────────────
@@ -678,6 +823,7 @@ def _build_html(races: list[dict], mode: str = "local") -> str:
 def build_live_site(
     csv_path: str,
     weights_path: str | None = None,
+    weights: dict | None = None,
     out_dir: str = "docs",
 ) -> Path:
     """Build docs/live.html for GitHub Pages hosting.
@@ -686,7 +832,7 @@ def build_live_site(
     the browser using a key the user saves in their browser's localStorage.
     """
     print("Loading and scoring races for live page...")
-    races = _score_all_races(csv_path, weights_path)
+    races = _score_all_races(csv_path, weights_path, weights=weights)
     html = _build_html(races, mode="hosted")
     out_path = Path(out_dir) / "live.html"
     out_path.parent.mkdir(parents=True, exist_ok=True)
