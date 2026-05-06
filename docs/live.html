@@ -93,6 +93,11 @@ tr.r-void{opacity:.4}
 .settings-box input:focus{outline:none;border-color:var(--accent)}
 .settings-note{color:var(--secondary);font-size:11px;line-height:1.5;margin-bottom:14px}
 .key-ok{color:var(--winner);font-size:11px;margin-top:-8px;margin-bottom:10px}
+
+.import-preview table{font-size:11px;width:100%}
+.import-dup td{opacity:.4}
+.import-won .imp-res{color:var(--winner);font-weight:700}
+.import-lost .imp-res{color:var(--danger);font-weight:700}
 </style>
 </head>
 <body>
@@ -120,6 +125,21 @@ tr.r-void{opacity:.4}
       <button class="btn btn-muted" onclick="clearKey()">Clear Key</button>
       <button class="btn btn-surface" onclick="closeSettings()" style="margin-left:auto">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- Import TAB Statement overlay -->
+<div class="overlay" id="import-overlay" onclick="if(event.target===this)closeImport()">
+  <div class="settings-box" style="width:780px;max-width:96vw;max-height:88vh;overflow-y:auto">
+    <h3>Import TAB Statement</h3>
+    <p class="settings-note">Copy rows directly from your TAB account history page and paste below. Any row containing <code style="color:var(--accent);font-size:10px">@Price:</code> is parsed as a harness bet. Already-recorded bets (same race + horse) are skipped automatically.</p>
+    <label>Statement Text</label>
+    <textarea id="import-txt" style="min-height:160px;font-size:11px;margin-bottom:10px" placeholder="Wed 6 May   19:00:16  FIXED ODDS   BATHURST R04 06/05 KENZIE SHANNON @Price:$23.00  23.00  Lost  $2.00  $0.00  $150.72&#10;Wed 6 May   18:00:00  FIXED ODDS   MENANGLE R05 02/05 OUR HORSE @Price:$4.50=Return:$9.00  4.50  Credit  $2.00  $9.00  $154.00&#10;..."></textarea>
+    <div class="row" style="gap:8px;margin-bottom:12px">
+      <button class="btn btn-accent" onclick="parseImport()">Parse Statement</button>
+      <button class="btn btn-surface" onclick="closeImport()">Cancel</button>
+    </div>
+    <div id="import-preview"></div>
   </div>
 </div>
 
@@ -166,7 +186,10 @@ tr.r-void{opacity:.4}
 
   <!-- Bet tracker -->
   <div class="card full">
-    <div class="card-title">Bet Tracker</div>
+    <div style="display:flex;align-items:center;margin-bottom:14px">
+      <span class="card-title" style="margin-bottom:0">Bet Tracker</span>
+      <button class="btn btn-muted btn-sm" style="margin-left:auto" onclick="openImport()">+ Import TAB Statement</button>
+    </div>
     <div id="hist-panel"><div class="empty">No bets recorded yet</div></div>
   </div>
 
@@ -567,7 +590,7 @@ function renderHistory() {
       <td class="name">${b.horse}</td>
       <td class="c">$${(b.model_odds??0).toFixed(2)}</td>
       <td>$${(b.tab_odds??0).toFixed(2)}</td>
-      <td><span class="edge-pill edge-q">${(b.edge*100).toFixed(1)}%</span></td>
+      <td><span class="edge-pill ${b.edge!=null?'edge-q':'edge-n'}">${b.edge!=null?(b.edge*100).toFixed(1)+'%':'—'}</span></td>
       <td>$${b.stake.toFixed(2)}</td>
       <td>${retStr}</td>
       <td>${resBtns}</td>
@@ -670,6 +693,215 @@ function clearKey() {
   localStorage.removeItem('muzzybet_anthropic_key');
   document.getElementById('api-key-input').value = '';
   document.getElementById('key-status').textContent = '';
+}
+
+// ── TAB Statement Import ──────────────────────────────────────────────────────
+// Venue name → 2-letter meeting-code prefix mapping
+const VENUE_PREFIX = {
+  'WAGGA WAGGA':    'WG',
+  'PORT MACQUARIE': 'PM',
+  'PORT KEMBLA':    'PK',
+  'HUNTER VALLEY':  'HV',
+  'PENRITH PARK':   'PE',
+  'BATHURST':       'BH',
+  'PENRITH':        'PE',
+  'TAMWORTH':       'TA',
+  'WAGGA':          'WG',
+  'MENANGLE':       'MN',
+  'NEWCASTLE':      'NR',
+  'ALBURY':         'AL',
+  'CANBERRA':       'CB',
+  'GOULBURN':       'LM',
+  'NARROMINE':      'NA',
+  'PARKES':         'PK',
+  'DUBBO':          'DU',
+  'GOSFORD':        'GO',
+  'MAITLAND':       'MA',
+  'CESSNOCK':       'CK',
+  'YOUNG':          'YG',
+  'ORANGE':         'OG',
+  'GRIFFITH':       'GR',
+};
+
+// Build regex — sort longest venue names first so "WAGGA WAGGA" matches before "WAGGA"
+const _venueKeys = Object.keys(VENUE_PREFIX).sort((a, b) => b.length - a.length);
+const _venuePat  = _venueKeys.map(v => v.replace(/\s+/g, '\\s+')).join('|');
+// Matches: VENUE R## DD/MM HORSE NAME @Price:$X.XX[=Return:$Y.YY]
+const _descRe = new RegExp(
+  `(${_venuePat})\\s+R0*(\\d+)\\s+(\\d{2})\\/(\\d{2})\\s+(.+?)\\s+@Price:\\$(\\d+\\.?\\d*)(?:=Return:\\$(\\d+\\.?\\d*))?`,
+  'i'
+);
+
+let _importParsed = [];
+
+function _venuePrefix(name) {
+  const u = name.toUpperCase();
+  for (const k of _venueKeys) {
+    if (u.replace(/\s+/g,' ').startsWith(k)) return VENUE_PREFIX[k];
+  }
+  return u.replace(/\s+/g,'').slice(0,2);
+}
+
+function parseTabStatement(text) {
+  const bets = [];
+  for (const raw of text.split(/\n/)) {
+    const line = raw.trim();
+    if (!line.includes('@Price:')) continue;
+
+    const m = line.match(_descRe);
+    if (!m) continue;
+
+    const venueRaw  = m[1];
+    const rn        = parseInt(m[2]);
+    const dd        = m[3], mm = m[4];
+    const horse     = m[5].trim().toUpperCase();
+    const tabOdds   = parseFloat(m[6]);
+    const returnAmt = m[7] ? parseFloat(m[7]) : null;
+
+    const prefix = _venuePrefix(venueRaw);
+    const mc     = `${prefix}${dd}${mm}26`;
+
+    // Use time from statement row for accurate placed_at (AEST +10:00)
+    const timeM    = line.match(/\b(\d{2}:\d{2}:\d{2})\b/);
+    const time     = timeM ? timeM[1] : '12:00:00';
+    const placedAt = `2026-${mm}-${dd}T${time}+10:00`;
+
+    // Determine result from text after @Price: in the line
+    const afterPrice = line.slice(line.indexOf('@Price:'));
+    let result = 'pending', payout = null;
+    if (returnAmt !== null) {
+      result = 'won';
+      payout = returnAmt;
+    } else if (/\bLost\b/i.test(afterPrice)) {
+      result = 'lost';
+    } else if (/\bCredit\b/i.test(afterPrice)) {
+      result = 'void';   // debit row marked Credit = refund/void
+    }
+
+    // Stake: dollar amounts in the line — last 3 are debit / credit / balance
+    const dollars = [...line.matchAll(/\$(\d+\.\d{2})/g)].map(x => parseFloat(x[1]));
+    let stake = 1.0;
+    if (dollars.length >= 3) stake = dollars[dollars.length - 3];
+    if (stake <= 0) stake = 1.0;
+
+    if (payout === null) payout = parseFloat((stake * tabOdds).toFixed(2));
+
+    // Auto-fill model odds if race is in current RACES data
+    const raceData = getRace(mc, rn);
+    let modelOdds = null;
+    if (raceData) {
+      const rm = bestMatch(horse, raceData.runners);
+      if (rm && rm.dist <= 4) modelOdds = rm.runner.fair_odds ?? null;
+    }
+    const edgeVal = (modelOdds && tabOdds) ? edge(tabOdds, modelOdds) : null;
+
+    bets.push({ mc, rn, horse, tab_odds: tabOdds, model_odds: modelOdds,
+                edge: edgeVal, stake, payout, result, placed_at: placedAt });
+  }
+  return bets;
+}
+
+function openImport() {
+  document.getElementById('import-txt').value = '';
+  document.getElementById('import-preview').innerHTML = '';
+  document.getElementById('import-overlay').classList.add('open');
+}
+function closeImport() { document.getElementById('import-overlay').classList.remove('open'); }
+
+function parseImport() {
+  const text = document.getElementById('import-txt').value;
+  _importParsed = parseTabStatement(text);
+  if (!_importParsed.length) {
+    document.getElementById('import-preview').innerHTML =
+      '<div class="empty">No bets found — paste rows that contain @Price: (e.g. copy from TAB account history)</div>';
+    return;
+  }
+  renderImportPreview(_importParsed);
+}
+
+function renderImportPreview(bets) {
+  const existing = loadBets();
+  const isDup = b => existing.some(e =>
+    e.mc === b.mc && e.rn === b.rn &&
+    e.horse.toUpperCase() === b.horse.toUpperCase());
+
+  const newCount = bets.filter(b => !isDup(b)).length;
+  const dupCount = bets.length - newCount;
+
+  let h = `<div style="margin-bottom:8px;color:var(--secondary);font-size:11px">
+    ${bets.length} bets parsed &nbsp;·&nbsp;
+    <span style="color:var(--winner)">${newCount} new</span> &nbsp;·&nbsp;
+    ${dupCount} already recorded (will be skipped)
+  </div>`;
+
+  h += '<div class="import-preview"><table><thead><tr>';
+  h += '<th>Race</th><th>Horse</th><th>Model $</th><th>TAB $</th><th>Edge</th><th>Stake</th><th>Result</th><th>Status</th>';
+  h += '</tr></thead><tbody>';
+
+  for (const b of bets) {
+    const dup     = isDup(b);
+    const rowCls  = dup ? 'import-dup' : b.result === 'won' ? 'import-won' : b.result === 'lost' ? 'import-lost' : '';
+    const modStr  = b.model_odds ? '$' + b.model_odds.toFixed(2) : '—';
+    const edgeStr = b.edge != null ? (b.edge * 100).toFixed(0) + '%' : '—';
+    const resTxt  = b.result === 'won'     ? '<span class="imp-res">WON</span>'
+                  : b.result === 'lost'    ? '<span class="imp-res">LOST</span>'
+                  : b.result === 'void'    ? '<span style="color:var(--secondary)">VOID</span>'
+                  : '<span style="color:var(--secondary)">PENDING</span>';
+    const status  = dup ? '<span style="color:var(--secondary)">skip (dup)</span>'
+                        : '<span class="match-ok">import</span>';
+    h += `<tr class="${rowCls}">
+      <td>${b.mc} R${b.rn}</td>
+      <td class="name">${b.horse}</td>
+      <td class="c">${modStr}</td>
+      <td>$${b.tab_odds.toFixed(2)}</td>
+      <td>${edgeStr}</td>
+      <td>$${b.stake.toFixed(2)}</td>
+      <td>${resTxt}</td>
+      <td>${status}</td>
+    </tr>`;
+  }
+  h += '</tbody></table></div>';
+
+  if (newCount > 0) {
+    h += `<div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+      <button class="btn btn-accent" onclick="confirmImport()">Import ${newCount} New Bet${newCount !== 1 ? 's' : ''}</button>
+      <span style="color:var(--secondary);font-size:11px">Duplicates skipped · Model $ filled where race data available</span>
+    </div>`;
+  } else {
+    h += '<div style="margin-top:10px;color:var(--secondary);font-size:11px">All parsed bets are already in the tracker.</div>';
+  }
+
+  document.getElementById('import-preview').innerHTML = h;
+}
+
+function confirmImport() {
+  const existing = loadBets();
+  const isDup = b => existing.some(e =>
+    e.mc === b.mc && e.rn === b.rn &&
+    e.horse.toUpperCase() === b.horse.toUpperCase());
+
+  const toImport = _importParsed.filter(b => !isDup(b));
+  let nextId = Date.now();
+  for (const b of toImport) {
+    existing.push({
+      id:          nextId++,
+      placed_at:   b.placed_at,
+      mc:          b.mc,
+      rn:          b.rn,
+      horse:       b.horse,
+      model_odds:  b.model_odds,
+      tab_odds:    b.tab_odds,
+      edge:        b.edge,
+      stake:       b.stake,
+      payout:      b.payout,
+      result:      b.result,
+    });
+  }
+  saveBets(existing);
+  refreshBank();
+  renderHistory();
+  closeImport();
+  alert(`Imported ${toImport.length} bet${toImport.length !== 1 ? 's' : ''} successfully.`);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
