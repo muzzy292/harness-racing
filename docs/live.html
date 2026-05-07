@@ -414,7 +414,7 @@ function renderQual(mc, rn, rows, bank) {
     const bigDivergence = r.runner && r.edge !== null && (r.edge >= 1.0 || r.edge <= -0.5);
     const runnerEnc = r.runner ? encodeURIComponent(JSON.stringify(r.runner)) : null;
     const analyseBtn = bigDivergence
-      ? `<button class="btn-analyse" onclick="analyseRunner(this,${runnerEnc},'${mc}',${rn},${r.tabOdds},${r.edge})">AI</button>`
+      ? `<button class="btn-analyse" onclick="analyseRunner(this,'${runnerEnc}','${mc}',${rn},${r.tabOdds},${r.edge})">AI</button>`
       : '';
     if (r.edge!==null && r.edge>=MIN_EDGE && r.stake!==null) {
       anyQ = true;
@@ -490,9 +490,12 @@ FLAG: [one of: Grade drop underpriced | Declining form | Cold operator | Fitness
 REASON: [1-2 sentences identifying the specific issue in the data]`;
 }
 
-async function analyseRunner(btn, runner, mc, rn, tabOdds, edgeVal) {
+async function analyseRunner(btn, runnerEnc, mc, rn, tabOdds, edgeVal) {
   const key = localStorage.getItem('muzzybet_anthropic_key');
   if (!key) { alert('No API key — open Settings and enter your Anthropic API key'); return; }
+
+  let runner;
+  try { runner = JSON.parse(decodeURIComponent(runnerEnc)); } catch(e) { alert('Failed to parse runner data'); return; }
 
   const rowKey = runner.horse_name.replace(/\s+/g,'_');
   const aiRow = document.querySelector(`.ai-row-${rowKey} td`);
