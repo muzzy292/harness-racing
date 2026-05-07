@@ -455,7 +455,7 @@ function buildAnalysisPrompt(runner, mc, rn, tabOdds, edgeVal) {
   const f = runner.feat || {};
   const comps = runner.components || {};
   const edgePct = (edgeVal * 100).toFixed(1);
-  const direction = edgeVal >= 0 ? `Model ${edgePct}% longer than market (potential value)` : `Market ${(-edgeVal*100).toFixed(1)}% shorter than model (model missing favourite)`;
+  const direction = edgeVal >= 0 ? `Market ${edgePct}% longer than model (potential value)` : `Market ${(-edgeVal*100).toFixed(1)}% shorter than model (model missing favourite)`;
 
   const featLines = [
     `Last 5 win rate: ${f.last_5_win_rate!=null ? (f.last_5_win_rate*100).toFixed(0)+'%' : 'n/a'}`,
