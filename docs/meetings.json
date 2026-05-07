@@ -383,5 +383,12 @@
     "meeting_date": "8 May 2026",
     "races": 8,
     "winners": 0
+  },
+  {
+    "meeting_code": "EY080526",
+    "track_name": "Wagga",
+    "meeting_date": "8 May 2026",
+    "races": 0,
+    "winners": 0
   }
 ]

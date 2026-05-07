@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wagga — 8 May 2026</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      /* MuzzyBet Stealth Theme */
+      --bg:            #0a0a0a;
+      --card-bg:       #101010;
+      --surface:       #131313;
+      --primary-text:  #f0f0f0;
+      --secondary:     #808080;
+      --accent:        #00d4ff;
+      --accent-dark:   #00aacc;
+      --accent-soft:   rgba(0,212,255,0.08);
+      --winner:        #22d3a0;
+      --winner-soft:   rgba(34,211,160,0.08);
+      --pick-bg:       rgba(192,132,252,0.08);
+      --pick-text:     #c084fc;
+      --border:        #1f1f1f;
+      --border-strong: #2e2e2e;
+      --highlight:     #1a1a1a;
+      --winner-bg:     rgba(34,211,160,0.06);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--primary-text);
+      background-color: var(--bg);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 20px;
+    }
+
+    /* Hero Section */
+    .hero {
+      background: #060606;
+      color: var(--primary-text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 28px 32px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 280px; height: 280px;
+      background: radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 3px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      font-family: 'Roboto Mono', monospace;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      text-transform: uppercase;
+    }
+
+    .sub { color: var(--secondary); font-size: 14px; margin-top: 6px; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .summary-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+
+    .summary-card .label {
+      display: block;
+      font-size: 10px;
+      color: var(--secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 3px;
+    }
+
+    .summary-card .value {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary-text);
+      font-family: 'Roboto Mono', monospace;
+    }
+
+    /* Navigation */
+    .race-nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      margin-bottom: 16px;
+      padding: 6px;
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      background: rgba(10,10,10,0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      scrollbar-width: none;
+    }
+
+    .race-nav::-webkit-scrollbar { display: none; }
+
+    .race-nav a {
+      text-decoration: none;
+      white-space: nowrap;
+      color: var(--secondary);
+      background: transparent;
+      border-radius: 5px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .race-nav a:hover {
+      background: var(--highlight);
+      color: var(--primary-text);
+    }
+
+    /* Race Cards */
+    .race-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+
+    .race-head {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--surface);
+    }
+
+    .race-head h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 900;
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--primary-text);
+    }
+
+    .race-head .top-pick {
+      font-size: 12px;
+      background: var(--pick-bg);
+      color: var(--pick-text);
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      border: 1px solid rgba(192,132,252,0.2);
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 9px 12px;
+      text-align: left;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--surface);
+      color: var(--secondary);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background-color: var(--highlight); }
+
+    /* Special Rows */
+    tr.top-pick-row { background: var(--pick-bg); }
+    tr.top-pick-row:hover { background: rgba(192,132,252,0.12); }
+    tr.result-winner { background: var(--winner-bg); }
+
+    .horse-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .horse-cell strong {
+      font-size: 14px;
+      color: var(--primary-text);
+      font-family: 'Barlow Condensed', 'Inter', sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .horse-cell .meta { color: var(--secondary); font-size: 12px; }
+
+    .pill {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .pill.pick { background: var(--pick-bg); color: var(--pick-text); border: 1px solid rgba(192,132,252,0.25); }
+    .pill.win { background: var(--winner-soft); color: var(--winner); border: 1px solid rgba(34,211,160,0.25); }
+    .pill.fs { background: rgba(124,58,237,0.15); color: #a78bfa; border: 1px solid rgba(124,58,237,0.25); }
+    .pill.ns { background: rgba(234,88,12,0.15); color: #fb923c; border: 1px solid rgba(234,88,12,0.25); }
+
+    .driver-change { color: #f59e0b; font-weight: 600; }
+
+    .muted { color: var(--secondary); opacity: 0.5; }
+
+    /* ── Portrait mobile ── */
+    @media (max-width: 820px) and (orientation: portrait) {
+      .wrap { padding: 12px 8px; }
+      h1 { font-size: 26px; }
+      .hero { padding: 20px 16px; border-radius: 16px; margin-bottom: 16px; }
+      .summary-grid { display: none; }
+      .race-nav { margin-bottom: 16px; }
+      .race-card { border-radius: 12px; margin-bottom: 16px; overflow-x: auto; }
+      .race-head { padding: 12px 16px; flex-direction: column; align-items: flex-start; gap: 6px; }
+      .race-head h2 { font-size: 18px; }
+      .race-head .top-pick { font-size: 12px; }
+      th, td { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+      .horse-cell .meta { display: none; }
+      .horse-cell strong { font-size: 13px; }
+      th:nth-child(4), td:nth-child(4),
+      th:nth-child(6), td:nth-child(6),
+      th:nth-child(7), td:nth-child(7),
+      th:nth-child(8), td:nth-child(8),
+      th:nth-child(9), td:nth-child(9),
+      th:nth-child(12), td:nth-child(12) { display: none; }
+    }
+
+    /* ── Landscape mobile / small tablet ── */
+    @media (max-width: 1024px) and (orientation: landscape) {
+      .wrap { padding: 12px 12px; }
+      .hero { padding: 20px 24px; border-radius: 16px; margin-bottom: 16px; }
+      h1 { font-size: 28px; }
+      .race-card { margin-bottom: 16px; overflow-x: auto; }
+      .race-head { padding: 12px 20px; }
+      .race-head h2 { font-size: 20px; }
+      th, td { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+      .horse-cell .meta { display: none; }
+      table { min-width: 700px; }
+    }
+
+    /* ── Diagnostics panel ── */
+    .diag-row td { padding: 0; background: #0d0d0d; border-bottom: 2px solid var(--border); }
+    .diag-panel { padding: 14px 18px 6px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+    .diag-group { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+    .diag-group h4 { margin: 0 0 7px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--secondary); }
+    .diag-kv { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 1px solid var(--border); font-size: 11.5px; }
+    .diag-kv:last-child { border-bottom: none; }
+    .diag-kv .k { color: var(--secondary); white-space: nowrap; }
+    .diag-kv .v { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+    .diag-kv .v.warn { color: #dc2626; }
+    .diag-kv .v.ok   { color: #059669; }
+    .diag-kv .v.muted { color: var(--secondary); font-weight: 400; }
+    .diag-comps { display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 18px 14px; }
+    .diag-comp-table { flex: 1; min-width: 190px; border-collapse: collapse; }
+    .diag-comp-table caption { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--secondary); text-align: left; padding-bottom: 4px; caption-side: top; }
+    .diag-comp-table td { padding: 1px 5px; font-size: 11.5px; border: none; }
+    .comp-name { color: var(--secondary); }
+    .comp-pos  { color: #16a34a; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+    .comp-neg  { color: #dc2626; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+    .comp-zero { color: var(--secondary); opacity: 0.45; font-variant-numeric: tabular-nums; text-align: right; }
+    .diag-toggle { background: none; border: 1px solid var(--border-strong); border-radius: 3px; cursor: pointer; font-size: 10px; padding: 1px 5px; margin-left: 5px; color: var(--secondary); transition: transform 0.15s; line-height: 1.4; vertical-align: middle; }
+    .diag-toggle.open { transform: rotate(90deg); color: var(--accent); border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <span class="eyebrow">EY080526</span>
+      <h1>Wagga — 8 May 2026</h1>
+      <p class="sub">Harness Racing Model — Fair Odds &amp; Probabilities</p>
+      <div class="summary-grid">
+        <div class="summary-card">
+          <span class="label">Meeting</span>
+          <span class="value">EY080526</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Track</span>
+          <span class="value">Wagga</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Date</span>
+          <span class="value">8 May 2026</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Races</span>
+          <span class="value">0</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Results Loaded</span>
+          <span class="value">0</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Winners</span>
+          <span class="value">—</span>
+        </div>
+        
+        <div class="summary-card">
+          <span class="label">Generated</span>
+          <span class="value">07 May 2026 21:56</span>
+        </div>
+        </div>
+    </section>
+    <nav class="race-nav">
+      <a href="index.html">Meetings</a>
+      <a href="stats.html">Stats</a>
+      <a href="betting.html">Betting</a>
+      <a href="diagnose.html">Diagnose</a>
+    <a href="live.html">Live</a>
+      
+    </nav>
+    <div class="race-card"><p>No races found for this meeting.</p></div>
+  </div>
+  <script>
+    function toggleDiag(id) {
+      var row = document.getElementById(id);
+      var btn = document.querySelector('[onclick="toggleDiag(\'' + id + '\')"]');
+      if (!row) return;
+      var hidden = row.style.display === 'none' || row.style.display === '';
+      row.style.display = hidden ? 'table-row' : 'none';
+      if (btn) btn.classList.toggle('open', hidden);
+    }
+  </script>
+</body>
+</html>
