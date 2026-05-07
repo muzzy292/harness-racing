@@ -214,6 +214,7 @@ const MIN_EDGE    = 0.25;
 const KELLY       = 0.25;
 const MAX_STK_PCT = 0.04;
 const MAX_WIN     = 500.0;
+const MAX_SP      = 60.0;
 const START_BANK  = 100.0;
 const LS_KEY      = 'muzzybet_live_v1';
 const LS_BANK_KEY = 'muzzybet_startbank_v1';
@@ -393,7 +394,7 @@ function calcBets() {
   const rows = tabOdds.map(t => {
     const m = bestMatch(t.name, race.runners);
     const e_val = m ? edge(t.odds, m.runner.fair_odds) : null;
-    const stake = (e_val!==null && e_val>=MIN_EDGE) ? kellyStake(e_val, t.odds, bank) : null;
+    const stake = (e_val!==null && e_val>=MIN_EDGE && t.odds<=MAX_SP) ? kellyStake(e_val, t.odds, bank) : null;
     return {tabName:t.name, tabOdds:t.odds, runner:m?.runner??null, dist:m?.dist??999, edge:e_val, stake};
   });
   renderQual(mc, rn, rows, bank);
