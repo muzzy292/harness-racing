@@ -397,5 +397,12 @@
     "meeting_date": "8 May 2026",
     "races": 8,
     "winners": 0
+  },
+  {
+    "meeting_code": "PC090526",
+    "track_name": "Menangle",
+    "meeting_date": "9 May 2026",
+    "races": 7,
+    "winners": 0
   }
 ]
