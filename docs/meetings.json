@@ -404,5 +404,13 @@
     "meeting_date": "9 May 2026",
     "races": 7,
     "winners": 0
+  },
+  {
+    "meeting_code": "NR110526",
+    "track_name": "Newcastle",
+    "meeting_date": "11 May 2026",
+    "races": 9,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
