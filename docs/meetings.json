@@ -4,7 +4,7 @@
     "track_name": "Narrabri",
     "meeting_date": "5 Apr 2026",
     "races": 7,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "NR060426",
@@ -67,7 +67,7 @@
     "track_name": "Newcastle",
     "meeting_date": "10 Apr 2026",
     "races": 9,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "DU100426",
@@ -151,7 +151,7 @@
     "track_name": "Tamworth",
     "meeting_date": "16 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 2
   },
   {
     "meeting_code": "PE160426",
@@ -291,7 +291,7 @@
     "track_name": "Bathurst",
     "meeting_date": "29 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 0
   },
   {
     "meeting_code": "TA300426",
@@ -368,7 +368,7 @@
     "track_name": "Tamworth",
     "meeting_date": "7 May 2026",
     "races": 9,
-    "winners": 3
+    "winners": 2
   },
   {
     "meeting_code": "PE070526",
