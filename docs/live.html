@@ -792,6 +792,7 @@ function clearKey() {
 // ── TAB Statement Import ──────────────────────────────────────────────────────
 // Venue name → 2-letter meeting-code prefix mapping
 const VENUE_PREFIX = {
+  // NSW
   'WAGGA WAGGA':    'WG',
   'PORT MACQUARIE': 'PM',
   'PORT KEMBLA':    'PK',
@@ -801,20 +802,28 @@ const VENUE_PREFIX = {
   'PENRITH':        'PE',
   'TAMWORTH':       'TA',
   'WAGGA':          'WG',
-  'MENANGLE':       'MN',
+  'MENANGLE':       'PC',
   'NEWCASTLE':      'NR',
   'ALBURY':         'AL',
   'CANBERRA':       'CB',
   'GOULBURN':       'LM',
   'NARROMINE':      'NA',
+  'NARRABRI':       'NA',
   'PARKES':         'PK',
   'DUBBO':          'DU',
   'GOSFORD':        'GO',
   'MAITLAND':       'MA',
   'CESSNOCK':       'CK',
-  'YOUNG':          'YG',
+  'YOUNG':          'YU',
   'ORANGE':         'OG',
   'GRIFFITH':       'GR',
+  'TEMORA':         'TM',
+  'LEETON':         'LE',
+  'JUNEE':          'JU',
+  // QLD
+  'ALBION PARK':    'AP',
+  'REDCLIFFE':      'RE',
+  'MARBURG':        'UG',
 };
 
 // Build regex — sort longest venue names first so "WAGGA WAGGA" matches before "WAGGA"
