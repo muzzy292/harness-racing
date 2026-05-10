@@ -98,6 +98,8 @@
     .meeting-meta { color: var(--secondary); font-size: 12px; }
     .meeting-stats { color: var(--primary-text); font-size: 12px; font-weight: 600; }
     .meeting-link { margin-top: 4px; color: var(--accent); font-size: 13px; font-weight: 600; }
+    .filter-btn{background:var(--surface);color:var(--secondary);border:1px solid var(--border);border-radius:5px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
+    .filter-btn.active{background:rgba(0,212,255,0.12);color:var(--accent);border-color:var(--accent)}
   </style>
 </head>
 <body>
@@ -113,436 +115,441 @@
     <p>Fair odds and probabilities — select a meeting below</p>
   </div>
   <div class="wrap">
+    <div class="filter-bar" style="display:flex;gap:8px;margin-bottom:20px">
+      <button class="filter-btn active" onclick="filterState('all')">All</button>
+      <button class="filter-btn" onclick="filterState('NSW')">NSW</button>
+      <button class="filter-btn" onclick="filterState('QLD')">QLD</button>
+    </div>
     <div class="grid">
       
-            <a class="meeting-card" href="PC090526.html">
+            <a class="meeting-card" data-state="NSW" href="PC090526.html">
               <span class="meeting-code">PC090526</span>
               <span class="meeting-meta">9 May 2026 · Menangle</span>
               <span class="meeting-stats">7 races · 0 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="NR080526.html">
+            <a class="meeting-card" data-state="NSW" href="NR080526.html">
               <span class="meeting-code">NR080526</span>
               <span class="meeting-meta">8 May 2026 · Newcastle</span>
               <span class="meeting-stats">8 races · 2 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="EY080526.html">
+            <a class="meeting-card" data-state="NSW" href="EY080526.html">
               <span class="meeting-code">EY080526</span>
               <span class="meeting-meta">8 May 2026 · Wagga</span>
               <span class="meeting-stats">7 races · 6 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="DU080526.html">
+            <a class="meeting-card" data-state="NSW" href="DU080526.html">
               <span class="meeting-code">DU080526</span>
               <span class="meeting-meta">8 May 2026 · Dubbo</span>
               <span class="meeting-stats">8 races · 1 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="TA070526.html">
+            <a class="meeting-card" data-state="NSW" href="TA070526.html">
               <span class="meeting-code">TA070526</span>
               <span class="meeting-meta">7 May 2026 · Tamworth</span>
               <span class="meeting-stats">9 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PE070526.html">
+            <a class="meeting-card" data-state="NSW" href="PE070526.html">
               <span class="meeting-code">PE070526</span>
               <span class="meeting-meta">7 May 2026 · Penrith</span>
               <span class="meeting-stats">7 races · 6 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="BH060526.html">
+            <a class="meeting-card" data-state="NSW" href="BH060526.html">
               <span class="meeting-code">BH060526</span>
               <span class="meeting-meta">6 May 2026 · Bathurst</span>
               <span class="meeting-stats">8 races · 2 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="ME050526.html">
+            <a class="meeting-card" data-state="NSW" href="ME050526.html">
               <span class="meeting-code">ME050526</span>
               <span class="meeting-meta">5 May 2026 · Menangle</span>
               <span class="meeting-stats">7 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="EY050526.html">
+            <a class="meeting-card" data-state="NSW" href="EY050526.html">
               <span class="meeting-code">EY050526</span>
               <span class="meeting-meta">5 May 2026 · Wagga</span>
               <span class="meeting-stats">8 races · 1 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="CB040526.html">
+            <a class="meeting-card" data-state="NSW" href="CB040526.html">
               <span class="meeting-code">CB040526</span>
               <span class="meeting-meta">4 May 2026 · Canberra</span>
               <span class="meeting-stats">6 races · 0 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="FB030526.html">
+            <a class="meeting-card" data-state="NSW" href="FB030526.html">
               <span class="meeting-code">FB030526</span>
               <span class="meeting-meta">3 May 2026 · Forbes</span>
               <span class="meeting-stats">8 races · 1 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PC020526.html">
+            <a class="meeting-card" data-state="NSW" href="PC020526.html">
               <span class="meeting-code">PC020526</span>
               <span class="meeting-meta">2 May 2026 · Menangle</span>
               <span class="meeting-stats">9 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="AL010526.html">
+            <a class="meeting-card" data-state="NSW" href="AL010526.html">
               <span class="meeting-code">AL010526</span>
               <span class="meeting-meta">1 May 2026 · Albury</span>
               <span class="meeting-stats">8 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="NR010526.html">
+            <a class="meeting-card" data-state="NSW" href="NR010526.html">
               <span class="meeting-code">NR010526</span>
               <span class="meeting-meta">1 May 2026 · Newcastle</span>
               <span class="meeting-stats">9 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="TA300426.html">
+            <a class="meeting-card" data-state="NSW" href="TA300426.html">
               <span class="meeting-code">TA300426</span>
               <span class="meeting-meta">30 Apr 2026 · Tamworth</span>
               <span class="meeting-stats">8 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PE300426.html">
+            <a class="meeting-card" data-state="NSW" href="PE300426.html">
               <span class="meeting-code">PE300426</span>
               <span class="meeting-meta">30 Apr 2026 · Penrith</span>
               <span class="meeting-stats">7 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="BH290426.html">
+            <a class="meeting-card" data-state="NSW" href="BH290426.html">
               <span class="meeting-code">BH290426</span>
               <span class="meeting-meta">29 Apr 2026 · Bathurst</span>
               <span class="meeting-stats">8 races · 1 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PC280426.html">
+            <a class="meeting-card" data-state="NSW" href="PC280426.html">
               <span class="meeting-code">PC280426</span>
               <span class="meeting-meta">28 Apr 2026 · Menangle</span>
               <span class="meeting-stats">6 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="LM270426.html">
+            <a class="meeting-card" data-state="NSW" href="LM270426.html">
               <span class="meeting-code">LM270426</span>
               <span class="meeting-meta">27 Apr 2026 · Goulburn</span>
               <span class="meeting-stats">8 races · 7 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="FB260426.html">
+            <a class="meeting-card" data-state="NSW" href="FB260426.html">
               <span class="meeting-code">FB260426</span>
               <span class="meeting-meta">26 Apr 2026 · Forbes</span>
               <span class="meeting-stats">9 races · 6 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="CL260426.html">
+            <a class="meeting-card" data-state="NSW" href="CL260426.html">
               <span class="meeting-code">CL260426</span>
               <span class="meeting-meta">26 Apr 2026 · Coolamon</span>
               <span class="meeting-stats">9 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PC250426.html">
+            <a class="meeting-card" data-state="NSW" href="PC250426.html">
               <span class="meeting-code">PC250426</span>
               <span class="meeting-meta">25 Apr 2026 · Menangle</span>
               <span class="meeting-stats">9 races · 5 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="EY240426.html">
+            <a class="meeting-card" data-state="NSW" href="EY240426.html">
               <span class="meeting-code">EY240426</span>
               <span class="meeting-meta">24 Apr 2026 · Wagga</span>
               <span class="meeting-stats">7 races · 2 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PK240426.html">
+            <a class="meeting-card" data-state="NSW" href="PK240426.html">
               <span class="meeting-code">PK240426</span>
               <span class="meeting-meta">24 Apr 2026 · Parkes</span>
               <span class="meeting-stats">8 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="NR240426.html">
+            <a class="meeting-card" data-state="NSW" href="NR240426.html">
               <span class="meeting-code">NR240426</span>
               <span class="meeting-meta">24 Apr 2026 · Newcastle</span>
               <span class="meeting-stats">8 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PE230426.html">
+            <a class="meeting-card" data-state="NSW" href="PE230426.html">
               <span class="meeting-code">PE230426</span>
               <span class="meeting-meta">23 Apr 2026 · Penrith</span>
               <span class="meeting-stats">8 races · 1 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="BH220426.html">
+            <a class="meeting-card" data-state="NSW" href="BH220426.html">
               <span class="meeting-code">BH220426</span>
               <span class="meeting-meta">22 Apr 2026 · Bathurst</span>
               <span class="meeting-stats">7 races · 6 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PC210426.html">
+            <a class="meeting-card" data-state="NSW" href="PC210426.html">
               <span class="meeting-code">PC210426</span>
               <span class="meeting-meta">21 Apr 2026 · Menangle</span>
               <span class="meeting-stats">5 races · 2 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="NR200426.html">
+            <a class="meeting-card" data-state="NSW" href="NR200426.html">
               <span class="meeting-code">NR200426</span>
               <span class="meeting-meta">20 Apr 2026 · Newcastle</span>
               <span class="meeting-stats">7 races · 1 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="CL190426.html">
+            <a class="meeting-card" data-state="NSW" href="CL190426.html">
               <span class="meeting-code">CL190426</span>
               <span class="meeting-meta">19 Apr 2026 · Coolamon</span>
               <span class="meeting-stats">7 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="CB190426.html">
+            <a class="meeting-card" data-state="NSW" href="CB190426.html">
               <span class="meeting-code">CB190426</span>
               <span class="meeting-meta">19 Apr 2026 · Canberra</span>
               <span class="meeting-stats">8 races · 5 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PC180426.html">
+            <a class="meeting-card" data-state="NSW" href="PC180426.html">
               <span class="meeting-code">PC180426</span>
               <span class="meeting-meta">18 Apr 2026 · Menangle</span>
               <span class="meeting-stats">8 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="EY170426.html">
+            <a class="meeting-card" data-state="NSW" href="EY170426.html">
               <span class="meeting-code">EY170426</span>
               <span class="meeting-meta">17 Apr 2026 · Wagga</span>
               <span class="meeting-stats">6 races · 2 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="NR170426.html">
+            <a class="meeting-card" data-state="NSW" href="NR170426.html">
               <span class="meeting-code">NR170426</span>
               <span class="meeting-meta">17 Apr 2026 · Newcastle</span>
               <span class="meeting-stats">8 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PK170426.html">
+            <a class="meeting-card" data-state="NSW" href="PK170426.html">
               <span class="meeting-code">PK170426</span>
               <span class="meeting-meta">17 Apr 2026 · Parkes</span>
               <span class="meeting-stats">9 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="TA160426.html">
+            <a class="meeting-card" data-state="NSW" href="TA160426.html">
               <span class="meeting-code">TA160426</span>
               <span class="meeting-meta">16 Apr 2026 · Tamworth</span>
               <span class="meeting-stats">8 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PE160426.html">
+            <a class="meeting-card" data-state="NSW" href="PE160426.html">
               <span class="meeting-code">PE160426</span>
               <span class="meeting-meta">16 Apr 2026 · Penrith</span>
               <span class="meeting-stats">9 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="BH150426.html">
+            <a class="meeting-card" data-state="NSW" href="BH150426.html">
               <span class="meeting-code">BH150426</span>
               <span class="meeting-meta">15 Apr 2026 · Bathurst</span>
               <span class="meeting-stats">8 races · 0 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PC140426.html">
+            <a class="meeting-card" data-state="NSW" href="PC140426.html">
               <span class="meeting-code">PC140426</span>
               <span class="meeting-meta">14 Apr 2026 · Menangle</span>
               <span class="meeting-stats">6 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="LE140426.html">
+            <a class="meeting-card" data-state="NSW" href="LE140426.html">
               <span class="meeting-code">LE140426</span>
               <span class="meeting-meta">14 Apr 2026 · Leeton</span>
               <span class="meeting-stats">8 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="CB130426.html">
+            <a class="meeting-card" data-state="NSW" href="CB130426.html">
               <span class="meeting-code">CB130426</span>
               <span class="meeting-meta">13 Apr 2026 · Canberra</span>
               <span class="meeting-stats">9 races · 7 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="NA120426.html">
+            <a class="meeting-card" data-state="NSW" href="NA120426.html">
               <span class="meeting-code">NA120426</span>
               <span class="meeting-meta">12 Apr 2026 · Narrabri</span>
               <span class="meeting-stats">6 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PC110426.html">
+            <a class="meeting-card" data-state="NSW" href="PC110426.html">
               <span class="meeting-code">PC110426</span>
               <span class="meeting-meta">11 Apr 2026 · Menangle</span>
               <span class="meeting-stats">7 races · 6 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="YU100426.html">
+            <a class="meeting-card" data-state="NSW" href="YU100426.html">
               <span class="meeting-code">YU100426</span>
               <span class="meeting-meta">10 Apr 2026 · Young</span>
               <span class="meeting-stats">7 races · 2 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="NR100426.html">
+            <a class="meeting-card" data-state="NSW" href="NR100426.html">
               <span class="meeting-code">NR100426</span>
               <span class="meeting-meta">10 Apr 2026 · Newcastle</span>
               <span class="meeting-stats">9 races · 2 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="DU100426.html">
+            <a class="meeting-card" data-state="NSW" href="DU100426.html">
               <span class="meeting-code">DU100426</span>
               <span class="meeting-meta">10 Apr 2026 · Dubbo</span>
               <span class="meeting-stats">6 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PE090426.html">
+            <a class="meeting-card" data-state="NSW" href="PE090426.html">
               <span class="meeting-code">PE090426</span>
               <span class="meeting-meta">9 Apr 2026 · Penrith</span>
               <span class="meeting-stats">8 races · 6 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="BH080426.html">
+            <a class="meeting-card" data-state="NSW" href="BH080426.html">
               <span class="meeting-code">BH080426</span>
               <span class="meeting-meta">8 Apr 2026 · Bathurst</span>
               <span class="meeting-stats">8 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PC070426.html">
+            <a class="meeting-card" data-state="NSW" href="PC070426.html">
               <span class="meeting-code">PC070426</span>
               <span class="meeting-meta">7 Apr 2026 · Menangle</span>
               <span class="meeting-stats">6 races · 1 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="NR060426.html">
+            <a class="meeting-card" data-state="NSW" href="NR060426.html">
               <span class="meeting-code">NR060426</span>
               <span class="meeting-meta">6 Apr 2026 · Newcastle</span>
               <span class="meeting-stats">6 races · 1 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="TM060426.html">
+            <a class="meeting-card" data-state="NSW" href="TM060426.html">
               <span class="meeting-code">TM060426</span>
               <span class="meeting-meta">6 Apr 2026 · Temora</span>
               <span class="meeting-stats">8 races · 5 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="NA050426.html">
+            <a class="meeting-card" data-state="NSW" href="NA050426.html">
               <span class="meeting-code">NA050426</span>
               <span class="meeting-meta">5 Apr 2026 · Narrabri</span>
               <span class="meeting-stats">7 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="EY040426.html">
+            <a class="meeting-card" data-state="NSW" href="EY040426.html">
               <span class="meeting-code">EY040426</span>
               <span class="meeting-meta">4 Apr 2026 · Wagga</span>
               <span class="meeting-stats">9 races · 4 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PK040426.html">
+            <a class="meeting-card" data-state="NSW" href="PK040426.html">
               <span class="meeting-code">PK040426</span>
               <span class="meeting-meta">4 Apr 2026 · Parkes</span>
               <span class="meeting-stats">9 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="NR020426.html">
+            <a class="meeting-card" data-state="NSW" href="NR020426.html">
               <span class="meeting-code">NR020426</span>
               <span class="meeting-meta">2 Apr 2026 · Newcastle</span>
               <span class="meeting-stats">9 races · 6 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PE020426.html">
+            <a class="meeting-card" data-state="NSW" href="PE020426.html">
               <span class="meeting-code">PE020426</span>
               <span class="meeting-meta">2 Apr 2026 · Penrith</span>
               <span class="meeting-stats">8 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="PC310326.html">
+            <a class="meeting-card" data-state="NSW" href="PC310326.html">
               <span class="meeting-code">PC310326</span>
               <span class="meeting-meta">31 Mar 2026 · Menangle</span>
               <span class="meeting-stats">7 races · 3 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="LM300326.html">
+            <a class="meeting-card" data-state="NSW" href="LM300326.html">
               <span class="meeting-code">LM300326</span>
               <span class="meeting-meta">30 Mar 2026 · Goulburn</span>
               <span class="meeting-stats">8 races · 2 winners</span>
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="BETTING.html">
+            <a class="meeting-card" data-state="NSW" href="BETTING.html">
               <span class="meeting-code">BETTING</span>
               
               
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="DIAGNOSE.html">
+            <a class="meeting-card" data-state="NSW" href="DIAGNOSE.html">
               <span class="meeting-code">DIAGNOSE</span>
               
               
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="LIVE.html">
+            <a class="meeting-card" data-state="NSW" href="LIVE.html">
               <span class="meeting-code">LIVE</span>
               
               
               <span class="meeting-link">Open meeting page</span>
             </a>
             
-            <a class="meeting-card" href="STATS.html">
+            <a class="meeting-card" data-state="NSW" href="STATS.html">
               <span class="meeting-code">STATS</span>
               
               
@@ -551,5 +558,13 @@
             
     </div>
   </div>
+<script>
+function filterState(s) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.textContent===s||(s==='all'&&b.textContent==='All')));
+  document.querySelectorAll('.meeting-card').forEach(c => {
+    c.style.display = (s==='all' || c.dataset.state===s) ? '' : 'none';
+  });
+}
+</script>
 </body>
 </html>

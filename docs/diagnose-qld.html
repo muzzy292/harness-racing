@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Model Diagnostic — Harness Racing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:#0a0a0a; --card-bg:#101010; --surface:#131313; --primary:#f0f0f0;
+      --secondary:#808080; --accent:#00d4ff; --accent-dark:#00aacc;
+      --border:#1f1f1f; --highlight:#1a1a1a;
+      --red:#ef4444; --amber:#f59e0b; --blue:#3b82f6;
+    }
+    *{box-sizing:border-box;}
+    html{scroll-behavior:smooth;}
+    body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      color:var(--primary);background:var(--bg);line-height:1.5;-webkit-font-smoothing:antialiased;}
+    .top-nav{background:#060606;padding:10px 20px;display:flex;gap:4px;align-items:center;border-bottom:1px solid var(--border);}
+    .top-nav a{color:var(--secondary);text-decoration:none;font-size:13px;font-weight:600;
+      padding:6px 14px;border-radius:5px;transition:all 0.15s;}
+    .top-nav a:hover{background:var(--highlight);color:var(--primary);}
+    .top-nav a.active{background:rgba(0,212,255,0.08);color:var(--accent);}
+    .hero{background:#060606;color:var(--primary);padding:28px 20px;border-bottom:1px solid var(--border);}
+    .hero-inner{max-width:1300px;margin:0 auto;display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
+    .hero h1{margin:0;font-size:26px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;font-family:'Barlow Condensed','Inter',sans-serif;}
+    .hero p{margin:4px 0 0;color:var(--secondary);font-size:13px;}
+    .meeting-select{margin-left:auto;display:flex;align-items:center;gap:10px;}
+    .meeting-select label{color:var(--secondary);font-size:13px;font-weight:600;white-space:nowrap;}
+    .meeting-select select{padding:8px 12px;border-radius:6px;border:1px solid var(--border);
+      background:var(--surface);color:var(--primary);font-size:13px;font-weight:600;cursor:pointer;
+      appearance:none;-webkit-appearance:none;min-width:180px;}
+    .meeting-select select option{background:#131313;color:var(--primary);}
+    .wrap{max-width:1300px;margin:0 auto;padding:28px 20px 60px;}
+    /* Summary cards */
+    .cards-row{display:grid;gap:14px;margin-bottom:24px;}
+    .cards-row.two{grid-template-columns:1fr 1fr;}
+    .cards-row.three{grid-template-columns:repeat(3,1fr);}
+    @media(max-width:700px){.cards-row.two,.cards-row.three{grid-template-columns:1fr;}}
+    .card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;
+      padding:18px 20px;box-shadow:0 2px 4px rgba(0,0,0,0.04);}
+    .card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;
+      color:var(--secondary);margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+    /* Mini stat rows */
+    .stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;
+      font-size:13px;border-bottom:1px solid var(--highlight);}
+    .stat-row:last-child{border-bottom:none;}
+    .stat-label{color:var(--secondary);}
+    .stat-val{font-weight:700;font-size:14px;}
+    .stat-val.green{color:var(--accent-dark);}
+    .stat-val.red{color:var(--red);}
+    .stat-val.amber{color:var(--amber);}
+    /* Quadrant grid */
+    .quad-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .quad{border-radius:10px;padding:12px;text-align:center;}
+    .quad .q-val{font-size:22px;font-weight:800;}
+    .quad .q-pct{font-size:12px;font-weight:600;color:var(--secondary);}
+    .quad .q-label{font-size:11px;color:var(--secondary);margin-top:2px;}
+    .quad.both-right{background:rgba(34,211,160,0.10);border:1px solid rgba(34,211,160,0.25);}
+    .quad.model-edge{background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);}
+    .quad.model-fail{background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);}
+    .quad.both-wrong{background:var(--surface);border:1px solid var(--border);}
+    /* Section header */
+    .section-header{display:flex;align-items:baseline;gap:12px;margin:28px 0 12px;}
+    .section-title{font-size:16px;font-weight:700;}
+    .section-count{font-size:13px;color:var(--secondary);}
+    /* Tables */
+    .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px;
+      background:var(--card-bg);box-shadow:0 2px 4px rgba(0,0,0,0.04);}
+    table{width:100%;border-collapse:collapse;min-width:700px;}
+    th,td{padding:8px 12px;text-align:left;font-size:12px;border-bottom:1px solid var(--border);}
+    th{background:var(--surface);color:var(--secondary);font-size:10px;font-weight:700;
+      text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;}
+    tr:last-child td{border-bottom:none;}
+    td.num{text-align:right;font-variant-numeric:tabular-nums;}
+    th.num{text-align:right;}
+    tr.model-win{background:rgba(34,211,160,0.07);}
+    tr.model-win:hover{background:rgba(34,211,160,0.12);}
+    tr.model-loss:hover{background:var(--highlight);}
+    .badge{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;}
+    .badge.win{background:#dcfce7;color:#15803d;}
+    .badge.loss{background:#fee2e2;color:#b91c1c;}
+    .hidden{display:none!important;}
+    .no-data{padding:24px;text-align:center;color:var(--secondary);font-size:13px;}
+    .footer{margin-top:40px;text-align:center;color:var(--secondary);font-size:12px;}
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="index.html">Meetings</a>
+    <a href="stats.html">Stats</a>
+    <a href="betting.html">Betting</a>
+    <a href="diagnose.html" class="active">Diagnose</a>
+  </nav>
+  <div class="hero">
+    <div class="hero-inner">
+      <div>
+        <h1>Model Diagnostic — QLD</h1>
+        <p>Per-race truth set &middot; 0 races with results &middot; Generated 10 May 2026 11:15</p>
+      </div>
+      <div class="meeting-select">
+        <label for="track-sel">Track:</label>
+        <select id="track-sel">
+          <option value="all">All tracks (0 races)</option>
+          
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- Row 1: Hit Rate + Quadrants -->
+    <div class="cards-row two">
+      <div class="card">
+        <div class="card-title">Hit Rate</div>
+        <div class="stat-row"><span class="stat-label">Top pick won (model)</span><span class="stat-val" id="s-model-correct"></span></div>
+        <div class="stat-row"><span class="stat-label">Top pick won (SP)</span><span class="stat-val" id="s-sp-correct"></span></div>
+        <div class="stat-row"><span class="stat-label">Top 3 contained winner</span><span class="stat-val" id="s-top3"></span></div>
+        <div class="stat-row"><span class="stat-label">Winner was model 2nd</span><span class="stat-val" id="s-rank2"></span></div>
+        <div class="stat-row"><span class="stat-label">Winner was model 3rd</span><span class="stat-val" id="s-rank3"></span></div>
+        <div class="stat-row"><span class="stat-label">Winner was model 4th+</span><span class="stat-val red" id="s-rank4plus"></span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Failure Quadrants</div>
+        <div class="quad-grid">
+          <div class="quad both-right">
+            <div class="q-val" id="q-both-correct"></div>
+            <div class="q-pct" id="q-both-correct-pct"></div>
+            <div class="q-label">Both right</div>
+          </div>
+          <div class="quad model-edge">
+            <div class="q-val" id="q-model-edge"></div>
+            <div class="q-pct" id="q-model-edge-pct"></div>
+            <div class="q-label">Model edge</div>
+          </div>
+          <div class="quad model-fail">
+            <div class="q-val" id="q-sp-failure"></div>
+            <div class="q-pct" id="q-sp-failure-pct"></div>
+            <div class="q-label">Model failure</div>
+          </div>
+          <div class="quad both-wrong">
+            <div class="q-val" id="q-both-wrong"></div>
+            <div class="q-pct" id="q-both-wrong-pct"></div>
+            <div class="q-label">Both wrong</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: S1 vs S2 breakdown -->
+    <div class="cards-row three">
+      <div class="card">
+        <div class="card-title">S1 vs S2 on Failures</div>
+        <div class="stat-row"><span class="stat-label"></span><span class="stat-label" style="font-weight:700">Top pick &nbsp;&nbsp; Winner</span></div>
+        <div class="stat-row"><span class="stat-label">Avg S1 score</span><span class="stat-val" id="s-s1-compare"></span></div>
+        <div class="stat-row"><span class="stat-label">Avg S2 score</span><span class="stat-val" id="s-s2-compare"></span></div>
+        <div class="stat-row"><span class="stat-label">Avg total score</span><span class="stat-val" id="s-tot-compare"></span></div>
+        <div class="stat-row"><span class="stat-label">Avg winner model rank</span><span class="stat-val" id="s-avg-rank"></span></div>
+        <div class="stat-row"><span class="stat-label">S2 changed top pick</span><span class="stat-val" id="s-s2-swung"></span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Flagged Patterns</div>
+        <div class="stat-row"><span class="stat-label">SP knew, model didn't (rank 4+)</span><span class="stat-val red" id="s-sp-knew"></span></div>
+        <div class="stat-row"><span class="stat-label">Map override placed top 3</span><span class="stat-val amber" id="s-map-override"></span></div>
+        <div class="stat-row"><span class="stat-label">Big miss (winner rank 5+)</span><span class="stat-val red" id="s-big-miss"></span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Score Distribution</div>
+        <div class="stat-row"><span class="stat-label">Total races</span><span class="stat-val" id="s-total-races"></span></div>
+        <div class="stat-row"><span class="stat-label">Model correct</span><span class="stat-val green" id="s-model-pct"></span></div>
+        <div class="stat-row"><span class="stat-label">SP correct</span><span class="stat-val" id="s-sp-pct"></span></div>
+        <div class="stat-row"><span class="stat-label">Model vs SP gap</span><span class="stat-val" id="s-gap"></span></div>
+      </div>
+    </div>
+
+    <!-- Section 4: Per-Race Detail -->
+    <div class="section-header">
+      <div class="section-title">Per-Race Detail</div>
+      <div class="section-count" id="detail-count"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="detail-table">
+        <thead><tr>
+          <th>Meeting</th><th class="num">R</th>
+          <th>Winner</th><th class="num">SP$</th>
+          <th class="num">Mdl#</th><th class="num">SP#</th>
+          <th>Model top 3</th>
+          <th class="num">W.S1</th><th class="num">W.S2</th>
+        </tr></thead>
+        <tbody id="detail-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Section 5: SP Knew, Model Didn't -->
+    <div class="section-header">
+      <div class="section-title">SP Knew, Model Didn't</div>
+      <div class="section-count" id="sp-knew-count"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="sp-knew-table">
+        <thead><tr>
+          <th>Meeting</th><th class="num">R</th>
+          <th>Winner</th>
+          <th class="num">Mdl#</th><th class="num">SP#</th>
+          <th class="num">Model$</th><th class="num">SP$</th>
+          <th class="num">nr_grade_delta</th>
+          <th class="num">sp_sim_grade_prob</th>
+        </tr></thead>
+        <tbody id="sp-knew-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Section 6: Map Overrides -->
+    <div class="section-header">
+      <div class="section-title">Map Override Opportunities</div>
+      <div class="section-count" id="map-count"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="map-table">
+        <thead><tr>
+          <th>Meeting</th><th class="num">R</th>
+          <th>Best-map horse</th>
+          <th class="num">Mdl#</th><th class="num">SP#</th><th class="num">Finish</th>
+          <th class="num">Map score</th>
+          <th>Winner</th><th class="num">Winner map</th>
+        </tr></thead>
+        <tbody id="map-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Section 7: Biggest Misses -->
+    <div class="section-header">
+      <div class="section-title">Biggest Model Misses</div>
+      <div class="section-count" id="miss-count"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="miss-table">
+        <thead><tr>
+          <th>Meeting</th><th class="num">R</th>
+          <th>Winner</th>
+          <th class="num">Mdl#</th><th class="num">SP#</th>
+          <th class="num">Model$</th><th class="num">SP$</th>
+          <th class="num">S1</th><th class="num">S2</th>
+          <th class="num">nr_grade_delta</th><th class="num">NR ceil</th>
+        </tr></thead>
+        <tbody id="miss-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="footer">Generated 10 May 2026 11:15</div>
+  </div>
+
+<script>
+const DATA = {"global":{},"by_meeting":{},"by_track":{},"tracks":[],"races":[],"map_overrides":[]};
+
+function fmt(v, decimals, prefix) {
+  if (v === null || v === undefined) return '<span style="color:#94a3b8">n/a</span>';
+  const s = (v >= 0 && prefix ? '+' : '') + v.toFixed(decimals);
+  return s;
+}
+function fmtOdds(v) {
+  return v ? '$' + v.toFixed(2) : '<span style="color:#94a3b8">n/a</span>';
+}
+function pct(n, total) {
+  return total ? (n / total * 100).toFixed(1) + '%' : '—';
+}
+function el(id) { return document.getElementById(id); }
+
+function updateSummary(stats) {
+  const n = stats.total_races || 0;
+  el('s-total-races').textContent = n;
+  el('s-model-correct').textContent = stats.model_correct + '/' + n + ' (' + pct(stats.model_correct, n) + ')';
+  el('s-sp-correct').textContent    = stats.sp_correct + '/' + n + ' (' + pct(stats.sp_correct, n) + ')';
+  el('s-top3').textContent          = stats.top3_hit + '/' + n + ' (' + pct(stats.top3_hit, n) + ')';
+  el('s-rank2').textContent         = stats.rank2 + '/' + n;
+  el('s-rank3').textContent         = stats.rank3 + '/' + n;
+  el('s-rank4plus').textContent     = stats.rank4plus + '/' + n;
+
+  el('q-both-correct').textContent     = stats.both_correct;
+  el('q-both-correct-pct').textContent = pct(stats.both_correct, n);
+  el('q-model-edge').textContent       = stats.model_edge;
+  el('q-model-edge-pct').textContent   = pct(stats.model_edge, n);
+  el('q-sp-failure').textContent       = stats.sp_failure;
+  el('q-sp-failure-pct').textContent   = pct(stats.sp_failure, n);
+  el('q-both-wrong').textContent       = stats.both_wrong;
+  el('q-both-wrong-pct').textContent   = pct(stats.both_wrong, n);
+
+  const f = n => n !== null && n !== undefined ? n.toFixed(3) : 'n/a';
+  el('s-s1-compare').innerHTML  = f(stats.avg_top_s1) + ' &nbsp; ' + f(stats.avg_win_s1);
+  el('s-s2-compare').innerHTML  = f(stats.avg_top_s2) + ' &nbsp; ' + f(stats.avg_win_s2);
+  el('s-tot-compare').innerHTML = f(stats.avg_top_tot) + ' &nbsp; ' + f(stats.avg_win_tot);
+  el('s-avg-rank').textContent  = stats.avg_winner_rank !== null ? stats.avg_winner_rank.toFixed(1) : 'n/a';
+  el('s-s2-swung').textContent  = stats.s2_swung + ' races';
+
+  el('s-sp-knew').textContent   = stats.sp_knew_count + ' races';
+  el('s-map-override').textContent = '—'; // recomputed below after filtering
+  el('s-big-miss').textContent  = stats.big_miss_count + ' races';
+
+  const modelPct = n ? (stats.model_correct / n * 100).toFixed(1) : '—';
+  const spPct    = n ? (stats.sp_correct    / n * 100).toFixed(1) : '—';
+  el('s-model-pct').textContent = modelPct + '%';
+  el('s-sp-pct').textContent    = spPct + '%';
+  const gap = n ? ((stats.model_correct - stats.sp_correct) / n * 100).toFixed(1) : '—';
+  el('s-gap').textContent = (parseFloat(gap) >= 0 ? '+' : '') + gap + '%';
+  el('s-gap').className = 'stat-val ' + (parseFloat(gap) >= 0 ? 'green' : 'red');
+}
+
+function buildDetailRows(races) {
+  return races.map(r => {
+    const cls = r.model_correct ? 'model-win' : 'model-loss';
+    const badge = r.model_correct
+      ? '<span class="badge win">WIN</span>'
+      : '<span class="badge loss">LOSS</span>';
+    const top3 = [r.model_top1, r.model_top2, r.model_top3].filter(Boolean)
+      .map(n => n.length > 12 ? n.slice(0,12) : n).join(', ');
+    const sp = r.winner_sp ? '$' + r.winner_sp.toFixed(2) : 'n/a';
+    return `<tr class="${cls}" data-meeting="${r.meeting}">
+      <td>${r.meeting}</td><td class="num">${r.race}</td>
+      <td>${r.winner} ${badge}</td>
+      <td class="num">${sp}</td>
+      <td class="num">${r.winner_model_rank ?? '?'}</td>
+      <td class="num">${r.winner_sp_rank ?? '?'}</td>
+      <td style="font-size:11px;color:var(--secondary)">${top3}</td>
+      <td class="num">${fmt(r.winner_s1, 2, true)}</td>
+      <td class="num">${fmt(r.winner_s2, 2, true)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function buildSpKnewRows(races) {
+  const rows = races.filter(r => r.is_sp_knew);
+  return rows.map(r => {
+    return `<tr data-meeting="${r.meeting}">
+      <td>${r.meeting}</td><td class="num">${r.race}</td>
+      <td>${r.winner}</td>
+      <td class="num" style="color:var(--red);font-weight:700">${r.winner_model_rank ?? '?'}</td>
+      <td class="num">${r.winner_sp_rank ?? '?'}</td>
+      <td class="num">${fmtOdds(r.winner_model_odds)}</td>
+      <td class="num">${r.winner_sp ? '$' + r.winner_sp.toFixed(2) : 'n/a'}</td>
+      <td class="num">${fmt(r.winner_nr_grade_delta, 1, true)}</td>
+      <td class="num">${fmt(r.winner_sp_class_ceiling, 3, true)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="9" class="no-data">No SP-knew failures in this selection.</td></tr>';
+}
+
+function buildMapRows(mapRows) {
+  return mapRows.map(r => {
+    return `<tr data-meeting="${r.meeting}">
+      <td>${r.meeting}</td><td class="num">${r.race}</td>
+      <td style="font-weight:600">${r.bm_horse}</td>
+      <td class="num">${r.bm_model_rank ?? '?'}</td>
+      <td class="num">${r.bm_sp_rank ?? '?'}</td>
+      <td class="num">${r.bm_finish}</td>
+      <td class="num">${fmt(r.bm_map, 2, false)}</td>
+      <td>${r.winner}</td>
+      <td class="num">${fmt(r.winner_map, 2, false)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="9" class="no-data">No map override opportunities in this selection.</td></tr>';
+}
+
+function buildMissRows(races) {
+  const rows = races.filter(r => (r.winner_model_rank || 0) >= 5)
+    .sort((a, b) => (b.winner_model_rank || 0) - (a.winner_model_rank || 0));
+  return rows.map(r => {
+    return `<tr data-meeting="${r.meeting}">
+      <td>${r.meeting}</td><td class="num">${r.race}</td>
+      <td>${r.winner}</td>
+      <td class="num" style="color:var(--red);font-weight:700">${r.winner_model_rank ?? '?'}</td>
+      <td class="num">${r.winner_sp_rank ?? '?'}</td>
+      <td class="num">${fmtOdds(r.winner_model_odds)}</td>
+      <td class="num">${r.winner_sp ? '$' + r.winner_sp.toFixed(2) : 'n/a'}</td>
+      <td class="num">${fmt(r.winner_s1, 3, true)}</td>
+      <td class="num">${fmt(r.winner_s2, 3, true)}</td>
+      <td class="num">${fmt(r.winner_nr_grade_delta, 1, true)}</td>
+      <td class="num">${r.winner_race_nr_ceiling !== null && r.winner_race_nr_ceiling !== undefined ? r.winner_race_nr_ceiling : '<span style="color:#94a3b8">n/a</span>'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="11" class="no-data">No big misses in this selection.</td></tr>';
+}
+
+function render(track) {
+  const isAll = track === 'all';
+  const stats = isAll ? DATA.global : (DATA.by_track[track] || {});
+  updateSummary(stats);
+
+  const races   = isAll ? DATA.races         : DATA.races.filter(r => r.track === track);
+  const mapData = isAll ? DATA.map_overrides : DATA.map_overrides.filter(r => r.track === track);
+
+  el('detail-tbody').innerHTML = buildDetailRows(races);
+  el('detail-count').textContent = races.length + ' races';
+
+  const spKnew = races.filter(r => r.is_sp_knew);
+  el('sp-knew-tbody').innerHTML = buildSpKnewRows(races);
+  el('sp-knew-count').textContent = spKnew.length + ' races';
+
+  el('map-tbody').innerHTML = buildMapRows(mapData);
+  el('map-count').textContent = mapData.length + ' races';
+  el('s-map-override').textContent = mapData.length + ' races';
+
+  const misses = races.filter(r => (r.winner_model_rank || 0) >= 5);
+  el('miss-tbody').innerHTML = buildMissRows(races);
+  el('miss-count').textContent = misses.length + ' races';
+}
+
+document.getElementById('track-sel').addEventListener('change', e => render(e.target.value));
+render('all');
+</script>
+</body>
+</html>

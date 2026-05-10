@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Betting Backtest — Harness Racing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a0a; --card-bg: #101010; --surface: #131313; --primary: #f0f0f0;
+      --secondary: #808080; --accent: #00d4ff; --accent-dark: #00aacc;
+      --border: #1f1f1f; --highlight: #1a1a1a;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin:0; font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      color:var(--primary); background:var(--bg); line-height:1.5; -webkit-font-smoothing:antialiased; }
+    .top-nav { background:#060606; padding:10px 20px; display:flex; gap:4px; align-items:center; border-bottom:1px solid var(--border); }
+    .top-nav a { color:var(--secondary); text-decoration:none; font-size:13px; font-weight:600;
+      padding:6px 14px; border-radius:5px; transition:all 0.15s; }
+    .top-nav a:hover { background:var(--highlight); color:var(--primary); }
+    .top-nav a.active { background:rgba(0,212,255,0.08); color:var(--accent); }
+    .hero { background:#060606; color:var(--primary); padding:32px 20px; text-align:center; border-bottom:1px solid var(--border); }
+    .hero h1 { margin:0 0 8px; font-size:32px; font-weight:900; letter-spacing:0.04em; text-transform:uppercase; font-family:'Barlow Condensed','Inter',sans-serif; }
+    .hero p { margin:0; color:var(--secondary); font-size:14px; }
+    .wrap { max-width:1300px; margin:0 auto; padding:32px 20px 60px; }
+    .summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:28px; }
+    .sc { background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:16px; }
+    .sc-label { display:block; font-size:11px; color:var(--secondary); text-transform:uppercase;
+      letter-spacing:0.05em; margin-bottom:4px; }
+    .sc-value { display:block; font-size:20px; font-weight:700; }
+    .sc-sub { display:block; font-size:12px; color:var(--secondary); margin-top:2px; }
+    .chart-card { background:var(--card-bg); border:1px solid var(--border); border-radius:16px;
+      padding:20px; margin-bottom:28px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); }
+    .chart-card h3 { margin:0 0 12px; font-size:14px; color:var(--secondary); font-weight:600;
+      text-transform:uppercase; letter-spacing:0.05em; }
+    .params { background:var(--card-bg); border:1px solid var(--border); border-radius:12px;
+      padding:14px 20px; margin-bottom:28px; font-size:13px; color:var(--secondary);
+      display:flex; gap:24px; flex-wrap:wrap; align-items:center; }
+    .params strong { color:var(--primary); }
+    .section-title { font-size:20px; font-weight:700; margin:0 0 14px;
+      padding-bottom:6px; border-bottom:2px solid var(--accent); display:inline-block; }
+    .table-toolbar { display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:10px; flex-wrap:wrap; gap:10px; }
+    .page-info { font-size:13px; color:var(--secondary); }
+    .page-controls { display:flex; gap:6px; align-items:center; }
+    .page-btn { background:var(--surface); border:1px solid var(--border); color:var(--primary);
+      padding:5px 14px; border-radius:6px; font-size:13px; cursor:pointer; transition:all 0.15s; }
+    .page-btn:hover:not(:disabled) { background:var(--highlight); border-color:var(--accent); }
+    .page-btn:disabled { opacity:0.35; cursor:default; }
+    .table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:16px;
+      background:var(--card-bg); box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); }
+    table { width:100%; border-collapse:collapse; min-width:900px; }
+    th,td { padding:9px 12px; text-align:left; font-size:13px; border-bottom:1px solid var(--border); }
+    th { background:var(--surface); color:var(--secondary); font-size:11px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap;
+      cursor:pointer; user-select:none; transition:color 0.15s; }
+    th:hover { color:var(--primary); }
+    th.sort-asc::after  { content:' ▲'; color:var(--accent); font-size:9px; }
+    th.sort-desc::after { content:' ▼'; color:var(--accent); font-size:9px; }
+    tr:last-child td { border-bottom:none; }
+    td.num { text-align:right; }
+    th.num { text-align:right; }
+    tr.bet-win { background:rgba(34,211,160,0.07); }
+    tr.bet-win:hover { background:rgba(34,211,160,0.12); }
+    tr.bet-loss { background:var(--card-bg); }
+    tr.bet-loss:hover { background:var(--highlight); }
+    .tier { display:inline-block; padding:2px 8px; border-radius:4px;
+      font-size:11px; font-weight:700; text-transform:uppercase; }
+    .tier-value    { background:#ecfdf5; color:#059669; }
+    .tier-strong   { background:#fef3c7; color:#b45309; }
+    .footer { margin-top:40px; text-align:center; color:var(--secondary); font-size:13px; }
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="index.html">Meetings</a>
+    <a href="stats.html">Stats</a>
+    <a href="betting.html" class="active">Betting</a>
+    <a href="diagnose.html">Diagnose</a>
+    <a href="live.html">Live</a>
+  </nav>
+  <div class="hero">
+    <h1>Betting Backtest — QLD</h1>
+    <p>Quarter-Kelly staking · QLD tracks · Starting bank $1,000</p>
+  </div>
+  <div class="wrap">
+    <div class="summary-grid"><div class="sc"><span class="sc-label">Starting Bank</span>
+          <span class="sc-value">$1,000</span>
+          
+        </div><div class="sc"><span class="sc-label">Current Bank</span>
+          <span class="sc-value" style="color:#10b981">$1,000.00</span>
+          <span class="sc-sub">+$0.00</span>
+        </div><div class="sc"><span class="sc-label">Total Bets</span>
+          <span class="sc-value">0</span>
+          <span class="sc-sub">0 winners</span>
+        </div><div class="sc"><span class="sc-label">Win Rate</span>
+          <span class="sc-value">0.0%</span>
+          
+        </div><div class="sc"><span class="sc-label">ROI</span>
+          <span class="sc-value" style="color:#10b981">+0.0%</span>
+          
+        </div><div class="sc"><span class="sc-label">Avg Edge</span>
+          <span class="sc-value">0.0%</span>
+          
+        </div><div class="sc"><span class="sc-label">Total Staked</span>
+          <span class="sc-value">$0.00</span>
+          
+        </div></div>
+    <div class="params">
+      <span><strong>Strategy:</strong> Quarter-Kelly (0.25×) &middot; Edge filter: 25%–100% odds</span>
+      <span><strong>Edge window:</strong> 25%–100% odds</span>
+      <span><strong>Max Bet:</strong> 4% of bank</span>
+      <span><strong>Halve Units:</strong> if bank falls 25%</span>
+      <span><strong>Tracks:</strong> QLD</span>
+      
+    </div>
+    <div class="chart-card">
+      <h3>Bankroll progression — 0 bets</h3>
+      <p style="color:var(--secondary)">No bets yet.</p>
+    </div>
+    <div class="section-title">Bet History</div>
+    <div class="table-toolbar">
+      <span class="page-info" id="pageInfo"></span>
+      <div class="page-controls">
+        <button class="page-btn" id="btnFirst" onclick="goPage(0)">«</button>
+        <button class="page-btn" id="btnPrev"  onclick="goPage(_page-1)">‹ Prev</button>
+        <span class="page-info" id="pageNum"></span>
+        <button class="page-btn" id="btnNext"  onclick="goPage(_page+1)">Next ›</button>
+        <button class="page-btn" id="btnLast"  onclick="goPage(_totalPages-1)">»</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="betTable">
+        <thead>
+          <tr>
+            <th data-col="date_sort">Date</th>
+            <th data-col="track">Track</th>
+            <th data-col="race" class="num">Race</th>
+            <th data-col="horse">Horse</th>
+            <th data-col="model_prob" class="num">Model%</th>
+            <th data-col="sp" class="num">SP</th>
+            <th data-col="edge" class="num">Edge%</th>
+            <th data-col="tier" class="num">Tier</th>
+            <th data-col="stake" class="num">Stake</th>
+            <th data-col="pos" class="num">Result</th>
+            <th data-col="profit" class="num">P&amp;L</th>
+            <th data-col="bank" class="num">Bank</th>
+          </tr>
+        </thead>
+        <tbody id="betBody"></tbody>
+      </table>
+    </div>
+    <div class="table-toolbar" style="margin-top:10px;">
+      <span class="page-info" id="pageInfo2"></span>
+      <div class="page-controls">
+        <button class="page-btn" id="btnFirst2" onclick="goPage(0)">«</button>
+        <button class="page-btn" id="btnPrev2"  onclick="goPage(_page-1)">‹ Prev</button>
+        <span class="page-info" id="pageNum2"></span>
+        <button class="page-btn" id="btnNext2"  onclick="goPage(_page+1)">Next ›</button>
+        <button class="page-btn" id="btnLast2"  onclick="goPage(_totalPages-1)">»</button>
+      </div>
+    </div>
+    <div class="footer">Generated 10 May 2026 11:15</div>
+  </div>
+<script>
+const _RECORDS = [];
+const _PAGE_SIZE = 200;
+let _sortCol = 'date_sort';
+let _sortDir = -1;   // -1 = desc (newest first by default)
+let _page = 0;
+let _sorted = [];
+let _totalPages = 1;
+
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _sortKey(r, col) {
+  const v = r[col];
+  if (typeof v === 'string') return v.toLowerCase();
+  return v ?? -Infinity;
+}
+
+function _doSort() {
+  _sorted = [..._RECORDS];
+  _sorted.sort((a, b) => {
+    const ka = _sortKey(a, _sortCol), kb = _sortKey(b, _sortCol);
+    if (ka < kb) return _sortDir;
+    if (ka > kb) return -_sortDir;
+    // secondary: date desc, then race asc
+    if (_sortCol !== 'date_sort') {
+      if (a.date_sort !== b.date_sort) return b.date_sort - a.date_sort;
+    }
+    return a.race - b.race;
+  });
+  _totalPages = Math.max(1, Math.ceil(_sorted.length / _PAGE_SIZE));
+  if (_page >= _totalPages) _page = _totalPages - 1;
+}
+
+function _renderPage() {
+  const start = _page * _PAGE_SIZE;
+  const slice = _sorted.slice(start, start + _PAGE_SIZE);
+  const rows = slice.map(r => {
+    const won = r.won;
+    const rowCls = won ? 'bet-win' : 'bet-loss';
+    const profStr = won ? '+$' + r.profit.toFixed(2) : '-$' + Math.abs(r.profit).toFixed(2);
+    const profCol = won ? '#10b981' : '#ef4444';
+    const resultStr = won ? '1st' : String(r.pos);
+    const tierCls = r.tier === 'Strong' ? 'tier-strong' : 'tier-value';
+    return `<tr class="${rowCls}">
+      <td>${_esc(r.date)}</td>
+      <td>${_esc(r.track)}</td>
+      <td class="num">R${r.race}</td>
+      <td>${_esc(r.horse)}</td>
+      <td class="num">${r.model_prob.toFixed(1)}%</td>
+      <td class="num">$${r.sp.toFixed(2)}</td>
+      <td class="num">${r.edge.toFixed(1)}%</td>
+      <td class="num"><span class="tier ${tierCls}">${_esc(r.tier)}</span></td>
+      <td class="num">$${r.stake.toFixed(2)}</td>
+      <td class="num">${resultStr}</td>
+      <td class="num" style="color:${profCol}">${profStr}</td>
+      <td class="num">$${r.bank.toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('betBody').innerHTML = rows ||
+    '<tr><td colspan="12" style="text-align:center;color:var(--secondary);padding:32px;">No bets recorded yet.</td></tr>';
+
+  // Update pagination controls (top + bottom)
+  const from = _sorted.length ? start + 1 : 0;
+  const to   = Math.min(start + _PAGE_SIZE, _sorted.length);
+  const info = `Showing ${from}–${to} of ${_sorted.length} bets`;
+  const pg   = `Page ${_page + 1} / ${_totalPages}`;
+  ['pageInfo','pageInfo2'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=info; });
+  ['pageNum','pageNum2'].forEach(id  => { const el=document.getElementById(id);  if(el) el.textContent=pg;   });
+
+  const atFirst = _page === 0;
+  const atLast  = _page >= _totalPages - 1;
+  [['btnFirst','btnFirst2'], ['btnPrev','btnPrev2']].forEach(([a,b]) => {
+    [a,b].forEach(id => { const el=document.getElementById(id); if(el) el.disabled=atFirst; });
+  });
+  [['btnNext','btnNext2'], ['btnLast','btnLast2']].forEach(([a,b]) => {
+    [a,b].forEach(id => { const el=document.getElementById(id); if(el) el.disabled=atLast; });
+  });
+
+  // Update header sort indicators
+  document.querySelectorAll('#betTable thead th').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.dataset.col === _sortCol) {
+      th.classList.add(_sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    }
+  });
+}
+
+function goPage(n) {
+  _page = Math.max(0, Math.min(n, _totalPages - 1));
+  _renderPage();
+  document.getElementById('betTable').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// Wire up header clicks
+document.querySelectorAll('#betTable thead th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (_sortCol === col) {
+      _sortDir = -_sortDir;
+    } else {
+      _sortCol = col;
+      // numeric cols default desc, text cols default asc
+      const numCols = new Set(['date_sort','race','model_prob','sp','edge','stake','pos','profit','bank']);
+      _sortDir = numCols.has(col) ? -1 : 1;
+    }
+    _page = 0;
+    _doSort();
+    _renderPage();
+  });
+});
+
+// Initial render
+_doSort();
+_renderPage();
+</script>
+</body>
+</html>
