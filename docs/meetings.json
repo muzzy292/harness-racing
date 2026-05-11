@@ -428,5 +428,13 @@
     "races": 5,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "YU120526",
+    "track_name": "Young",
+    "meeting_date": "12 May 2026",
+    "races": 9,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
