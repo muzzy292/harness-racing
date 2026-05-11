@@ -25,7 +25,7 @@
     "track_name": "Parkes",
     "meeting_date": "4 Apr 2026",
     "races": 9,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "TM060426",
@@ -123,7 +123,7 @@
     "track_name": "Penrith",
     "meeting_date": "2 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "PC140426",
@@ -144,7 +144,7 @@
     "track_name": "Bathurst",
     "meeting_date": "15 Apr 2026",
     "races": 8,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "TA160426",
@@ -333,7 +333,7 @@
     "track_name": "Forbes",
     "meeting_date": "3 May 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "CB040526",
@@ -375,14 +375,14 @@
     "track_name": "Penrith",
     "meeting_date": "7 May 2026",
     "races": 7,
-    "winners": 6
+    "winners": 5
   },
   {
     "meeting_code": "NR080526",
     "track_name": "Newcastle",
     "meeting_date": "8 May 2026",
     "races": 8,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "EY080526",
@@ -410,7 +410,7 @@
     "track_name": "Newcastle",
     "meeting_date": "11 May 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 2,
     "state": "NSW"
   },
   {
