@@ -420,5 +420,13 @@
     "races": 8,
     "winners": 0,
     "state": "QLD"
+  },
+  {
+    "meeting_code": "ME120526",
+    "track_name": "Menangle",
+    "meeting_date": "12 May 2026",
+    "races": 5,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
