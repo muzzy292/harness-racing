@@ -25,6 +25,7 @@ from .pipeline import (
     sync_recent_results,
 )
 from .odds import (
+    fit_component_weights,
     flatten_meeting_scores,
     load_feature_rows,
     load_market_rows,
@@ -470,6 +471,18 @@ def main() -> None:
     calibrate_nr_parser = subparsers.add_parser("calibrate-nr-factor", help="Estimate the margin-per-NR-point factor from within-horse grade comparisons")
     calibrate_nr_parser.add_argument("--db", default="data/harness.db")
     calibrate_nr_parser.add_argument("--min-grade-spread", type=int, default=5)
+
+    train_tree_parser = subparsers.add_parser("train-tree", help="Train gradient-boosted tree second model and evaluate blend vs rule-based model")
+    train_tree_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    train_tree_parser.add_argument("--db", default="data/harness.db")
+    train_tree_parser.add_argument("--weights", default="weights.json")
+    train_tree_parser.add_argument("--output", default="data/tree_model.pkl", help="Where to save the fitted model")
+    train_tree_parser.add_argument("--test-fraction", type=float, default=0.25, help="Fraction of meetings held out for evaluation (default 0.25)")
+
+    fit_weights_parser = subparsers.add_parser("fit-weights", help="Fit logistic regression on component scores vs results to suggest optimal weights")
+    fit_weights_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    fit_weights_parser.add_argument("--db", default="data/harness.db")
+    fit_weights_parser.add_argument("--weights", default="weights.json")
 
     calibrate_parser = subparsers.add_parser("calibrate-temperature", help="Sweep softmax temperatures and report log loss against stored results")
     calibrate_parser.add_argument("--csv", default="data/features/runner_features.csv")
@@ -923,10 +936,14 @@ def main() -> None:
         _print_diagnose_report(race_groups, out_path=args.out)
     elif args.command == "build-betting-site":
         build_betting_site(args.db, args.csv, args.out, starting_bankroll=args.starting_bankroll)
+        build_betting_site(args.db, args.csv, args.out, starting_bankroll=args.starting_bankroll, state="NSW")
+        build_betting_site(args.db, args.csv, args.out, starting_bankroll=args.starting_bankroll, state="QLD")
     elif args.command == "build-diagnose-site":
         weights = _resolve_weights(getattr(args, "weights", None))
-        page_path = build_diagnose_site(args.csv, args.db, args.out, weights=weights)
-        print(f"Built diagnostic page at {page_path}")
+        build_diagnose_site(args.csv, args.db, args.out, weights=weights)
+        build_diagnose_site(args.csv, args.db, args.out, weights=weights, state="NSW")
+        page_path = build_diagnose_site(args.csv, args.db, args.out, weights=weights, state="QLD")
+        print(f"Built diagnostic pages at {page_path.parent}")
     elif args.command == "calibrate-nr-factor":
         from .features import _NR_MARGIN_FACTOR
         r = calibrate_nr_factor(args.db)
@@ -936,6 +953,154 @@ def main() -> None:
         print(f"  Mean slope:   {r['mean']:.2f} m/NR point")
         print(f"  Current _NR_MARGIN_FACTOR: {r['current']}")
         print(f"  Suggested value: {r['suggested']:.2f} (rounded to nearest 0.25)")
+    elif args.command == "train-tree":
+        import sqlite3
+        from collections import defaultdict
+        from .tree import train_tree, tree_race_probs, save_tree
+
+        conn = sqlite3.connect(args.db)
+        conn.row_factory = sqlite3.Row
+        winners = {
+            (r["meeting_code"], r["race_number"]): r["horse_name"]
+            for r in conn.execute(
+                "SELECT meeting_code, race_number, horse_name FROM race_results "
+                "WHERE finish_position = 1 AND horse_name IS NOT NULL"
+            )
+        }
+        sp_map = {
+            (r["meeting_code"], r["race_number"], r["horse_name"].strip().upper()): r["starting_price"]
+            for r in conn.execute(
+                "SELECT meeting_code, race_number, horse_name, starting_price "
+                "FROM race_results WHERE starting_price IS NOT NULL"
+            )
+        }
+        conn.close()
+
+        rows = load_feature_rows(args.csv)
+        w    = load_weights(args.weights)
+
+        print(f"Training tree on {len(rows)} runners, {len(winners)} races with results...")
+        result = train_tree(rows, winners, test_fraction=args.test_fraction)
+        model      = result["model"]
+        feat_cols  = result["feature_cols"]
+        test_keys  = result["_test_keys"]
+
+        print(f"  Train: {result['train_races']} races ({result['train_samples']} runners)")
+        print(f"  Test:  {result['test_races']} races ({result['test_samples']} runners)")
+
+        print(f"\n--- Top 20 feature importances ---")
+        for name, imp in result["feature_importances"][:20]:
+            bar = "#" * int(imp * 400)
+            print(f"  {name:<40}  {imp:.4f}  {bar}")
+
+        # Evaluate blending on holdout set
+        # Group holdout rows by race
+        races: dict[tuple, list[dict]] = defaultdict(list)
+        for row in rows:
+            mc = row.get("meeting_code", "")
+            rn = int(row.get("race_number") or 0)
+            if mc and rn and (mc, rn) in test_keys:
+                races[(mc, rn)].append(row)
+
+        print(f"\n--- Holdout ROI by tree blend weight (rule+market baseline vs tree blended) ---")
+        print(f"  {'Tree weight':<14}  {'Any':>8}  {'>=10%':>8}  {'>=25%':>8}  {'>=50%':>8}  {'>=100%':>8}  {'Bets':>6}")
+        print("  " + "-" * 75)
+
+        for tree_w in [0.0, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40]:
+            bets = []
+            for key, race_rows in races.items():
+                if key not in winners:
+                    continue
+                winner_key = winners[key].strip().upper()
+                scored = score_race_rows(race_rows, key[0], key[1], weights=w)
+                if not scored:
+                    continue
+                # Tree probs for this race
+                t_probs = tree_race_probs(race_rows, model, feat_cols) if tree_w > 0 else {}
+
+                for runner in scored:
+                    base_odds = runner.get("adjusted_fair_odds") or runner.get("fair_odds")
+                    if base_odds is None:
+                        continue
+                    sp_key = (key[0], key[1], str(runner.get("horse_name", "")).strip().upper())
+                    sp = sp_map.get(sp_key)
+                    if sp is None or sp <= 1:
+                        continue
+
+                    horse_key = str(runner.get("horse_name", "")).strip().upper()
+                    if tree_w > 0:
+                        base_prob = runner.get("adjusted_probability") or runner.get("win_probability") or 0.0
+                        t_prob    = t_probs.get(horse_key, base_prob)
+                        blended_prob = (1 - tree_w) * base_prob + tree_w * t_prob
+                        model_odds = round(1.0 / blended_prob, 2) if blended_prob > 0 else base_odds
+                    else:
+                        model_odds = base_odds
+
+                    edge = (sp - model_odds) / model_odds
+                    won  = horse_key == winner_key
+                    bets.append({"edge": edge, "sp": sp, "won": won})
+
+            roi_cols = []
+            for thresh in [0, 0.10, 0.25, 0.50, 1.00]:
+                subset = [b for b in bets if b["edge"] >= thresh]
+                if not subset:
+                    roi_cols.append("   n/a")
+                    continue
+                wins = [b for b in subset if b["won"]]
+                roi  = (sum(b["sp"] for b in wins) - len(subset)) / len(subset) * 100
+                roi_cols.append(f"{roi:+6.1f}%")
+            n_bets = len([b for b in bets if b["edge"] >= 0])
+            label  = f"{tree_w:.0%}"
+            print(f"  {label:<14}  {'  '.join(roi_cols)}  {n_bets:>6}")
+
+        save_tree(result, args.output)
+        print(f"\nModel saved -> {args.output}")
+
+    elif args.command == "fit-weights":
+        import sqlite3
+        conn = sqlite3.connect(args.db)
+        conn.row_factory = sqlite3.Row
+        winners = {
+            (r["meeting_code"], r["race_number"]): r["horse_name"]
+            for r in conn.execute(
+                "SELECT meeting_code, race_number, horse_name FROM race_results "
+                "WHERE finish_position = 1 AND horse_name IS NOT NULL"
+            )
+        }
+        conn.close()
+        rows = load_feature_rows(args.csv)
+        w = load_weights(args.weights)
+        print(f"Loaded {len(rows)} runners, {len(winners)} races with results.")
+        try:
+            fitted = fit_component_weights(rows, winners, weights=w)
+        except RuntimeError as exc:
+            print(f"Error: {exc}")
+        else:
+            if not fitted:
+                print("No data — check that race_results are populated in the DB.")
+            else:
+                s1_w = w.get("stage1", {})
+                s2_w = w.get("stage2", {})
+                all_w = {**s1_w, **s2_w}
+                print(f"\n{'Component':<26} {'Current':>8} {'Fitted':>8} {'Ratio':>7}  Signal")
+                print("-" * 66)
+                # S1 components first, then S2
+                for section, section_w in [("--- Stage 1 ---", s1_w), ("--- Stage 2 ---", s2_w)]:
+                    print(f"\n  {section}")
+                    for k, cur in section_w.items():
+                        fit = fitted.get(k, 0.0)
+                        if cur == 0.0:
+                            note = "  (disabled)"
+                        elif abs(cur) < 1e-9:
+                            note = ""
+                        else:
+                            ratio = fit / cur
+                            note = "  ^ boost" if ratio > 1.2 else "  v reduce" if ratio < 0.8 else "  ok"
+                            note = f"  {ratio:>5.2f}x{note}"
+                        print(f"    {k:<24} {cur:>8.3f} {fit:>8.3f}{note}")
+                print(f"\nNote: fitted values are logistic regression coefficients on unit-weighted")
+                print(f"      components. Use ratios to guide weight adjustments, not absolute values.")
+
     elif args.command == "calibrate-temperature":
         meeting_codes = [m.strip() for m in (args.meetings or "").split(",") if m.strip()] or None
         temperatures = [float(t.strip()) for t in (args.temperatures or "").split(",") if t.strip()] or None
