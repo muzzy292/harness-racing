@@ -452,5 +452,13 @@
     "races": 8,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "RE130526",
+    "track_name": "Redcliffe",
+    "meeting_date": "13 May 2026",
+    "races": 8,
+    "winners": 0,
+    "state": "QLD"
   }
 ]
