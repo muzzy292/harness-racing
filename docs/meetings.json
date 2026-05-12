@@ -95,14 +95,14 @@
     "track_name": "Canberra",
     "meeting_date": "13 Apr 2026",
     "races": 9,
-    "winners": 7
+    "winners": 6
   },
   {
     "meeting_code": "LM300326",
     "track_name": "Goulburn",
     "meeting_date": "30 Mar 2026",
     "races": 8,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "NR020426",
@@ -116,7 +116,7 @@
     "track_name": "Menangle",
     "meeting_date": "31 Mar 2026",
     "races": 7,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "PE020426",
@@ -130,7 +130,7 @@
     "track_name": "Menangle",
     "meeting_date": "14 Apr 2026",
     "races": 6,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "LE140426",
@@ -200,7 +200,7 @@
     "track_name": "Canberra",
     "meeting_date": "19 Apr 2026",
     "races": 8,
-    "winners": 5
+    "winners": 6
   },
   {
     "meeting_code": "NR200426",
@@ -277,7 +277,7 @@
     "track_name": "Goulburn",
     "meeting_date": "27 Apr 2026",
     "races": 8,
-    "winners": 7
+    "winners": 6
   },
   {
     "meeting_code": "PC280426",
@@ -291,7 +291,7 @@
     "track_name": "Bathurst",
     "meeting_date": "29 Apr 2026",
     "races": 8,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "TA300426",
@@ -375,7 +375,7 @@
     "track_name": "Penrith",
     "meeting_date": "7 May 2026",
     "races": 7,
-    "winners": 5
+    "winners": 4
   },
   {
     "meeting_code": "NR080526",
@@ -418,7 +418,7 @@
     "track_name": "Albion Park",
     "meeting_date": "11 May 2026",
     "races": 8,
-    "winners": 1,
+    "winners": 2,
     "state": "QLD"
   },
   {
@@ -426,7 +426,7 @@
     "track_name": "Menangle",
     "meeting_date": "12 May 2026",
     "races": 5,
-    "winners": 0,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -442,7 +442,7 @@
     "track_name": "Albion Park",
     "meeting_date": "12 May 2026",
     "races": 6,
-    "winners": 0,
+    "winners": 1,
     "state": "QLD"
   },
   {
