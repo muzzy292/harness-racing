@@ -11,28 +11,28 @@
     "track_name": "Newcastle",
     "meeting_date": "6 Apr 2026",
     "races": 6,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "EY040426",
     "track_name": "Wagga",
     "meeting_date": "4 Apr 2026",
     "races": 9,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "PK040426",
     "track_name": "Parkes",
     "meeting_date": "4 Apr 2026",
     "races": 9,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "TM060426",
     "track_name": "Temora",
     "meeting_date": "6 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "PC070426",
@@ -60,7 +60,7 @@
     "track_name": "Young",
     "meeting_date": "10 Apr 2026",
     "races": 7,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "NR100426",
@@ -116,7 +116,7 @@
     "track_name": "Menangle",
     "meeting_date": "31 Mar 2026",
     "races": 7,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "PE020426",
@@ -130,7 +130,7 @@
     "track_name": "Menangle",
     "meeting_date": "14 Apr 2026",
     "races": 6,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "LE140426",
@@ -144,7 +144,7 @@
     "track_name": "Bathurst",
     "meeting_date": "15 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "TA160426",
@@ -193,7 +193,7 @@
     "track_name": "Coolamon",
     "meeting_date": "19 Apr 2026",
     "races": 7,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "CB190426",
@@ -207,7 +207,7 @@
     "track_name": "Newcastle",
     "meeting_date": "20 Apr 2026",
     "races": 7,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "PC210426",
@@ -228,7 +228,7 @@
     "track_name": "Penrith",
     "meeting_date": "23 Apr 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "EY240426",
@@ -256,21 +256,21 @@
     "track_name": "Menangle",
     "meeting_date": "25 Apr 2026",
     "races": 9,
-    "winners": 5
+    "winners": 4
   },
   {
     "meeting_code": "FB260426",
     "track_name": "Forbes",
     "meeting_date": "26 Apr 2026",
     "races": 9,
-    "winners": 7
+    "winners": 6
   },
   {
     "meeting_code": "CL260426",
     "track_name": "Coolamon",
     "meeting_date": "26 Apr 2026",
     "races": 9,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "LM270426",
@@ -319,7 +319,7 @@
     "track_name": "Newcastle",
     "meeting_date": "1 May 2026",
     "races": 9,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "PC020526",
@@ -389,14 +389,14 @@
     "track_name": "Wagga",
     "meeting_date": "8 May 2026",
     "races": 7,
-    "winners": 6
+    "winners": 5
   },
   {
     "meeting_code": "DU080526",
     "track_name": "Dubbo",
     "meeting_date": "8 May 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "PC090526",
@@ -418,7 +418,7 @@
     "track_name": "Albion Park",
     "meeting_date": "11 May 2026",
     "races": 8,
-    "winners": 2,
+    "winners": 3,
     "state": "QLD"
   },
   {
@@ -466,7 +466,7 @@
     "track_name": "Albion Park",
     "meeting_date": "14 May 2026",
     "races": 8,
-    "winners": 0,
+    "winners": 4,
     "state": "QLD"
   },
   {
@@ -474,7 +474,7 @@
     "track_name": "Menangle",
     "meeting_date": "14 May 2026",
     "races": 8,
-    "winners": 0,
+    "winners": 1,
     "state": "NSW"
   },
   {
