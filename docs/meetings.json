@@ -116,7 +116,7 @@
     "track_name": "Menangle",
     "meeting_date": "31 Mar 2026",
     "races": 7,
-    "winners": 5
+    "winners": 4
   },
   {
     "meeting_code": "PE020426",
@@ -158,7 +158,7 @@
     "track_name": "Penrith",
     "meeting_date": "16 Apr 2026",
     "races": 9,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "EY170426",
@@ -172,7 +172,7 @@
     "track_name": "Newcastle",
     "meeting_date": "17 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 6
   },
   {
     "meeting_code": "PK170426",
@@ -193,7 +193,7 @@
     "track_name": "Coolamon",
     "meeting_date": "19 Apr 2026",
     "races": 7,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "CB190426",
@@ -228,7 +228,7 @@
     "track_name": "Penrith",
     "meeting_date": "23 Apr 2026",
     "races": 8,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "EY240426",
@@ -368,7 +368,7 @@
     "track_name": "Tamworth",
     "meeting_date": "7 May 2026",
     "races": 9,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "PE070526",
@@ -389,21 +389,21 @@
     "track_name": "Wagga",
     "meeting_date": "8 May 2026",
     "races": 7,
-    "winners": 5
+    "winners": 6
   },
   {
     "meeting_code": "DU080526",
     "track_name": "Dubbo",
     "meeting_date": "8 May 2026",
     "races": 8,
-    "winners": 2
+    "winners": 1
   },
   {
     "meeting_code": "PC090526",
     "track_name": "Menangle",
     "meeting_date": "9 May 2026",
     "races": 7,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "NR110526",
@@ -482,7 +482,7 @@
     "track_name": "Wagga",
     "meeting_date": "15 May 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 3,
     "state": "NSW"
   },
   {
@@ -490,7 +490,7 @@
     "track_name": "Newcastle",
     "meeting_date": "15 May 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 6,
     "state": "NSW"
   },
   {
@@ -498,7 +498,7 @@
     "track_name": "Redcliffe",
     "meeting_date": "15 May 2026",
     "races": 7,
-    "winners": 0,
+    "winners": 2,
     "state": "QLD"
   },
   {
@@ -506,7 +506,7 @@
     "track_name": "Parkes",
     "meeting_date": "15 May 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 2,
     "state": "NSW"
   },
   {
