@@ -228,7 +228,7 @@
     "track_name": "Penrith",
     "meeting_date": "23 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "EY240426",
@@ -256,7 +256,7 @@
     "track_name": "Menangle",
     "meeting_date": "25 Apr 2026",
     "races": 9,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "FB260426",
@@ -426,7 +426,7 @@
     "track_name": "Menangle",
     "meeting_date": "12 May 2026",
     "races": 5,
-    "winners": 2,
+    "winners": 1,
     "state": "NSW"
   },
   {
@@ -514,7 +514,7 @@
     "track_name": "Menangle",
     "meeting_date": "16 May 2026",
     "races": 8,
-    "winners": 0,
+    "winners": 1,
     "state": "NSW"
   }
 ]
