@@ -540,5 +540,13 @@
     "races": 6,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "AP190526",
+    "track_name": "Albion Park",
+    "meeting_date": "19 May 2026",
+    "races": 3,
+    "winners": 0,
+    "state": "QLD"
   }
 ]
