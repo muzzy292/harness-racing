@@ -516,5 +516,13 @@
     "races": 8,
     "winners": 1,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "CB180526",
+    "track_name": "Canberra",
+    "meeting_date": "18 May 2026",
+    "races": 8,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
