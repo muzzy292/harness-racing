@@ -564,5 +564,13 @@
     "races": 8,
     "winners": 4,
     "state": "QLD"
+  },
+  {
+    "meeting_code": "RE200526",
+    "track_name": "Redcliffe",
+    "meeting_date": "20 May 2026",
+    "races": 0,
+    "winners": 0,
+    "state": "QLD"
   }
 ]
