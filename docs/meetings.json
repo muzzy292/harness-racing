@@ -596,5 +596,13 @@
     "races": 10,
     "winners": 0,
     "state": "QLD"
+  },
+  {
+    "meeting_code": "PE210526",
+    "track_name": "Penrith",
+    "meeting_date": "21 May 2026",
+    "races": 7,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
