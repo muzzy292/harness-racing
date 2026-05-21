@@ -586,7 +586,7 @@
     "track_name": "Tamworth",
     "meeting_date": "21 May 2026",
     "races": 10,
-    "winners": 0,
+    "winners": 1,
     "state": "NSW"
   },
   {
@@ -594,7 +594,7 @@
     "track_name": "Redclif",
     "meeting_date": "21 May 2026",
     "races": 10,
-    "winners": 0,
+    "winners": 1,
     "state": "QLD"
   },
   {
@@ -602,7 +602,7 @@
     "track_name": "Penrith",
     "meeting_date": "21 May 2026",
     "races": 7,
-    "winners": 0,
+    "winners": 2,
     "state": "NSW"
   }
 ]
