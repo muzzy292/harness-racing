@@ -628,5 +628,13 @@
     "races": 11,
     "winners": 0,
     "state": "QLD"
+  },
+  {
+    "meeting_code": "NR220526",
+    "track_name": "Newcastle",
+    "meeting_date": "22 May 2026",
+    "races": 9,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
