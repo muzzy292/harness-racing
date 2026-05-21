@@ -604,5 +604,13 @@
     "races": 7,
     "winners": 2,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "EY220526",
+    "track_name": "Wagga",
+    "meeting_date": "22 May 2026",
+    "races": 4,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
