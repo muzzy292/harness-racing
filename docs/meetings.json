@@ -644,5 +644,13 @@
     "races": 9,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "AP230526",
+    "track_name": "Albpark",
+    "meeting_date": "23 May 2026",
+    "races": 9,
+    "winners": 0,
+    "state": "QLD"
   }
 ]
