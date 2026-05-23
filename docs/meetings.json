@@ -610,7 +610,7 @@
     "track_name": "Wagga",
     "meeting_date": "22 May 2026",
     "races": 4,
-    "winners": 0,
+    "winners": 4,
     "state": "NSW"
   },
   {
@@ -618,7 +618,7 @@
     "track_name": "Dubbo",
     "meeting_date": "22 May 2026",
     "races": 8,
-    "winners": 0,
+    "winners": 3,
     "state": "NSW"
   },
   {
@@ -626,7 +626,7 @@
     "track_name": "Albpark",
     "meeting_date": "22 May 2026",
     "races": 11,
-    "winners": 0,
+    "winners": 3,
     "state": "QLD"
   },
   {
@@ -634,7 +634,7 @@
     "track_name": "Newcastle",
     "meeting_date": "22 May 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 1,
     "state": "NSW"
   }
 ]
