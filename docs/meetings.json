@@ -652,5 +652,13 @@
     "races": 9,
     "winners": 0,
     "state": "QLD"
+  },
+  {
+    "meeting_code": "UG240526",
+    "track_name": "Marburg",
+    "meeting_date": "24 May 2026",
+    "races": 8,
+    "winners": 0,
+    "state": "QLD"
   }
 ]
