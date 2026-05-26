@@ -333,7 +333,7 @@
     "track_name": "Forbes",
     "meeting_date": "3 May 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "CB040526",
@@ -361,7 +361,7 @@
     "track_name": "Bathurst",
     "meeting_date": "6 May 2026",
     "races": 8,
-    "winners": 1
+    "winners": 0
   },
   {
     "meeting_code": "TA070526",
@@ -450,7 +450,7 @@
     "track_name": "Bathurst",
     "meeting_date": "13 May 2026",
     "races": 8,
-    "winners": 2,
+    "winners": 3,
     "state": "NSW"
   },
   {
@@ -554,7 +554,7 @@
     "track_name": "Albpark",
     "meeting_date": "16 May 2026",
     "races": 8,
-    "winners": 2,
+    "winners": 1,
     "state": "QLD"
   },
   {
@@ -578,7 +578,7 @@
     "track_name": "Bathurst",
     "meeting_date": "20 May 2026",
     "races": 9,
-    "winners": 3,
+    "winners": 4,
     "state": "NSW"
   },
   {
@@ -594,7 +594,7 @@
     "track_name": "Redclif",
     "meeting_date": "21 May 2026",
     "races": 10,
-    "winners": 2,
+    "winners": 1,
     "state": "QLD"
   },
   {
@@ -690,7 +690,7 @@
     "track_name": "Young",
     "meeting_date": "26 May 2026",
     "races": 10,
-    "winners": 4,
+    "winners": 5,
     "state": "NSW"
   },
   {
