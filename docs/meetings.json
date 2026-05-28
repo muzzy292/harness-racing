@@ -724,5 +724,13 @@
     "races": 8,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "PE280526",
+    "track_name": "Penrith",
+    "meeting_date": "28 May 2026",
+    "races": 8,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
