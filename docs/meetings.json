@@ -698,7 +698,7 @@
     "track_name": "Bathurst",
     "meeting_date": "27 May 2026",
     "races": 7,
-    "winners": 0,
+    "winners": 1,
     "state": "NSW"
   },
   {
@@ -706,7 +706,7 @@
     "track_name": "Redclif",
     "meeting_date": "27 May 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 1,
     "state": "QLD"
   }
 ]
