@@ -249,7 +249,7 @@
     "track_name": "Newcastle",
     "meeting_date": "24 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "PC250426",
@@ -498,7 +498,7 @@
     "track_name": "Redclif",
     "meeting_date": "15 May 2026",
     "races": 7,
-    "winners": 0,
+    "winners": 1,
     "state": "QLD"
   },
   {
@@ -554,7 +554,7 @@
     "track_name": "Albpark",
     "meeting_date": "16 May 2026",
     "races": 8,
-    "winners": 3,
+    "winners": 1,
     "state": "QLD"
   },
   {
@@ -594,7 +594,7 @@
     "track_name": "Redclif",
     "meeting_date": "21 May 2026",
     "races": 10,
-    "winners": 1,
+    "winners": 2,
     "state": "QLD"
   },
   {
@@ -714,7 +714,7 @@
     "track_name": "Albpark",
     "meeting_date": "28 May 2026",
     "races": 9,
-    "winners": 1,
+    "winners": 2,
     "state": "QLD"
   },
   {
@@ -738,7 +738,7 @@
     "track_name": "Wagga",
     "meeting_date": "29 May 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 1,
     "state": "NSW"
   },
   {
@@ -746,7 +746,7 @@
     "track_name": "Newcastle",
     "meeting_date": "29 May 2026",
     "races": 8,
-    "winners": 0,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -754,7 +754,7 @@
     "track_name": "Bathurst",
     "meeting_date": "29 May 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -762,7 +762,7 @@
     "track_name": "Redclif",
     "meeting_date": "29 May 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 1,
     "state": "QLD"
   }
 ]
