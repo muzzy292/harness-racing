@@ -812,5 +812,13 @@
     "races": 4,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "AP020626T",
+    "track_name": "Albpark",
+    "meeting_date": "2 Jun 2026",
+    "races": 6,
+    "winners": 0,
+    "state": "QLD"
   }
 ]
