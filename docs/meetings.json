@@ -804,5 +804,13 @@
     "races": 8,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "ME020626",
+    "track_name": "Menangle",
+    "meeting_date": "2 Jun 2026",
+    "races": 4,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
