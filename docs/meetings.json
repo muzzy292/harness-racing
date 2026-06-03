@@ -828,5 +828,13 @@
     "races": 9,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "BH030626",
+    "track_name": "Bathurst",
+    "meeting_date": "3 Jun 2026",
+    "races": 8,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
