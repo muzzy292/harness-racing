@@ -137,7 +137,7 @@
     "track_name": "Leeton",
     "meeting_date": "14 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "BH150426",
@@ -172,7 +172,7 @@
     "track_name": "Newcastle",
     "meeting_date": "17 Apr 2026",
     "races": 8,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "PK170426",
@@ -249,7 +249,7 @@
     "track_name": "Newcastle",
     "meeting_date": "24 Apr 2026",
     "races": 8,
-    "winners": 5
+    "winners": 4
   },
   {
     "meeting_code": "PC250426",
@@ -368,7 +368,7 @@
     "track_name": "Tamworth",
     "meeting_date": "7 May 2026",
     "races": 9,
-    "winners": 2
+    "winners": 1
   },
   {
     "meeting_code": "PE070526",
@@ -690,7 +690,7 @@
     "track_name": "Young",
     "meeting_date": "26 May 2026",
     "races": 10,
-    "winners": 5,
+    "winners": 4,
     "state": "NSW"
   },
   {
@@ -866,7 +866,7 @@
     "track_name": "Wagga",
     "meeting_date": "5 Jun 2026",
     "races": 6,
-    "winners": 0,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -874,7 +874,7 @@
     "track_name": "Newcastle",
     "meeting_date": "5 Jun 2026",
     "races": 10,
-    "winners": 0,
+    "winners": 4,
     "state": "NSW"
   },
   {
