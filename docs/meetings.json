@@ -916,5 +916,13 @@
     "races": 7,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "CB080626",
+    "track_name": "Canberra",
+    "meeting_date": "8 Jun 2026",
+    "races": 7,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
