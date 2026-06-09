@@ -940,5 +940,13 @@
     "races": 6,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "EY090626",
+    "track_name": "Wagga",
+    "meeting_date": "9 Jun 2026",
+    "races": 8,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
