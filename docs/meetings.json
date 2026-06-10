@@ -956,5 +956,13 @@
     "races": 8,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "RE100626",
+    "track_name": "Redclif",
+    "meeting_date": "10 Jun 2026",
+    "races": 10,
+    "winners": 0,
+    "state": "QLD"
   }
 ]
