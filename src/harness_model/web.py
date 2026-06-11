@@ -1688,6 +1688,10 @@ def _compute_bet_records(
     total_profit = sum(r["profit"] for r in records)
     winners = sum(1 for r in records if r["won"])
     n = len(records)
+    # Flat-stake ROI: 1 unit per bet, no compounding. Kelly ROI depends on the
+    # order bets land in (a hot streak early inflates later stakes), so this is
+    # the cleaner read on whether the bet selection itself has an edge.
+    flat_units = sum((r["market_odds"] - 1.0) if r["won"] else -1.0 for r in records)
     summary = {
         "starting_bankroll": starting_bankroll,
         "current_bankroll": bankroll,
@@ -1697,6 +1701,7 @@ def _compute_bet_records(
         "total_staked": round(total_staked, 2),
         "total_profit": round(total_profit, 2),
         "roi": round(total_profit / total_staked * 100, 2) if total_staked else 0.0,
+        "flat_roi": round(flat_units / n * 100, 2) if n else 0.0,
         "avg_edge": round(sum(r["edge_pct"] for r in records) / n, 1) if n else 0.0,
         "unit_halved": unit_halved,
         "state": state or ("All excl. " + ", ".join(exclude_states) if exclude_states else "All"),
@@ -1731,6 +1736,9 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
             sub=f"{summary['winners']} winners"),
         _sc("Win Rate",       f"{summary['win_rate']:.1f}%"),
         _sc("ROI",            f"{profit_sign}{summary['roi']:.1f}%", colour=profit_colour),
+        _sc("Flat-Stake ROI", f"{summary.get('flat_roi', 0.0):+.1f}%",
+            sub="1 unit/bet, no compounding",
+            colour="#10b981" if summary.get("flat_roi", 0.0) >= 0 else "#ef4444"),
         _sc("Avg Edge",       f"{summary['avg_edge']:.1f}%"),
         _sc("Total Staked",   f"${summary['total_staked']:,.2f}"),
     ])
