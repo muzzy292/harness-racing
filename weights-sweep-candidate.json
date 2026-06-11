@@ -1,0 +1,61 @@
+{
+  "stage1": {
+    "consistency": 2.5,
+    "ceiling": 2.5,
+    "late_speed": 0.8,
+    "tempo_adj": 0.35,
+    "tempo_flags": 0.05,
+    "null_flags": 0.20,
+    "market_min": 0.0,
+    "market_max": 0.0,
+    "win_rate": 2.0,
+    "career_win_rate": 0.0,
+    "top3_rate": 1.0,
+    "competitive_rate": 0.75,
+    "nr": 1.5,
+    "class_pos": 0.30,
+    "stake_class": 0.0,
+    "class_delta": 0.1,
+    "sp_class": 0.0,
+    "sp_trend": 0.0,
+    "sp_market_ceiling": 0.35,
+    "sp_class_ceiling": 0.45,
+    "sp_avg_market": 0.25,
+    "sp_reliability": 0.25,
+    "sp_similar_grade": 0.0,
+    "form_staleness": 1.0
+  },
+  "stage2": {
+    "map_lead": 1.5,
+    "map_soft": 0.35,
+    "map_soft_context": 0.25,
+    "pace_backmarker": 0.3,
+    "pace_backmarker_threshold": 0.2,
+    "map_wide": 0.25,
+    "map_death": 0.75,
+    "dist_strike_rate": 0.6,
+    "nr_grade_delta": 2.5,
+    "driver_form": 0.6,
+    "trainer_form_manual": 0.6,
+    "hot_driver": 0.5,
+    "hot_trainer": 0.4,
+    "cold_driver": 0.5,
+    "cold_trainer": 0.4,
+    "second_up": 0.0,
+    "barrier_relief": 0.0
+  },
+  "fitness": {
+    "tier_15_28": -0.35,
+    "tier_29_42": -0.6,
+    "tier_43_84": -0.85,
+    "tier_85_99": -1.1,
+    "tier_100_119": -1.45,
+    "tier_120_149": -1.7,
+    "tier_150_plus": -2.0
+  },
+  "softmax": {
+    "temperature": 1.6,
+    "model_weight": 0.45,
+    "market_weight": 0.55
+  }
+}
