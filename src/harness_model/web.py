@@ -22,6 +22,22 @@ def _meeting_state(meeting_code: str) -> str:
     return "QLD" if str(meeting_code)[:2].upper() in _QLD_PREFIXES else "NSW"
 
 
+def _load_state_weights(base: dict | None) -> dict[str, dict | None]:
+    """Resolve per-state weight sets for the web pipeline.
+
+    weights-nsw.json / weights-qld.json (repo root, alongside weights.json)
+    override the base weights for meetings in that state. A state without its
+    own file falls back to the base weights, so behaviour is unchanged until
+    a state file is created. NSW and QLD have structurally different class
+    systems (NR bands vs win restrictions) and need independent calibration.
+    """
+    resolved: dict[str, dict | None] = {}
+    for st in ("NSW", "QLD"):
+        path = Path(f"weights-{st.lower()}.json")
+        resolved[st] = load_weights(path) if path.exists() else base
+    return resolved
+
+
 def build_meeting_site(
     meeting_code: str,
     csv_path: str | Path = "data/features/runner_features.csv",
@@ -1542,6 +1558,7 @@ def _compute_bet_records(
     state: str | None = None,
     from_date: datetime | None = None,
     exclude_states: tuple[str, ...] = (),
+    per_state_weights: bool = False,
 ) -> tuple[list[dict], dict]:
     """Score all meetings in the CSV, join with race_results, apply fractional Kelly.
 
@@ -1549,7 +1566,11 @@ def _compute_bet_records(
     from_date: if set, only meetings on or after this date are included.
     exclude_states: states skipped entirely (e.g. ("QLD",) while QLD pricing
     is unreliable — see NR-ceiling parsing gap).
+    per_state_weights: when True, weights-<state>.json overrides ``weights``
+    per meeting. Off by default so sweep/fitting scripts that pass candidate
+    weight dicts keep full control of what is scored.
     """
+    state_weights = _load_state_weights(weights) if per_state_weights else None
     # Results lookup: (meeting_code, race_number, normalised_name) → row
     results_lookup: dict[tuple, dict] = {}
     for r in conn.execute(
@@ -1587,7 +1608,8 @@ def _compute_bet_records(
             continue
         if from_date and _date_key(mc) < from_date:
             continue
-        scored = score_meeting_rows(feature_rows, mc, weights=weights)
+        mc_weights = state_weights[_meeting_state(mc)] if state_weights else weights
+        scored = score_meeting_rows(feature_rows, mc, weights=mc_weights)
         for race_number, race_rows in sorted(scored.items()):
             for row in race_rows:
                 horse = str(row.get("horse_name") or "")
@@ -2047,6 +2069,7 @@ def build_betting_site(
     records, summary = _compute_bet_records(
         conn, csv_path, weights, starting_bankroll,
         state=state, from_date=from_date, exclude_states=exclude_states,
+        per_state_weights=True,
     )
     conn.close()
 
@@ -2145,9 +2168,10 @@ def republish_all_meetings(
     init_db(conn)
 
     published = 0
+    state_weights = _load_state_weights(weights)
     for code in meeting_codes:
         try:
-            meeting_scores = score_meeting_rows(feature_rows, code, weights=weights)
+            meeting_scores = score_meeting_rows(feature_rows, code, weights=state_weights[_meeting_state(code)])
             meeting_meta = _load_meeting_metadata(conn, code)
             result_rows = _load_results(conn, code)
 
@@ -2291,11 +2315,12 @@ def build_diagnose_site(
 
     # Build race_groups identical to the diagnose CLI handler
     race_groups: dict[tuple, list[dict]] = {}
+    state_weights = _load_state_weights(weights)
     for meeting_code in meetings:
         if state and _meeting_state(meeting_code) != state:
             continue
         try:
-            scored = score_meeting_rows(rows, meeting_code, weights=weights)
+            scored = score_meeting_rows(rows, meeting_code, weights=state_weights[_meeting_state(meeting_code)])
         except Exception:
             continue
         for race_number, horse_rows in scored.items():

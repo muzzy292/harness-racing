@@ -25,6 +25,8 @@ _STARTING_BANK = 100.0
 # ---------------------------------------------------------------------------
 
 def _score_all_races(csv_path: str, weights_path: str | None, weights: dict | None = None) -> list[dict]:
+    from .web import _load_state_weights, _meeting_state
+
     rows = load_feature_rows(csv_path)
     if weights is not None:
         w = weights
@@ -32,6 +34,9 @@ def _score_all_races(csv_path: str, weights_path: str | None, weights: dict | No
         w = load_weights(weights_path)
     else:
         w = None
+    # Per-state weights: weights-nsw.json / weights-qld.json override the base
+    # set for that state's meetings (falls back to w when no state file exists).
+    state_weights = _load_state_weights(w)
 
     combos: set[tuple[str, int]] = set()
     for row in rows:
@@ -45,7 +50,7 @@ def _score_all_races(csv_path: str, weights_path: str | None, weights: dict | No
 
     races: list[dict] = []
     for mc, rn in sorted(combos, reverse=True):   # most recent first
-        scored = score_race_rows(rows, mc, rn, weights=w)
+        scored = score_race_rows(rows, mc, rn, weights=state_weights[_meeting_state(mc)])
         if not scored:
             continue
         def _f(v):
