@@ -1541,11 +1541,14 @@ def _compute_bet_records(
     starting_bankroll: float = 1000.0,
     state: str | None = None,
     from_date: datetime | None = None,
+    exclude_states: tuple[str, ...] = (),
 ) -> tuple[list[dict], dict]:
     """Score all meetings in the CSV, join with race_results, apply fractional Kelly.
 
     Returns (records, summary). Records are in chronological order.
     from_date: if set, only meetings on or after this date are included.
+    exclude_states: states skipped entirely (e.g. ("QLD",) while QLD pricing
+    is unreliable — see NR-ceiling parsing gap).
     """
     # Results lookup: (meeting_code, race_number, normalised_name) → row
     results_lookup: dict[tuple, dict] = {}
@@ -1579,6 +1582,8 @@ def _compute_bet_records(
 
     for mc in meeting_codes:
         if state and _meeting_state(mc) != state:
+            continue
+        if _meeting_state(mc) in exclude_states:
             continue
         if from_date and _date_key(mc) < from_date:
             continue
@@ -1672,7 +1677,7 @@ def _compute_bet_records(
         "roi": round(total_profit / total_staked * 100, 2) if total_staked else 0.0,
         "avg_edge": round(sum(r["edge_pct"] for r in records) / n, 1) if n else 0.0,
         "unit_halved": unit_halved,
-        "state": state or "All",
+        "state": state or ("All excl. " + ", ".join(exclude_states) if exclude_states else "All"),
         "from_date": from_date.strftime("%d %b %Y").lstrip("0") if from_date else None,
     }
     return records, summary
@@ -2029,6 +2034,7 @@ def build_betting_site(
     starting_bankroll: float = 1000.0,
     state: str | None = None,
     from_date: datetime | None = None,
+    exclude_states: tuple[str, ...] = (),
 ) -> Path:
     """Build fractional-Kelly backtest page and write to out_dir/betting[-state].html."""
     out_dir = Path(out_dir)
@@ -2038,7 +2044,10 @@ def build_betting_site(
     init_db(conn)
     weights_path = Path("weights.json")
     weights = load_weights(weights_path) if weights_path.exists() else None
-    records, summary = _compute_bet_records(conn, csv_path, weights, starting_bankroll, state=state, from_date=from_date)
+    records, summary = _compute_bet_records(
+        conn, csv_path, weights, starting_bankroll,
+        state=state, from_date=from_date, exclude_states=exclude_states,
+    )
     conn.close()
 
     betting_html = _render_betting_html(
@@ -2176,7 +2185,11 @@ def republish_all_meetings(
     # per-meeting form snapshots and calibrated weights.
     _bet_from = datetime(2026, 5, 1)
     try:
-        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, from_date=_bet_from)
+        # Headline page excludes QLD: 44% of QLD races lack a parseable NR
+        # ceiling, producing unreliable prices (-44.8% ROI). The QLD-only page
+        # is still built below for monitoring, but QLD bets stay out of the
+        # main ledger until NR gating / state-specific weights are in place.
+        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, from_date=_bet_from, exclude_states=("QLD",))
         build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="NSW", from_date=_bet_from)
         build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="QLD", from_date=_bet_from)
     except Exception as exc:  # noqa: BLE001
