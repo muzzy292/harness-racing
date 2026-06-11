@@ -52,6 +52,16 @@ src/harness_model/
 
 ## Scoring Model (3-Stage Architecture)
 
+> **Weights regime (since 11 Jun 2026):** NSW meetings score with `weights-nsw.json` —
+> conditional-logit weights fitted on races before 7 May and validated on the
+> 7 May–11 Jun holdout (`fit_holdout.py`; test log-loss 1.817 vs 1.934 hand-tuned).
+> Temperature is 1.0 (MLE-calibrated — do not retune by hand). `weights.json` is the
+> QLD/fallback set. The betting page uses the pre-registered flat-stake blend rule
+> (bet when `blended_prob × SP > 1.10`, config in the `blend` section of
+> weights-nsw.json); ledger restarted 11 Jun. **Weight changes go through a refit
+> with a temporal holdout, not hand-tuning** — the per-component tables below
+> describe the component *structure*; live weight values come from the fit.
+
 ### Stage 1: Horse Performance Rating
 Historical form — independent of today's race conditions.
 
