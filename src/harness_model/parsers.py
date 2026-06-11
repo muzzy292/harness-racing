@@ -39,6 +39,11 @@ TRACK_NAME_MAP = {
     "KILMORE": "Kilmore",
     "HORSHAM": "Horsham",
     "BENDIGO": "Bendigo",
+    # QLD tracks
+    "ALBION PARK": "Albpark",
+    "ALBPARK": "Albpark",
+    "REDCLIFFE": "Redclif",
+    "REDCLIF": "Redclif",
 }
 
 TRACK_CODE_MAP = {
@@ -59,12 +64,19 @@ TRACK_CODE_MAP = {
     "KILMORE": "Kilmore",
     "HORSHAM": "Horsham",
     "BENDIGO": "Bendigo",
-    "MENANGLE": "Menangle",
+    # QLD tracks
+    "ALBPARK": "Albpark",
+    "REDCLIF": "Redclif",
+    "MARBURG": "Marburg",
 }
 
-STATE_TRACKS = {"Menangle": "NSW", "Penrith": "NSW", "Bathurst": "NSW", "Goulburn": "NSW"}
+STATE_TRACKS = {
+    "Menangle": "NSW", "Penrith": "NSW", "Bathurst": "NSW", "Goulburn": "NSW",
+    "Albpark": "QLD", "Redclif": "QLD", "Marburg": "QLD",
+}
 # Whole-word match — prevents "TAMTROTS" (club name) triggering on "TROT".
-_EXCLUDED_RACE_RE = re.compile(r"\b(?:TROT(?:TERS|TING)?|2YO)\b")
+# Negative lookahead (?!\s+RODS) prevents "TROT RODS" (QLD pacing series) from being excluded.
+_EXCLUDED_RACE_RE = re.compile(r"\b(?:TROT(?!\s+RODS)(?:TERS|TING)?|2YO)\b")
 
 CODES = {
     "OL": -10.0, "OLM": -10.0, "OLT": -10.0, "OTE": -10.0, "OTM": -10.0, "OT": -10.0,
@@ -238,6 +250,73 @@ def parse_results_html(html: str, meeting_code: str) -> list[ResultRunner]:
             )
 
     return _dedupe_results(results)
+
+
+def parse_excluded_driver_rows(html: str, meeting_date: str | None) -> list[dict]:
+    """Extract driver/trainer/finish data from excluded races (trotters, 2YO).
+
+    Returns minimal dicts suitable for inserting into horse_runs so that
+    rolling driver and trainer win-rate stats include all race types, not
+    just the pacing events the model scores.
+    """
+    header_pattern = re.compile(
+        r'<tr class="raceHeader">.*?'
+        r'<td class="raceNumber[^"]*"[^>]*>\s*(?P<race_number>\d+)\s*</td>.*?'
+        r'<td class="raceTitle">(?P<race_title>.*?)</td>.*?'
+        r'<td class="distance">(?P<distance>[^<]*)</td>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    table_pattern = re.compile(
+        r'<table class="raceFieldTable resultTable">(?P<table>.*?)</table>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    row_pattern = re.compile(
+        r"<tr>\s*"
+        r'<td class="horse_number">\s*(?P<place>\*?\d+)?\s*</td>.*?'
+        r'<a href="[^"]*horseId=(?P<horse_id>\d+)" class="horse_name_link">(?P<horse_name>[^<]+)</a>.*?'
+        r'<td class="margin">\s*(?P<margin>[^<]*)</td>.*?'
+        r'<td class="starting_price[^"]*">\s*(?P<starting_price>.*?)</td>',
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    rows: list[dict] = []
+    headers = list(header_pattern.finditer(html))
+    tables = list(table_pattern.finditer(html))
+
+    for header_match, table_match in zip(headers, tables):
+        race_title = _clean_spaces(re.sub(r"<[^>]+>", " ", header_match.group("race_title")))
+        if not _is_excluded_race(race_title):
+            continue  # pacing races are handled by parse_results_html
+
+        # Determine race_type label from title
+        race_type = "TROT" if re.search(r"\bTROT(?:TERS?|TING)?\b", race_title, re.IGNORECASE) else "2YO"
+
+        table_html = table_match.group("table")
+        for row_match in row_pattern.finditer(table_html):
+            place_text = (row_match.group("place") or "").strip().lstrip("*")
+            finish_position = int(place_text) if place_text.isdigit() else None
+
+            row_end = table_html.find("</tr>", row_match.end())
+            full_row = table_html[row_match.start(): row_end if row_end != -1 else row_match.end()]
+
+            driver_m = re.search(
+                r'<td class="driver nowrap">.*?<a[^>]*>([^<]+)</a>', full_row, re.IGNORECASE | re.DOTALL
+            )
+            trainer_m = re.search(
+                r'<td class="trainer nowrap">.*?<a[^>]*>([^<]+)</a>', full_row, re.IGNORECASE | re.DOTALL
+            )
+
+            rows.append({
+                "horse_id":       row_match.group("horse_id"),
+                "run_date":       meeting_date,
+                "driver_name":    _clean_spaces(driver_m.group(1)) if driver_m else None,
+                "trainer_name":   _clean_spaces(trainer_m.group(1)) if trainer_m else None,
+                "finish_position": finish_position,
+                "race_name":      race_title,
+                "race_type":      race_type,
+            })
+
+    return rows
 
 
 def parse_hrnsw_results_index(html: str) -> list[dict[str, str]]:

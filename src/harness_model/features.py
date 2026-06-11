@@ -185,9 +185,15 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
     rows: list[dict[str, object]] = []
     for runner in runners:
         hid = str(runner["horse_id"])
+        # Only use form lines whose run_date is strictly before the meeting date.
+        # Without this filter, re-ingesting future meetings adds newer form lines
+        # that bleed into scores for past races (data leakage).
+        _meeting_date_key = _sort_run_date(runner["meeting_date"])
         seen: set[tuple] = set()
         recent_lines: list[dict] = []
         for line in _recent_lines_by_horse.get(hid, []):
+            if _meeting_date_key and _sort_run_date(line.get("run_date")) >= _meeting_date_key:
+                continue  # exclude runs on or after today's race — not known at race time
             key = (line.get("run_date"), line.get("track_code"), line.get("distance"))
             if key not in seen:
                 seen.add(key)

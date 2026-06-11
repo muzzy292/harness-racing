@@ -128,6 +128,13 @@ Auto-migration via `_ensure_columns()` — new columns added non-destructively o
 Known gaps and future work. Do not implement without discussing with the user first.
 
 ### Race Map (field-awareness)
+- **Track-specific map multipliers** — Analysis of winner lead/soft/death scores vs field average across all meetings shows map signal varies dramatically by track. Implement per-track map multipliers in `track_pars.json`, wire into scoring as a scalar applied to `map_lead`, `map_soft`, `map_death` components. Data from 83-meeting analysis (2,125+ runners with results):
+  - **Increase map weight (~2×):** Penrith (+0.275 lead_diff), Parkes (+0.275), Albion Park (+0.238), Dubbo (+0.223)
+  - **Moderate — current weights fine:** Menangle (+0.129), Tamworth (+0.136), Newcastle (+0.073), Bathurst (+0.035)
+  - **Reduce/zero map weight:** Albury (−0.229), Leeton (−0.166), Redcliffe (−0.107) — frontrunners underperform at these tracks, map signal runs backwards
+  - **Death seat:** Signal weak overall (winners don't strongly avoid death seat); most tracks show near-zero DeathDiff. Albury (−0.132) and Redcliffe (−0.065) are exceptions where death IS a penalty.
+  - **Implementation path:** Add a `map_multiplier` dict to `track_pars.json` keyed by track name; in `odds.py` `_score_stage2()`, multiply `map_lead_score`, `map_soft_trip_score`, `map_death_score` by the track's multiplier before applying weights. Neutral default = 1.0 for tracks not in the dict.
+
 - **Pace pressure calibration** — `map_soft_context` and `pace_backmarker` are live but unvalidated. Weights (0.3, 0.6) are starting points. Calibrate against results once 20+ races with clear pace scenarios are available.
 - **Barrier relief signal — implemented** — `barrier_relief_score` in S2 at weight 0.4. Historical barriers sourced from `race_runners` (last 5 prior meetings), field-size-adjusted using `race_field_size` (COUNT per race). Requires ≥3 historical starts; degrades gracefully to None for thin history. `_barrier_score()` also rebalanced (new discrete Fr scale, style-split Sr at lead_rate ≥ 0.25). Note: `runner_recent_lines.mile_rate` stores pace times ("1:57.3"), NOT barrier strings — historical barriers must come from `race_runners`.
 
@@ -171,3 +178,46 @@ Known gaps and future work. Do not implement without discussing with the user fi
 
 **LM300326** (Goulburn, 30 March 2026) — use this for pipeline validation.
 Race 4 should show 8 runners with BAM BAM BROOK at Fr4 and TONYS DREAM scratched.
+
+---
+
+## Cloud Migration Plan
+
+Move the model off the desktop to a hosted server with daily automated pipeline.
+
+### Architecture
+- **VPS** (Oracle Cloud Always Free — Sydney region, ARM, 4 vCPU / 24 GB RAM) runs all compute and holds the SQLite DB
+- **GitHub Pages** (existing) serves the frontend — VPS pushes rendered HTML after each run
+- Do NOT use GitHub Actions — SQLite DB needs persistent storage, not suitable for git commits
+
+### Automation: daily_run.sh (7:00am AEST via cron)
+```
+sync-results   → fetch final SPs/positions for recently run meetings
+sync-upcoming  → discover and ingest today's meetings
+build-features → rebuild features CSV
+republish-all  → rebuild HTML + push to GitHub Pages
+```
+Cron: `0 21 * * *` (UTC) = 7:00am AEST
+
+### CLI commands that already exist — no new model code needed
+| Command | Purpose |
+|---|---|
+| `sync-upcoming` | Discovers + ingests upcoming meetings not yet in DB |
+| `sync-results`  | Fetches + ingests results for recent meetings without stored results |
+| `build-features` | Rebuilds features CSV |
+| `republish-all` | Rebuilds HTML + pushes to GitHub Pages |
+
+### Migration steps (ordered)
+1. Provision Oracle Cloud Ubuntu 22.04 ARM (Sydney)
+2. Install: Python 3.11, pip, git, Playwright + Chromium
+3. Clone repo; transfer `data/harness.db`, `data/track_pars.json`, `weights.json` via scp
+4. Generate SSH deploy key on VPS → add to GitHub repo (write access)
+5. Run one manual `daily_run.sh` end-to-end, verify Pages updates
+6. Set cron job; run desktop in parallel for one week to confirm parity
+7. Stop running on desktop
+
+### Open questions to resolve before building
+1. Does `sync-upcoming` cover QLD meetings (AP/RE) or NSW only? — description says "NSW meetings", may need extending
+2. Does re-ingesting a post-race HTML correctly capture final SPs into `race_results.starting_price`?
+3. Is Playwright Chromium stable on ARM Linux? (test early)
+4. DB backup strategy — daily `scp` to desktop or object storage (DB is the single source of truth)

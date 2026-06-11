@@ -7,6 +7,7 @@ from datetime import datetime
 from .features import build_runner_feature_rows, generate_track_pars_from_db, install_sqlite_helpers, write_feature_csv, write_track_pars
 from .parsers import (
     parse_driver_page_html,
+    parse_excluded_driver_rows,
     parse_horse_profile_html,
     parse_hrnsw_results_index,
     parse_hrnsw_track_options,
@@ -43,6 +44,7 @@ from .storage import (
     init_db,
     sync_runner_recent_lines_to_horse_runs,
     upsert_driver_stats,
+    upsert_excluded_driver_runs,
     upsert_horse_profile,
     upsert_meeting,
     upsert_results,
@@ -412,6 +414,14 @@ def ingest_results_html(db_path: str | Path, html_path: str | Path) -> int:
     conn = connect(db_path)
     init_db(conn)
     upsert_results(conn, results)
+    # Also capture driver/trainer results from excluded races (trotters, 2YO)
+    # so rolling win-rate stats reflect all race types, not just pacing.
+    meeting_date = (
+        conn.execute("SELECT meeting_date FROM meetings WHERE meeting_code = ?", (meeting_code,))
+        .fetchone()
+    )
+    excluded_rows = parse_excluded_driver_rows(html, meeting_date[0] if meeting_date else None)
+    upsert_excluded_driver_runs(conn, excluded_rows)
     conn.close()
     return len(results)
 

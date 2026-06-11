@@ -14,6 +14,13 @@ from typing import Any
 from .odds import load_feature_rows, load_market_rows, load_weights, score_meeting_rows
 from .storage import connect, init_db
 
+_QLD_PREFIXES: frozenset[str] = frozenset({"AP", "RE", "UG"})
+
+
+def _meeting_state(meeting_code: str) -> str:
+    """Return 'QLD' for QLD meetings, 'NSW' for all others."""
+    return "QLD" if str(meeting_code)[:2].upper() in _QLD_PREFIXES else "NSW"
+
 
 def build_meeting_site(
     meeting_code: str,
@@ -174,6 +181,7 @@ def _write_index(
                 "meeting_date": meeting_meta.get("meeting_date"),
                 "races": races,
                 "winners": winners,
+                "state": _meeting_state(code),
             })
         manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
@@ -205,9 +213,10 @@ def _write_index(
         if winners_val is not None:
             stats_parts.append(f"{winners_val} winners")
         stats_html = f'<span class="meeting-stats">{html.escape(" · ".join(stats_parts))}</span>' if stats_parts else ""
+        state_attr = html.escape(m.get("state") or _meeting_state(code))
         cards.append(
             f"""
-            <a class="meeting-card" href="{html.escape(code)}.html">
+            <a class="meeting-card" data-state="{state_attr}" href="{html.escape(code)}.html">
               <span class="meeting-code">{html.escape(code)}</span>
               {f'<span class="meeting-meta">{meta_line}</span>' if meta_line else ''}
               {stats_html}
@@ -316,6 +325,8 @@ def _write_index(
     .meeting-meta {{ color: var(--secondary); font-size: 12px; }}
     .meeting-stats {{ color: var(--primary-text); font-size: 12px; font-weight: 600; }}
     .meeting-link {{ margin-top: 4px; color: var(--accent); font-size: 13px; font-weight: 600; }}
+    .filter-btn{{background:var(--surface);color:var(--secondary);border:1px solid var(--border);border-radius:5px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}}
+    .filter-btn.active{{background:rgba(0,212,255,0.12);color:var(--accent);border-color:var(--accent)}}
   </style>
 </head>
 <body>
@@ -323,7 +334,11 @@ def _write_index(
     <a href="index.html" class="active">Meetings</a>
     <a href="stats.html">Stats</a>
     <a href="betting.html">Betting</a>
+    <a href="betting-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
+    <a href="betting-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
     <a href="diagnose.html">Diagnose</a>
+    <a href="diagnose-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
+    <a href="diagnose-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
     <a href="live.html">Live</a>
   </nav>
   <div class="hero">
@@ -331,10 +346,23 @@ def _write_index(
     <p>Fair odds and probabilities — select a meeting below</p>
   </div>
   <div class="wrap">
+    <div class="filter-bar" style="display:flex;gap:8px;margin-bottom:20px">
+      <button class="filter-btn active" onclick="filterState('all')">All</button>
+      <button class="filter-btn" onclick="filterState('NSW')">NSW</button>
+      <button class="filter-btn" onclick="filterState('QLD')">QLD</button>
+    </div>
     <div class="grid">
       {''.join(cards) if cards else '<p>No meeting pages built yet.</p>'}
     </div>
   </div>
+<script>
+function filterState(s) {{
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.textContent===s||(s==='all'&&b.textContent==='All')));
+  document.querySelectorAll('.meeting-card').forEach(c => {{
+    c.style.display = (s==='all' || c.dataset.state===s) ? '' : 'none';
+  }});
+}}
+</script>
 </body>
 </html>
 """
@@ -715,8 +743,12 @@ def _render_meeting_html(
       <a href="index.html">Meetings</a>
       <a href="stats.html">Stats</a>
       <a href="betting.html">Betting</a>
+      <a href="betting-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
+      <a href="betting-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
       <a href="diagnose.html">Diagnose</a>
-    <a href="live.html">Live</a>
+      <a href="diagnose-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
+      <a href="diagnose-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
+      <a href="live.html">Live</a>
       {race_nav}
     </nav>
     {''.join(sections) if sections else '<div class="race-card"><p>No races found for this meeting.</p></div>'}
@@ -1351,7 +1383,11 @@ def _render_stats_html(driver_rows: list[dict], trainer_rows: list[dict], meta: 
     <a href="index.html">Meetings</a>
     <a href="stats.html" class="active">Stats</a>
     <a href="betting.html">Betting</a>
+    <a href="betting-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
+    <a href="betting-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
     <a href="diagnose.html">Diagnose</a>
+    <a href="diagnose-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
+    <a href="diagnose-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
     <a href="live.html">Live</a>
   </nav>
   <div class="hero">
@@ -1451,6 +1487,8 @@ def build_stats_site(
 
 _KELLY_FRACTION  = 0.25   # quarter-Kelly
 _MAX_BET_PCT     = 0.04   # never more than 4% of current bankroll
+_MAX_WIN         = 500.0  # max payout per bet — realistic bookmaker limit for country harness
+_MAX_SP          = 60.0   # never bet horses longer than this SP (bookmaker / realism cap)
 # Odds-based edge bounds: only bet when market_odds / fair_odds is in [1.25, 2.0).
 # Backtest shows 25–100% odds-edge is the profitable zone; >=100% edge bets are
 # large model-vs-market disagreements that consistently lose.
@@ -1501,10 +1539,13 @@ def _compute_bet_records(
     csv_path: str | Path,
     weights: dict | None,
     starting_bankroll: float = 1000.0,
+    state: str | None = None,
+    from_date: datetime | None = None,
 ) -> tuple[list[dict], dict]:
     """Score all meetings in the CSV, join with race_results, apply fractional Kelly.
 
     Returns (records, summary). Records are in chronological order.
+    from_date: if set, only meetings on or after this date are included.
     """
     # Results lookup: (meeting_code, race_number, normalised_name) → row
     results_lookup: dict[tuple, dict] = {}
@@ -1537,6 +1578,10 @@ def _compute_bet_records(
     records: list[dict] = []
 
     for mc in meeting_codes:
+        if state and _meeting_state(mc) != state:
+            continue
+        if from_date and _date_key(mc) < from_date:
+            continue
         scored = score_meeting_rows(feature_rows, mc, weights=weights)
         for race_number, race_rows in sorted(scored.items()):
             for row in race_rows:
@@ -1567,6 +1612,10 @@ def _compute_bet_records(
                 if odds_edge < _MIN_ODDS_EDGE:
                     continue
 
+                # Skip horses priced above the SP ceiling (too long for realistic bets).
+                if market_odds > _MAX_SP:
+                    continue
+
                 # Halve units once if bankroll drops 25% from start
                 if not unit_halved and bankroll < starting_bankroll * 0.75:
                     unit_halved = True
@@ -1577,6 +1626,10 @@ def _compute_bet_records(
                     continue
 
                 stake = round(bankroll * stake_pct, 2)
+                # Cap stake so potential payout never exceeds bookmaker limit
+                if market_odds > 0 and stake * market_odds > _MAX_WIN:
+                    stake = round(_MAX_WIN / market_odds, 2)
+                stake = max(0.50, stake)
                 won = int(finish_pos) == 1
                 profit = round(stake * (market_odds - 1), 2) if won else round(-stake, 2)
                 bankroll = round(bankroll + profit, 2)
@@ -1619,6 +1672,8 @@ def _compute_bet_records(
         "roi": round(total_profit / total_staked * 100, 2) if total_staked else 0.0,
         "avg_edge": round(sum(r["edge_pct"] for r in records) / n, 1) if n else 0.0,
         "unit_halved": unit_halved,
+        "state": state or "All",
+        "from_date": from_date.strftime("%d %b %Y").lstrip("0") if from_date else None,
     }
     return records, summary
 
@@ -1654,6 +1709,7 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
     ])
 
     unit_note = " · Units halved (bank fell 25%)" if summary.get("unit_halved") else ""
+    _from_note = f" · From {summary['from_date']}" if summary.get("from_date") else ""
 
     # Add a numeric date_sort key so JS can sort chronologically without parsing
     _MONTHS = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
@@ -1686,6 +1742,19 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
             "bank":        r["bankroll"],
         })
     records_json = _json.dumps(serialisable)
+
+    _bet_state = summary.get("state", "All")
+    _sub = "style=\"font-size:11px;padding:3px 8px\""
+    _bet_nav = (
+        f'<a href="betting.html"{" class=\"active\"" if _bet_state=="All" else ""}>Betting</a>'
+        f'<a href="betting-nsw.html" {_sub}{" class=\"active\"" if _bet_state=="NSW" else ""}>NSW</a>'
+        f'<a href="betting-qld.html" {_sub}{" class=\"active\"" if _bet_state=="QLD" else ""}>QLD</a>'
+    )
+    _diag_nav = (
+        '<a href="diagnose.html">Diagnose</a>'
+        f'<a href="diagnose-nsw.html" {_sub}>NSW</a>'
+        f'<a href="diagnose-qld.html" {_sub}>QLD</a>'
+    )
 
     return f"""<!doctype html>
 <html lang="en">
@@ -1765,13 +1834,13 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
   <nav class="top-nav">
     <a href="index.html">Meetings</a>
     <a href="stats.html">Stats</a>
-    <a href="betting.html" class="active">Betting</a>
-    <a href="diagnose.html">Diagnose</a>
+    {_bet_nav}
+    {_diag_nav}
     <a href="live.html">Live</a>
   </nav>
   <div class="hero">
-    <h1>Betting Backtest</h1>
-    <p>Quarter-Kelly staking · All tracks · Starting bank ${start_bank:,.0f}</p>
+    <h1>Betting Backtest{' — ' + html.escape(summary['state']) if summary.get('state') and summary['state'] != 'All' else ''}</h1>
+    <p>Quarter-Kelly staking · {html.escape(summary.get('state') or 'All')} tracks · Starting bank ${start_bank:,.0f}{(' · From ' + html.escape(summary['from_date'])) if summary.get('from_date') else ''}</p>
   </div>
   <div class="wrap">
     <div class="summary-grid">{summary_html}</div>
@@ -1780,11 +1849,11 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
       <span><strong>Edge window:</strong> 25%–100% odds</span>
       <span><strong>Max Bet:</strong> 4% of bank</span>
       <span><strong>Halve Units:</strong> if bank falls 25%</span>
-      <span><strong>Tracks:</strong> All</span>
+      <span><strong>Tracks:</strong> {html.escape(summary.get('state') or 'All')}</span>
       {f'<span style="color:#f59e0b;font-weight:600;">⚠ Units halved</span>' if summary.get("unit_halved") else ''}
     </div>
     <div class="chart-card">
-      <h3>Bankroll progression — {summary['total_bets']} bets{unit_note}</h3>
+      <h3>Bankroll progression — {summary['total_bets']} bets{_from_note}{unit_note}</h3>
       {chart_svg if chart_svg else '<p style="color:var(--secondary)">No bets yet.</p>'}
     </div>
     <div class="section-title">Bet History</div>
@@ -1958,8 +2027,10 @@ def build_betting_site(
     csv_path: str | Path,
     out_dir: str | Path,
     starting_bankroll: float = 1000.0,
+    state: str | None = None,
+    from_date: datetime | None = None,
 ) -> Path:
-    """Build fractional-Kelly backtest page and write to out_dir/betting.html."""
+    """Build fractional-Kelly backtest page and write to out_dir/betting[-state].html."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1967,13 +2038,14 @@ def build_betting_site(
     init_db(conn)
     weights_path = Path("weights.json")
     weights = load_weights(weights_path) if weights_path.exists() else None
-    records, summary = _compute_bet_records(conn, csv_path, weights, starting_bankroll)
+    records, summary = _compute_bet_records(conn, csv_path, weights, starting_bankroll, state=state, from_date=from_date)
     conn.close()
 
     betting_html = _render_betting_html(
         records, summary, datetime.now().strftime("%d %b %Y %H:%M")
     )
-    out_path = out_dir / "betting.html"
+    filename = f"betting-{state.lower()}.html" if state else "betting.html"
+    out_path = out_dir / filename
     out_path.write_text(betting_html, encoding="utf-8")
     print(f"Betting page written -> {out_path}  ({summary['total_bets']} bets, ROI {summary['roi']:+.1f}%)")
     return out_path
@@ -2099,6 +2171,23 @@ def republish_all_meetings(
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     _write_index(docs)
 
+    # Rebuild betting and diagnose pages (all + per-state).
+    # Betting pages start from 1 May 2026 — the first date with clean (non-leaky)
+    # per-meeting form snapshots and calibrated weights.
+    _bet_from = datetime(2026, 5, 1)
+    try:
+        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, from_date=_bet_from)
+        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="NSW", from_date=_bet_from)
+        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="QLD", from_date=_bet_from)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  Warning: betting page rebuild failed — {exc}")
+    try:
+        build_diagnose_site(csv_path, db_path, docs, weights=weights)
+        build_diagnose_site(csv_path, db_path, docs, weights=weights, state="NSW")
+        build_diagnose_site(csv_path, db_path, docs, weights=weights, state="QLD")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  Warning: diagnose page rebuild failed — {exc}")
+
     # Rebuild live page so hosted race data stays current
     try:
         from .live import build_live_site
@@ -2148,6 +2237,7 @@ def build_diagnose_site(
     db_path: str | Path,
     out_dir: str | Path = "docs",
     weights: dict | None = None,
+    state: str | None = None,
 ) -> Path:
     """Score all meetings with stored results, build the diagnostic truth-set page."""
     out_dir = Path(out_dir)
@@ -2170,6 +2260,7 @@ def build_diagnose_site(
         "NA": "Narrabri", "NR": "Newcastle", "PC": "Menangle",
         "PE": "Penrith", "PK": "Parkes", "TA": "Tamworth",
         "TM": "Temora", "UG": "Marburg", "YU": "Young",
+        "AP": "Albion Park", "RE": "Redcliffe",
     }
     meeting_track: dict[str, str] = {}
     for r in conn.execute("SELECT meeting_code, track_name FROM meetings").fetchall():
@@ -2188,6 +2279,8 @@ def build_diagnose_site(
     # Build race_groups identical to the diagnose CLI handler
     race_groups: dict[tuple, list[dict]] = {}
     for meeting_code in meetings:
+        if state and _meeting_state(meeting_code) != state:
+            continue
         try:
             scored = score_meeting_rows(rows, meeting_code, weights=weights)
         except Exception:
@@ -2229,13 +2322,14 @@ def build_diagnose_site(
             race_groups[(meeting_code, race_number)] = group
 
     generated_at = datetime.now().strftime("%d %b %Y %H:%M")
-    html_str = _render_diagnose_html(race_groups, generated_at, meeting_track=meeting_track)
-    out_path = out_dir / "diagnose.html"
+    html_str = _render_diagnose_html(race_groups, generated_at, meeting_track=meeting_track, state=state)
+    filename = f"diagnose-{state.lower()}.html" if state else "diagnose.html"
+    out_path = out_dir / filename
     out_path.write_text(html_str, encoding="utf-8")
     return out_path
 
 
-def _render_diagnose_html(race_groups: dict, generated_at: str, meeting_track: dict | None = None) -> str:
+def _render_diagnose_html(race_groups: dict, generated_at: str, meeting_track: dict | None = None, state: str | None = None) -> str:
     """Render the full diagnostic page as an HTML string."""
 
     def _avg(lst: list) -> float | None:
@@ -2359,6 +2453,18 @@ def _render_diagnose_html(race_groups: dict, generated_at: str, meeting_track: d
 
     n_races = global_stats.get("total_races", 0)
 
+    _sub = "style=\"font-size:11px;padding:3px 8px\""
+    _bet_nav = (
+        '<a href="betting.html">Betting</a>'
+        f'<a href="betting-nsw.html" {_sub}>NSW</a>'
+        f'<a href="betting-qld.html" {_sub}>QLD</a>'
+    )
+    _diag_nav = (
+        f'<a href="diagnose.html"{" class=\"active\"" if not state else ""}>Diagnose</a>'
+        f'<a href="diagnose-nsw.html" {_sub}{" class=\"active\"" if state=="NSW" else ""}>NSW</a>'
+        f'<a href="diagnose-qld.html" {_sub}{" class=\"active\"" if state=="QLD" else ""}>QLD</a>'
+    )
+
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -2450,13 +2556,13 @@ def _render_diagnose_html(race_groups: dict, generated_at: str, meeting_track: d
   <nav class="top-nav">
     <a href="index.html">Meetings</a>
     <a href="stats.html">Stats</a>
-    <a href="betting.html">Betting</a>
-    <a href="diagnose.html" class="active">Diagnose</a>
+    {_bet_nav}
+    {_diag_nav}
   </nav>
   <div class="hero">
     <div class="hero-inner">
       <div>
-        <h1>Model Diagnostic</h1>
+        <h1>Model Diagnostic{' — ' + html.escape(state) if state else ''}</h1>
         <p>Per-race truth set &middot; {n_races} races with results &middot; Generated {html.escape(generated_at)}</p>
       </div>
       <div class="meeting-select">

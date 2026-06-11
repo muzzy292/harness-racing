@@ -326,13 +326,31 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
     last_10_win_rate = _to_float(row.get("last_10_win_rate"))
     last_10_starts = _to_int(row.get("last_10_starts"))
     days_since_last_run_s1 = _to_float(row.get("days_since_last_run"))
+    recent_form_run_count_365 = _to_int(row.get("recent_form_run_count_365"))
 
-    # Form staleness: 365-729 days → score -1.0; 730+ days → -1.5.
-    # Multiplied by form_staleness weight in the return dict.
-    # All Stage 1 form signals (consistency, ceiling, win rate, etc.) are based on
-    # runs that may be over a year old — this discounts S1 to reflect that staleness.
-    # On top of the Stage 2 fitness penalty (tier_150_plus: -2.0 in weights.json).
-    if days_since_last_run_s1 is not None and days_since_last_run_s1 >= 730:
+    # Form staleness: discount S1 when a horse has little or no recent form (last 12m).
+    # Uses recent_form_run_count_365 (count of form lines within 365 days) as the primary
+    # signal — this persists through 2nd/3rd run back unlike days_since_last_run which
+    # resets after the first run back.
+    #
+    #   0 recent runs (first run back from 12m+ absence): -1.5
+    #   1 recent run (2nd run back):                      -1.0
+    #   2 recent runs (3rd run back):                     -0.5
+    #   3+ recent runs:                                    0.0  (no staleness penalty)
+    #
+    # Falls back to days_since_last_run when recent_form_run_count_365 is unavailable
+    # (old CSV rows before this feature was added).
+    # Complements Stage 2 fitness — S1 discounts form quality, S2 discounts race readiness.
+    if recent_form_run_count_365 is not None:
+        if recent_form_run_count_365 == 0:
+            _form_stale = -1.5
+        elif recent_form_run_count_365 == 1:
+            _form_stale = -1.0
+        elif recent_form_run_count_365 == 2:
+            _form_stale = -0.5
+        else:
+            _form_stale = 0.0
+    elif days_since_last_run_s1 is not None and days_since_last_run_s1 >= 730:
         _form_stale = -1.5
     elif days_since_last_run_s1 is not None and days_since_last_run_s1 >= 365:
         _form_stale = -1.0
@@ -523,8 +541,9 @@ def _stage1_components(row: dict[str, str], weights: dict | None = None) -> dict
         # Apply a fixed S1 penalty for debut runners so they sit near the field
         # mean rather than above every horse with actual (negative) form history.
         "debut_adj": -1.0 * w.get("debut_adj", 2.0) if career_starts == 0 else 0.0,
-        # Form staleness: historical form is stale after a 12+ month absence.
-        # Score -1.0 (365-729d) or -1.5 (730+d), multiplied by weight.
+        # Form staleness: discounts S1 when recent_form_run_count_365 is low.
+        # 0 runs in last 365d → -1.5; 1 run → -1.0; 2 runs → -0.5; 3+ → 0.0.
+        # Persists through 2nd/3rd run back (unlike days_since_last_run which resets).
         # Complements the Stage 2 fitness penalty — S1 discounts form ability,
         # S2 fitness discounts race readiness.
         "form_staleness": _form_stale * w.get("form_staleness", 1.5),

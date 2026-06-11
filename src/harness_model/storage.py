@@ -295,20 +295,10 @@ def upsert_runners(conn: sqlite3.Connection, runners: list[RunnerInfo]) -> None:
             for runner in runners
         ],
     )
-    # Purge stale form-line snapshots before writing fresh ones.
-    # Each ingest re-scrapes the horse's recent form. Without this delete the same
-    # physical run accumulates once per meeting the horse appeared in, keyed on
-    # (meeting_code, race_number, line_index). Deleting old-meeting rows here keeps
-    # exactly one set of form lines per horse — from the most recent ingestion.
-    _runners_with_lines = [r for r in runners if r.recent_lines]
-    if _runners_with_lines:
-        _current_meeting = _runners_with_lines[0].meeting_code
-        _horse_ids = list({r.horse_id for r in _runners_with_lines})
-        _ph = ",".join("?" * len(_horse_ids))
-        conn.execute(
-            f"DELETE FROM runner_recent_lines WHERE horse_id IN ({_ph}) AND meeting_code != ?",
-            (*_horse_ids, _current_meeting),
-        )
+    # Each meeting's form lines are kept as a per-meeting snapshot (meeting_code is
+    # part of the primary key). This allows features.py to filter form lines by
+    # run_date < meeting_date, ensuring historical races only see data available at
+    # race time. The ON CONFLICT clause below handles re-ingesting the same meeting.
 
     conn.executemany(
         """
@@ -558,6 +548,40 @@ def sync_runner_recent_lines_to_horse_runs(conn: sqlite3.Connection, runners: li
     )
     conn.commit()
     return len(synced_rows)
+
+
+def upsert_excluded_driver_runs(conn: sqlite3.Connection, rows: list[dict]) -> int:
+    """Insert driver/trainer results from excluded races (trotters, 2YO) into horse_runs.
+
+    These minimal rows ensure rolling driver and trainer win-rate stats
+    include all race types. Only the fields needed for stats are populated;
+    margin and sectional columns are left NULL.
+    """
+    if not rows:
+        return 0
+    conn.executemany(
+        """
+        INSERT INTO horse_runs(
+            horse_id, run_date, finish_position, driver_name, trainer_name,
+            race_name, race_type, null_run
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+        ON CONFLICT(horse_id, run_date, race_name, distance_code) DO UPDATE SET
+            finish_position = COALESCE(excluded.finish_position, horse_runs.finish_position),
+            driver_name     = COALESCE(excluded.driver_name,     horse_runs.driver_name),
+            trainer_name    = COALESCE(excluded.trainer_name,    horse_runs.trainer_name)
+        """,
+        [
+            (
+                r["horse_id"], r["run_date"], r["finish_position"],
+                r["driver_name"], r["trainer_name"],
+                r["race_name"], r["race_type"],
+            )
+            for r in rows
+        ],
+    )
+    conn.commit()
+    return len(rows)
 
 
 def upsert_horse_profile(conn: sqlite3.Connection, profile: HorseProfile) -> None:

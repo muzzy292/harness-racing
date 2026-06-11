@@ -16,6 +16,8 @@ from .odds import load_feature_rows, load_weights, score_race_rows
 _MIN_EDGE = 0.25
 _KELLY_FRACTION = 0.25
 _MAX_STAKE_PCT = 0.04
+_MAX_WIN = 500.0
+_MAX_SP = 60.0
 _STARTING_BANK = 100.0
 
 # ---------------------------------------------------------------------------
@@ -284,10 +286,19 @@ tr.r-void{opacity:.4}
   <div class="card full">
     <div class="card-title">Qualifying Bets</div>
     <div class="bank-bar">
-      <div><div class="bank-lbl">Bank</div><div class="bank-val" id="bank-val">$100.00</div></div>
+      <div>
+        <div class="bank-lbl">Starting Bank</div>
+        <div style="display:flex;align-items:center;gap:3px">
+          <span style="font-family:'Roboto Mono',monospace;font-size:16px;color:var(--secondary)">$</span>
+          <input type="number" id="start-bank-input" min="1" step="50"
+            style="width:90px;background:var(--surface);color:var(--primary-text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-family:'Roboto Mono',monospace;font-size:16px;font-weight:600"
+            onchange="setStartBank(this.value)" title="Set your starting bankroll">
+        </div>
+      </div>
+      <div><div class="bank-lbl">Current Bank</div><div class="bank-val" id="bank-val">—</div></div>
       <div><div class="bank-lbl">P&amp;L</div><div class="bank-stat" id="pnl-val">+$0.00</div></div>
       <div><div class="bank-lbl">Record</div><div class="bank-stat" id="rec-val">0W / 0L / 0P</div></div>
-      <button class="btn btn-muted btn-sm" onclick="if(confirm('Reset bank to $100 and clear all bets?'))resetAll()" style="margin-left:auto">Reset Bank</button>
+      <button class="btn btn-muted btn-sm" onclick="if(confirm('Clear all recorded bets?'))resetAll()" style="margin-left:auto">Reset Bets</button>
     </div>
     <div id="qual-panel"><div class="empty">Paste TAB odds and click Calculate Bets</div></div>
   </div>
@@ -309,8 +320,24 @@ const RACES       = %%RACES_JSON%%;
 const MIN_EDGE    = %%MIN_EDGE%%;
 const KELLY       = %%KELLY%%;
 const MAX_STK_PCT = %%MAX_STK%%;
+const MAX_WIN     = %%MAX_WIN%%;
+const MAX_SP      = %%MAX_SP%%;
 const START_BANK  = %%START_BANK%%;
 const LS_KEY      = 'muzzybet_live_v1';
+const LS_BANK_KEY = 'muzzybet_startbank_v1';
+
+function getStartBank() {
+  const stored = parseFloat(localStorage.getItem(LS_BANK_KEY));
+  return (!isNaN(stored) && stored > 0) ? stored : START_BANK;
+}
+function setStartBank(val) {
+  const v = parseFloat(val);
+  if (!isNaN(v) && v > 0) {
+    localStorage.setItem(LS_BANK_KEY, v.toFixed(2));
+    document.getElementById('start-bank-input').value = v.toFixed(2);
+    refreshBank();
+  }
+}
 
 // ── Race data helpers ─────────────────────────────────────────────────────────
 function mcToDate(mc) {
@@ -455,7 +482,7 @@ function roundStake(raw) {
 function kellyStake(e, tabOdds, bank) {
   if (e<=0 || tabOdds<=1) return 0;
   const k = (e/(tabOdds-1))*KELLY;
-  const raw = Math.min(k*bank, bank*MAX_STK_PCT);
+  const raw = Math.min(k*bank, bank*MAX_STK_PCT, MAX_WIN/tabOdds);
   return roundStake(raw);
 }
 
@@ -474,7 +501,7 @@ function calcBets() {
   const rows = tabOdds.map(t => {
     const m = bestMatch(t.name, race.runners);
     const e_val = m ? edge(t.odds, m.runner.fair_odds) : null;
-    const stake = (e_val!==null && e_val>=MIN_EDGE) ? kellyStake(e_val, t.odds, bank) : null;
+    const stake = (e_val!==null && e_val>=MIN_EDGE && t.odds<=MAX_SP) ? kellyStake(e_val, t.odds, bank) : null;
     return {tabName:t.name, tabOdds:t.odds, runner:m?.runner??null, dist:m?.dist??999, edge:e_val, stake};
   });
   renderQual(mc, rn, rows, bank);
@@ -496,7 +523,7 @@ function renderQual(mc, rn, rows, bank) {
     const bigDivergence = r.runner && r.edge !== null && (r.edge >= 1.0 || r.edge <= -0.5);
     const runnerEnc = r.runner ? encodeURIComponent(JSON.stringify(r.runner)) : null;
     const analyseBtn = bigDivergence
-      ? `<button class="btn-analyse" onclick="analyseRunner(this,${runnerEnc},'${mc}',${rn},${r.tabOdds},${r.edge})">AI</button>`
+      ? `<button class="btn-analyse" onclick="analyseRunner(this,'${runnerEnc}','${mc}',${rn},${r.tabOdds},${r.edge})">AI</button>`
       : '';
     if (r.edge!==null && r.edge>=MIN_EDGE && r.stake!==null) {
       anyQ = true;
@@ -537,7 +564,7 @@ function buildAnalysisPrompt(runner, mc, rn, tabOdds, edgeVal) {
   const f = runner.feat || {};
   const comps = runner.components || {};
   const edgePct = (edgeVal * 100).toFixed(1);
-  const direction = edgeVal >= 0 ? `Model ${edgePct}% longer than market (potential value)` : `Market ${(-edgeVal*100).toFixed(1)}% shorter than model (model missing favourite)`;
+  const direction = edgeVal >= 0 ? `Market ${edgePct}% longer than model (potential value)` : `Market ${(-edgeVal*100).toFixed(1)}% shorter than model (model missing favourite)`;
 
   const featLines = [
     `Last 5 win rate: ${f.last_5_win_rate!=null ? (f.last_5_win_rate*100).toFixed(0)+'%' : 'n/a'}`,
@@ -572,9 +599,12 @@ FLAG: [one of: Grade drop underpriced | Declining form | Cold operator | Fitness
 REASON: [1-2 sentences identifying the specific issue in the data]`;
 }
 
-async function analyseRunner(btn, runner, mc, rn, tabOdds, edgeVal) {
+async function analyseRunner(btn, runnerEnc, mc, rn, tabOdds, edgeVal) {
   const key = localStorage.getItem('muzzybet_anthropic_key');
   if (!key) { alert('No API key — open Settings and enter your Anthropic API key'); return; }
+
+  let runner;
+  try { runner = JSON.parse(decodeURIComponent(runnerEnc)); } catch(e) { alert('Failed to parse runner data'); return; }
 
   const rowKey = runner.horse_name.replace(/\s+/g,'_');
   const aiRow = document.querySelector(`.ai-row-${rowKey} td`);
@@ -622,7 +652,7 @@ function loadBets() { try { return JSON.parse(localStorage.getItem(LS_KEY)||'[]'
 function saveBets(b) { localStorage.setItem(LS_KEY, JSON.stringify(b)); }
 
 function currentBank() {
-  let bank = START_BANK;
+  let bank = getStartBank();
   for (const b of loadBets()) {
     if (b.result==='won')  bank += b.payout - b.stake;
     if (b.result==='lost') bank -= b.stake;
@@ -659,15 +689,16 @@ function resetAll() { localStorage.removeItem(LS_KEY); refreshBank(); renderHist
 
 // ── Bankroll display ──────────────────────────────────────────────────────────
 function refreshBank() {
+  const startBank = getStartBank();
   const bets = loadBets();
-  let bank=START_BANK, wins=0, losses=0, pending=0;
+  let bank=startBank, wins=0, losses=0, pending=0;
   for (const b of bets) {
     if (b.result==='won')  { bank+=b.payout-b.stake; wins++; }
     else if (b.result==='lost') { bank-=b.stake; losses++; }
     else if (b.result==='pending') pending++;
   }
   bank = Math.max(bank, 0);
-  const pnl = bank - START_BANK;
+  const pnl = bank - startBank;
   document.getElementById('bank-val').textContent = '$'+bank.toFixed(2);
   const pnlEl = document.getElementById('pnl-val');
   pnlEl.textContent = (pnl>=0?'+$':'−$')+Math.abs(pnl).toFixed(2);
@@ -868,6 +899,7 @@ function clearKey() {
 // ── TAB Statement Import ──────────────────────────────────────────────────────
 // Venue name → 2-letter meeting-code prefix mapping
 const VENUE_PREFIX = {
+  // NSW
   'WAGGA WAGGA':    'WG',
   'PORT MACQUARIE': 'PM',
   'PORT KEMBLA':    'PK',
@@ -877,20 +909,28 @@ const VENUE_PREFIX = {
   'PENRITH':        'PE',
   'TAMWORTH':       'TA',
   'WAGGA':          'WG',
-  'MENANGLE':       'MN',
+  'MENANGLE':       'PC',
   'NEWCASTLE':      'NR',
   'ALBURY':         'AL',
   'CANBERRA':       'CB',
   'GOULBURN':       'LM',
   'NARROMINE':      'NA',
+  'NARRABRI':       'NA',
   'PARKES':         'PK',
   'DUBBO':          'DU',
   'GOSFORD':        'GO',
   'MAITLAND':       'MA',
   'CESSNOCK':       'CK',
-  'YOUNG':          'YG',
+  'YOUNG':          'YU',
   'ORANGE':         'OG',
   'GRIFFITH':       'GR',
+  'TEMORA':         'TM',
+  'LEETON':         'LE',
+  'JUNEE':          'JU',
+  // QLD
+  'ALBION PARK':    'AP',
+  'REDCLIFFE':      'RE',
+  'MARBURG':        'UG',
 };
 
 // Build regex — sort longest venue names first so "WAGGA WAGGA" matches before "WAGGA"
@@ -1151,6 +1191,11 @@ function confirmImport() {
 })();
 
 populateMeetings();
+// Initialise starting bank input from localStorage (or default)
+(function() {
+  const inp = document.getElementById('start-bank-input');
+  if (inp) inp.value = getStartBank().toFixed(2);
+})();
 refreshBank();
 renderHistory();
 </script>
@@ -1172,6 +1217,8 @@ def _build_html(races: list[dict], mode: str = "local") -> str:
         .replace("%%MIN_EDGE%%", str(_MIN_EDGE))
         .replace("%%KELLY%%", str(_KELLY_FRACTION))
         .replace("%%MAX_STK%%", str(_MAX_STAKE_PCT))
+        .replace("%%MAX_WIN%%", str(_MAX_WIN))
+        .replace("%%MAX_SP%%", str(_MAX_SP))
         .replace("%%START_BANK%%", str(_STARTING_BANK))
     )
 
