@@ -107,8 +107,9 @@ Fitness penalty (graduated by days since last run):
 - Softmax (temperature **1.6**, recently lowered from 2.75) converts S1+S2 scores
   to win probabilities.
 - Optional blend: 45% model / 55% market (used for "fair odds" display, not for
-  the backtest below which I believe uses pure model probabilities — **a reviewer
-  should confirm which probability feeds the Kelly stake**).
+  the backtest below). **Confirmed (June 2026 review):** the Kelly stake uses the
+  pure model `win_probability` — by design, since no pre-race market odds are
+  available; SP is only used post-race to settle bets.
 - Probability guardrails prevent extreme outputs.
 
 Full weight config: `weights.json` (attached / reproduced above).
@@ -142,8 +143,13 @@ accuracy is large, and worth the reviewer's attention: is this expected for a
 "fair odds vs market" model, or does it suggest the model's probability
 distribution is too flat / mis-ranked?
 
-### 4b. Betting backtest (Quarter-Kelly, 25%-100% edge window, 4% max bet,
-bank halves if it falls 25%, all bets from 1 May 2026 onwards)
+### 4b. Betting backtest (Quarter-Kelly, edge ≥25% with no upper bound, SP ≤ $60,
+4% max bet, bank halves if it falls 25%, all bets from 1 May 2026 onwards)
+
+**Correction (June 2026 review):** earlier versions of this document described a
+"25%–100% edge window" — the upper bound was never implemented and the
+no-upper-bound behaviour is by design. QLD bets are now excluded from the
+headline ledger entirely.
 
 Source: `docs/betting.html` / `betting-nsw.html` / `betting-qld.html`.
 
@@ -250,20 +256,18 @@ be valuable.**
 8. **`sp_class` over-penalises grade-drop horses and maiden runners** — two
    confirmed examples (STUDLEIGH MELISE grade-drop winner at $3.40 priced $16.12
    by model; CAPTAINS DELIGHT maiden-race winner at $2.15 priced $10.02 by
-   model). `sp_class` is currently weighted 0.0 in `weights.json` (appears to
-   already be zeroed — **worth confirming with the author whether this was the
-   resolution, or whether it's zeroed for an unrelated reason**).
+   model). **Resolved:** `sp_class` was zeroed deliberately as the fix for
+   these cases (per code comments in `odds.py` it is retained for potential
+   reinstatement once more data exists).
 
 9. **`late_speed` inflated by shared race-level sectionals** — every horse in a
    race is stored with the *same* `last_half`/`first_half` time (the race-level
    time, not per-horse), so a horse who finished 30+ metres behind gets credited
    with the winner's fast sectional. Concrete example: COLLECT A DIME, model
    $5.73 vs $41 SP, driven by `late_speed = +2.45` from two runs where the horse
-   was 32-34m behind in fast-paced races. Two proposed fixes: (A) margin
-   correction to estimate individual time from shared race time, or (B) discard
-   sectionals from runs with `adjusted_margin > ~8m`. **This seems like one of
-   the more concrete, fixable data-quality bugs in the list** — `late_speed` is
-   currently weighted 0.8 in S1.
+   was 32-34m behind in fast-paced races. **Resolved:** fix (B) is implemented —
+   `_sectional_deltas_vs_par` in `features.py` discards sectionals from runs
+   with `adjusted_margin > 8.0` (`_SECTIONAL_MARGIN_THRESHOLD`).
 
 10. **BMR removed** — `bmr_dist_rge` was removed (hardcoded 117.0s centre was
     track-blind). Column preserved in CSV but unused. Reinstatement needs

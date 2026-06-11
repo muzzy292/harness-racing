@@ -1505,9 +1505,9 @@ _KELLY_FRACTION  = 0.25   # quarter-Kelly
 _MAX_BET_PCT     = 0.04   # never more than 4% of current bankroll
 _MAX_WIN         = 500.0  # max payout per bet — realistic bookmaker limit for country harness
 _MAX_SP          = 60.0   # never bet horses longer than this SP (bookmaker / realism cap)
-# Odds-based edge bounds: only bet when market_odds / fair_odds is in [1.25, 2.0).
-# Backtest shows 25–100% odds-edge is the profitable zone; >=100% edge bets are
-# large model-vs-market disagreements that consistently lose.
+# Edge filter: bet whenever market_odds / fair_odds - 1 >= 25%, up to the
+# _MAX_SP cap above. There is intentionally NO upper edge bound — the strategy
+# takes any size of model-vs-market disagreement within the SP cap.
 _MIN_ODDS_EDGE   = 0.25   # market must be at least 25% longer than fair odds
 
 
@@ -1872,8 +1872,8 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
   <div class="wrap">
     <div class="summary-grid">{summary_html}</div>
     <div class="params">
-      <span><strong>Strategy:</strong> Quarter-Kelly (0.25×) &middot; Edge filter: 25%–100% odds</span>
-      <span><strong>Edge window:</strong> 25%–100% odds</span>
+      <span><strong>Strategy:</strong> Quarter-Kelly (0.25×) &middot; Edge filter: &ge;25% odds</span>
+      <span><strong>SP cap:</strong> $60 max</span>
       <span><strong>Max Bet:</strong> 4% of bank</span>
       <span><strong>Halve Units:</strong> if bank falls 25%</span>
       <span><strong>Tracks:</strong> {html.escape(summary.get('state') or 'All')}</span>
