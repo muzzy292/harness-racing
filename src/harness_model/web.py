@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import math
 import os
 import sqlite3
 import subprocess
@@ -1511,6 +1512,51 @@ _MAX_SP          = 60.0   # never bet horses longer than this SP (bookmaker / re
 _MIN_ODDS_EDGE   = 0.25   # market must be at least 25% longer than fair odds
 
 
+def _blend_race_bets(
+    race_rows: list[dict],
+    results_lookup: dict,
+    mc: str,
+    race_number: int,
+    cfg: dict,
+) -> list[tuple[dict, dict, float, float]]:
+    """Blend betting rule (validated in fit_holdout.py, 11 Jun 2026).
+
+    Blended score per runner = b1*ln(normalised SP prob) + b2*model score;
+    softmax within the race gives a blended probability. Bet when
+    blended_prob x SP exceeds cfg threshold (and SP <= _MAX_SP).
+    Requires >=4 runners with results so the SP normalisation is meaningful.
+    Returns (row, result, blended_prob, market_odds) per qualifying bet.
+    """
+    entries = []
+    for row in race_rows:
+        result = results_lookup.get((mc, race_number, _normalise_name(str(row.get("horse_name") or ""))))
+        if result is None:
+            continue
+        sp = float(result["starting_price"])
+        rel = row.get("relative_score")
+        if sp <= 1.0 or rel is None:
+            continue
+        entries.append((row, result, sp, float(rel)))
+    if len(entries) < 4:
+        return []
+
+    b1 = cfg.get("b1", 1.0)
+    b2 = cfg.get("b2", 0.0)
+    threshold = cfg.get("threshold", 1.10)
+    total_inv = sum(1.0 / sp for _, _, sp, _ in entries)
+    scores = [b1 * math.log((1.0 / sp) / total_inv) + b2 * rel for _, _, sp, rel in entries]
+    m = max(scores)
+    exps = [math.exp(s - m) for s in scores]
+    total = sum(exps)
+
+    bets = []
+    for (row, result, sp, _rel), e in zip(entries, exps):
+        prob = e / total
+        if sp <= _MAX_SP and prob * sp > threshold:
+            bets.append((row, result, prob, sp))
+    return bets
+
+
 def _kelly_stake_pct(model_prob: float, market_odds: float, fraction: float = _KELLY_FRACTION) -> float | None:
     """Fractional Kelly stake as a fraction of bankroll, or None if no bet."""
     if market_odds <= 1.0 or model_prob <= 0:
@@ -1599,6 +1645,7 @@ def _compute_bet_records(
 
     bankroll = starting_bankroll
     unit_halved = False
+    used_blend = False
     records: list[dict] = []
 
     for mc in meeting_codes:
@@ -1610,7 +1657,39 @@ def _compute_bet_records(
             continue
         mc_weights = state_weights[_meeting_state(mc)] if state_weights else weights
         scored = score_meeting_rows(feature_rows, mc, weights=mc_weights)
+        # Blend strategy: active when the meeting's weights carry a "blend"
+        # section (currently weights-nsw.json). Flat stake (1% of starting
+        # bank), no Kelly/unit-halving - matches the validated simulation.
+        blend_cfg = (mc_weights or {}).get("blend")
         for race_number, race_rows in sorted(scored.items()):
+            if blend_cfg:
+                meta = meeting_meta.get(mc, {})
+                for row, result, blended_prob, market_odds in _blend_race_bets(
+                    race_rows, results_lookup, mc, race_number, blend_cfg
+                ):
+                    used_blend = True
+                    stake = round(starting_bankroll * 0.01, 2)
+                    won = int(result["finish_position"]) == 1
+                    profit = round(stake * (market_odds - 1), 2) if won else round(-stake, 2)
+                    bankroll = round(bankroll + profit, 2)
+                    records.append({
+                        "meeting_code": mc,
+                        "meeting_date": meta.get("meeting_date", ""),
+                        "track_name": meta.get("track_name", ""),
+                        "race_number": race_number,
+                        "horse_name": str(row.get("horse_name") or ""),
+                        "model_prob": round(blended_prob * 100, 1),
+                        "fair_odds": round(1.0 / blended_prob, 2),
+                        "market_odds": market_odds,
+                        "edge_pct": round((blended_prob * market_odds - 1.0) * 100, 1),
+                        "tier": "Blend",
+                        "stake": stake,
+                        "won": won,
+                        "finish_pos": result["finish_position"],
+                        "profit": profit,
+                        "bankroll": bankroll,
+                    })
+                continue
             for row in race_rows:
                 horse = str(row.get("horse_name") or "")
                 model_prob_raw = row.get("win_probability")
@@ -1704,6 +1783,7 @@ def _compute_bet_records(
         "flat_roi": round(flat_units / n * 100, 2) if n else 0.0,
         "avg_edge": round(sum(r["edge_pct"] for r in records) / n, 1) if n else 0.0,
         "unit_halved": unit_halved,
+        "strategy": "blend" if used_blend else "kelly",
         "state": state or ("All excl. " + ", ".join(exclude_states) if exclude_states else "All"),
         "from_date": from_date.strftime("%d %b %Y").lstrip("0") if from_date else None,
     }
@@ -1743,7 +1823,22 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
         _sc("Total Staked",   f"${summary['total_staked']:,.2f}"),
     ])
 
-    unit_note = " · Units halved (bank fell 25%)" if summary.get("unit_halved") else ""
+    _is_blend = summary.get("strategy") == "blend"
+    if _is_blend:
+        _staking_label = "Flat-stake blend strategy"
+        _params_html = (
+            "<span><strong>Strategy:</strong> Blend rule &mdash; bet when "
+            "P(blend) &times; SP &gt; 1.10 (P = 0.895&middot;ln market + 0.573&middot;model, fitted 11 Jun 2026)</span>"
+            "<span><strong>Stake:</strong> flat 1% of starting bank</span>"
+        )
+    else:
+        _staking_label = "Quarter-Kelly staking"
+        _params_html = (
+            "<span><strong>Strategy:</strong> Quarter-Kelly (0.25&times;) &middot; Edge filter: &ge;25% odds</span>"
+            "<span><strong>Max Bet:</strong> 4% of bank</span>"
+            "<span><strong>Halve Units:</strong> if bank falls 25%</span>"
+        )
+    unit_note = " · Units halved (bank fell 25%)" if summary.get("unit_halved") and not _is_blend else ""
     _from_note = f" · From {summary['from_date']}" if summary.get("from_date") else ""
 
     # Add a numeric date_sort key so JS can sort chronologically without parsing
@@ -1875,17 +1970,15 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
   </nav>
   <div class="hero">
     <h1>Betting Backtest{' — ' + html.escape(summary['state']) if summary.get('state') and summary['state'] != 'All' else ''}</h1>
-    <p>Quarter-Kelly staking · {html.escape(summary.get('state') or 'All')} tracks · Starting bank ${start_bank:,.0f}{(' · From ' + html.escape(summary['from_date'])) if summary.get('from_date') else ''}</p>
+    <p>{_staking_label} · {html.escape(summary.get('state') or 'All')} tracks · Starting bank ${start_bank:,.0f}{(' · From ' + html.escape(summary['from_date'])) if summary.get('from_date') else ''}</p>
   </div>
   <div class="wrap">
     <div class="summary-grid">{summary_html}</div>
     <div class="params">
-      <span><strong>Strategy:</strong> Quarter-Kelly (0.25×) &middot; Edge filter: &ge;25% odds</span>
+      {_params_html}
       <span><strong>SP cap:</strong> $60 max</span>
-      <span><strong>Max Bet:</strong> 4% of bank</span>
-      <span><strong>Halve Units:</strong> if bank falls 25%</span>
       <span><strong>Tracks:</strong> {html.escape(summary.get('state') or 'All')}</span>
-      {f'<span style="color:#f59e0b;font-weight:600;">⚠ Units halved</span>' if summary.get("unit_halved") else ''}
+      {f'<span style="color:#f59e0b;font-weight:600;">⚠ Units halved</span>' if summary.get("unit_halved") and not _is_blend else ''}
     </div>
     <div class="chart-card">
       <h3>Bankroll progression — {summary['total_bets']} bets{_from_note}{unit_note}</h3>
@@ -2213,9 +2306,12 @@ def republish_all_meetings(
     _write_index(docs)
 
     # Rebuild betting and diagnose pages (all + per-state).
-    # Betting pages start from 1 May 2026 — the first date with clean (non-leaky)
-    # per-meeting form snapshots and calibrated weights.
-    _bet_from = datetime(2026, 5, 1)
+    # NSW/headline ledger starts 11 Jun 2026 — adoption of the fitted weights
+    # and the pre-registered blend strategy (fit_holdout.py). Forward bets only;
+    # earlier bets were placed under different weights/rules and would mix
+    # strategies. QLD keeps the legacy window (1 May) for monitoring.
+    _bet_from = datetime(2026, 6, 11)
+    _bet_from_qld = datetime(2026, 5, 1)
     try:
         # Headline page excludes QLD: 44% of QLD races lack a parseable NR
         # ceiling, producing unreliable prices (-44.8% ROI). The QLD-only page
@@ -2223,7 +2319,7 @@ def republish_all_meetings(
         # main ledger until NR gating / state-specific weights are in place.
         build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, from_date=_bet_from, exclude_states=("QLD",))
         build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="NSW", from_date=_bet_from)
-        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="QLD", from_date=_bet_from)
+        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="QLD", from_date=_bet_from_qld)
     except Exception as exc:  # noqa: BLE001
         print(f"  Warning: betting page rebuild failed — {exc}")
     try:
