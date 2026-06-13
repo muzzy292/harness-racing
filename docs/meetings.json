@@ -11,7 +11,7 @@
     "track_name": "Newcastle",
     "meeting_date": "6 Apr 2026",
     "races": 6,
-    "winners": 2
+    "winners": 1
   },
   {
     "meeting_code": "EY040426",
@@ -60,7 +60,7 @@
     "track_name": "Young",
     "meeting_date": "10 Apr 2026",
     "races": 7,
-    "winners": 2
+    "winners": 1
   },
   {
     "meeting_code": "NR100426",
@@ -95,7 +95,7 @@
     "track_name": "Canberra",
     "meeting_date": "13 Apr 2026",
     "races": 9,
-    "winners": 6
+    "winners": 5
   },
   {
     "meeting_code": "LM300326",
@@ -109,7 +109,7 @@
     "track_name": "Newcastle",
     "meeting_date": "2 Apr 2026",
     "races": 9,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "PC310326",
@@ -151,7 +151,7 @@
     "track_name": "Tamworth",
     "meeting_date": "16 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 2
   },
   {
     "meeting_code": "PE160426",
@@ -165,14 +165,14 @@
     "track_name": "Wagga",
     "meeting_date": "17 Apr 2026",
     "races": 6,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "NR170426",
     "track_name": "Newcastle",
     "meeting_date": "17 Apr 2026",
     "races": 8,
-    "winners": 5
+    "winners": 4
   },
   {
     "meeting_code": "PK170426",
@@ -186,7 +186,7 @@
     "track_name": "Menangle",
     "meeting_date": "18 Apr 2026",
     "races": 8,
-    "winners": 0
+    "winners": 1
   },
   {
     "meeting_code": "CL190426",
@@ -235,7 +235,7 @@
     "track_name": "Wagga",
     "meeting_date": "24 Apr 2026",
     "races": 7,
-    "winners": 3
+    "winners": 2
   },
   {
     "meeting_code": "PK240426",
@@ -249,28 +249,28 @@
     "track_name": "Newcastle",
     "meeting_date": "24 Apr 2026",
     "races": 8,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "PC250426",
     "track_name": "Menangle",
     "meeting_date": "25 Apr 2026",
     "races": 9,
-    "winners": 4
+    "winners": 5
   },
   {
     "meeting_code": "FB260426",
     "track_name": "Forbes",
     "meeting_date": "26 Apr 2026",
     "races": 9,
-    "winners": 3
+    "winners": 1
   },
   {
     "meeting_code": "CL260426",
     "track_name": "Coolamon",
     "meeting_date": "26 Apr 2026",
     "races": 9,
-    "winners": 5
+    "winners": 6
   },
   {
     "meeting_code": "LM270426",
@@ -298,7 +298,7 @@
     "track_name": "Tamworth",
     "meeting_date": "30 Apr 2026",
     "races": 8,
-    "winners": 5
+    "winners": 3
   },
   {
     "meeting_code": "PE300426",
@@ -312,14 +312,14 @@
     "track_name": "Albury",
     "meeting_date": "1 May 2026",
     "races": 8,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "NR010526",
     "track_name": "Newcastle",
     "meeting_date": "1 May 2026",
     "races": 9,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "PC020526",
@@ -340,7 +340,7 @@
     "track_name": "Canberra",
     "meeting_date": "4 May 2026",
     "races": 6,
-    "winners": 1
+    "winners": 0
   },
   {
     "meeting_code": "ME050526",
@@ -361,14 +361,14 @@
     "track_name": "Bathurst",
     "meeting_date": "6 May 2026",
     "races": 8,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "TA070526",
     "track_name": "Tamworth",
     "meeting_date": "7 May 2026",
     "races": 9,
-    "winners": 1
+    "winners": 3
   },
   {
     "meeting_code": "PE070526",
@@ -434,7 +434,7 @@
     "track_name": "Young",
     "meeting_date": "12 May 2026",
     "races": 9,
-    "winners": 4,
+    "winners": 5,
     "state": "NSW"
   },
   {
@@ -490,7 +490,7 @@
     "track_name": "Newcastle",
     "meeting_date": "15 May 2026",
     "races": 9,
-    "winners": 3,
+    "winners": 5,
     "state": "NSW"
   },
   {
@@ -506,7 +506,7 @@
     "track_name": "Parkes",
     "meeting_date": "15 May 2026",
     "races": 9,
-    "winners": 2,
+    "winners": 3,
     "state": "NSW"
   },
   {
@@ -578,7 +578,7 @@
     "track_name": "Bathurst",
     "meeting_date": "20 May 2026",
     "races": 9,
-    "winners": 4,
+    "winners": 3,
     "state": "NSW"
   },
   {
@@ -586,7 +586,7 @@
     "track_name": "Tamworth",
     "meeting_date": "21 May 2026",
     "races": 10,
-    "winners": 3,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -634,7 +634,7 @@
     "track_name": "Newcastle",
     "meeting_date": "22 May 2026",
     "races": 9,
-    "winners": 2,
+    "winners": 1,
     "state": "NSW"
   },
   {
@@ -642,7 +642,7 @@
     "track_name": "Menangle",
     "meeting_date": "23 May 2026",
     "races": 9,
-    "winners": 1,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -650,7 +650,7 @@
     "track_name": "Albpark",
     "meeting_date": "23 May 2026",
     "races": 9,
-    "winners": 4,
+    "winners": 3,
     "state": "QLD"
   },
   {
@@ -706,7 +706,7 @@
     "track_name": "Redclif",
     "meeting_date": "27 May 2026",
     "races": 9,
-    "winners": 2,
+    "winners": 3,
     "state": "QLD"
   },
   {
@@ -738,7 +738,7 @@
     "track_name": "Wagga",
     "meeting_date": "29 May 2026",
     "races": 9,
-    "winners": 4,
+    "winners": 3,
     "state": "NSW"
   },
   {
@@ -762,7 +762,7 @@
     "track_name": "Redclif",
     "meeting_date": "29 May 2026",
     "races": 9,
-    "winners": 3,
+    "winners": 4,
     "state": "QLD"
   },
   {
@@ -826,7 +826,7 @@
     "track_name": "Wagga",
     "meeting_date": "2 Jun 2026",
     "races": 9,
-    "winners": 3,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -834,7 +834,7 @@
     "track_name": "Bathurst",
     "meeting_date": "3 Jun 2026",
     "races": 8,
-    "winners": 2,
+    "winners": 1,
     "state": "NSW"
   },
   {
@@ -842,7 +842,7 @@
     "track_name": "Redclif",
     "meeting_date": "3 Jun 2026",
     "races": 8,
-    "winners": 2,
+    "winners": 3,
     "state": "QLD"
   },
   {
@@ -850,7 +850,7 @@
     "track_name": "Albpark",
     "meeting_date": "4 Jun 2026",
     "races": 7,
-    "winners": 1,
+    "winners": 2,
     "state": "QLD"
   },
   {
@@ -874,7 +874,7 @@
     "track_name": "Newcastle",
     "meeting_date": "5 Jun 2026",
     "races": 10,
-    "winners": 1,
+    "winners": 0,
     "state": "NSW"
   },
   {
@@ -890,7 +890,7 @@
     "track_name": "Menangle",
     "meeting_date": "6 Jun 2026",
     "races": 8,
-    "winners": 3,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -954,7 +954,7 @@
     "track_name": "Bathurst",
     "meeting_date": "10 Jun 2026",
     "races": 8,
-    "winners": 5,
+    "winners": 4,
     "state": "NSW"
   },
   {
@@ -986,7 +986,7 @@
     "track_name": "Penrith",
     "meeting_date": "11 Jun 2026",
     "races": 8,
-    "winners": 0,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -994,7 +994,7 @@
     "track_name": "Wagga",
     "meeting_date": "12 Jun 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 5,
     "state": "NSW"
   },
   {
@@ -1002,7 +1002,7 @@
     "track_name": "Dubbo",
     "meeting_date": "12 Jun 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -1010,7 +1010,7 @@
     "track_name": "Newcastle",
     "meeting_date": "12 Jun 2026",
     "races": 9,
-    "winners": 0,
+    "winners": 3,
     "state": "NSW"
   },
   {
@@ -1018,7 +1018,7 @@
     "track_name": "Redclif",
     "meeting_date": "12 Jun 2026",
     "races": 11,
-    "winners": 0,
+    "winners": 1,
     "state": "QLD"
   },
   {
