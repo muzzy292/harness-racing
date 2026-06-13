@@ -996,5 +996,13 @@
     "races": 9,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "DU120626",
+    "track_name": "Dubbo",
+    "meeting_date": "12 Jun 2026",
+    "races": 9,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
