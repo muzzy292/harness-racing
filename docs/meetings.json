@@ -1020,5 +1020,13 @@
     "races": 11,
     "winners": 0,
     "state": "QLD"
+  },
+  {
+    "meeting_code": "AP130626",
+    "track_name": "Albpark",
+    "meeting_date": "13 Jun 2026",
+    "races": 10,
+    "winners": 0,
+    "state": "QLD"
   }
 ]
