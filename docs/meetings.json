@@ -1004,5 +1004,13 @@
     "races": 9,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "NR120626",
+    "track_name": "Newcastle",
+    "meeting_date": "12 Jun 2026",
+    "races": 9,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
