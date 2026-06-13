@@ -1012,5 +1012,13 @@
     "races": 9,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "RE120626",
+    "track_name": "Redclif",
+    "meeting_date": "12 Jun 2026",
+    "races": 11,
+    "winners": 0,
+    "state": "QLD"
   }
 ]
