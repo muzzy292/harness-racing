@@ -1092,5 +1092,13 @@
     "races": 9,
     "winners": 0,
     "state": "QLD"
+  },
+  {
+    "meeting_code": "PE180626",
+    "track_name": "Penrith",
+    "meeting_date": "18 Jun 2026",
+    "races": 9,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
