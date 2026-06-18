@@ -1116,5 +1116,13 @@
     "races": 9,
     "winners": 0,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "PK190626",
+    "track_name": "Parkes",
+    "meeting_date": "19 Jun 2026",
+    "races": 10,
+    "winners": 0,
+    "state": "NSW"
   }
 ]
