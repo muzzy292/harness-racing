@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
-from .storage import connect, scratch_horse as db_scratch_horse, set_trainer_change_manual as db_set_trainer_change, set_trainer_form_manual as db_set_trainer_form
+from .storage import connect, remove_meeting as db_remove_meeting, scratch_horse as db_scratch_horse, set_trainer_change_manual as db_set_trainer_change, set_trainer_form_manual as db_set_trainer_form
 from .pipeline import (
     build_feature_dataset,
     build_track_par_database,
@@ -496,6 +497,11 @@ def main() -> None:
     scratch_parser.add_argument("--race-number", type=int, help="Limit to a specific race number (optional)")
     scratch_parser.add_argument("--db", default="data/harness.db")
 
+    remove_meeting_parser = subparsers.add_parser("remove-meeting", help="Remove an abandoned/cancelled meeting from the DB and published site")
+    remove_meeting_parser.add_argument("--meeting-code", required=True)
+    remove_meeting_parser.add_argument("--db", default="data/harness.db")
+    remove_meeting_parser.add_argument("--docs", default="docs", help="Docs dir to clean (HTML + manifest)")
+
     set_trainer_form_parser = subparsers.add_parser("set-trainer-form", help="Manually set trainer form for a horse (+1 good / 0 neutral / -1 poor)")
     set_trainer_form_parser.add_argument("--meeting-code", required=True)
     set_trainer_form_parser.add_argument("--horse-name", required=True, help="Horse name (case-insensitive partial match)")
@@ -715,6 +721,31 @@ def main() -> None:
                 print(f"Scratched: {name}  (Race {race})")
         else:
             print(f"No matching horse found for '{args.horse_name}' in meeting {args.meeting_code}")
+    elif args.command == "remove-meeting":
+        conn = connect(args.db)
+        deleted = db_remove_meeting(conn, args.meeting_code)
+        conn.close()
+        total = sum(deleted.values())
+        if total:
+            print(f"Removed {args.meeting_code} from DB:")
+            for table, count in deleted.items():
+                print(f"  {table}: {count} rows")
+        else:
+            print(f"{args.meeting_code} not found in DB (nothing deleted).")
+        # Clean published artifacts: the meeting HTML and its manifest entry.
+        docs = Path(args.docs)
+        page = docs / f"{args.meeting_code}.html"
+        if page.exists():
+            page.unlink()
+            print(f"  Deleted {page}")
+        manifest_path = docs / "meetings.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            kept = [m for m in manifest if m.get("meeting_code") != args.meeting_code]
+            if len(kept) != len(manifest):
+                manifest_path.write_text(json.dumps(kept, indent=2), encoding="utf-8")
+                print(f"  Removed manifest entry ({len(manifest) - len(kept)} dropped)")
+        print("Now rerun build-features + republish-all to refresh the CSV and site.")
     elif args.command == "set-trainer-form":
         conn = connect(args.db)
         updated = db_set_trainer_form(conn, args.meeting_code, args.horse_name, value=args.value, race_number=args.race_number)

@@ -896,6 +896,30 @@ def scratch_horse(
     return [(row["horse_name"], row["race_number"]) for row in rows]
 
 
+def remove_meeting(conn: sqlite3.Connection, meeting_code: str) -> dict[str, int]:
+    """Delete all rows for a meeting from its meeting-keyed tables.
+
+    For abandoned/cancelled meetings that were ingested but never ran. Only
+    touches tables keyed by meeting_code (meetings, race_runners,
+    runner_recent_lines, race_results); horse_profiles/horse_runs are keyed by
+    horse and shared across meetings, so they are intentionally left alone.
+    Returns a per-table count of deleted rows.
+    """
+    targets = ("race_results", "runner_recent_lines", "race_runners", "meetings")
+    existing = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    deleted: dict[str, int] = {}
+    for table in targets:
+        if table not in existing:
+            continue
+        cols = {c[1] for c in conn.execute(f"PRAGMA table_info({table})")}
+        if "meeting_code" not in cols:
+            continue
+        cur = conn.execute(f"DELETE FROM {table} WHERE meeting_code = ?", (meeting_code,))
+        deleted[table] = cur.rowcount
+    conn.commit()
+    return deleted
+
+
 def set_trainer_change_manual(
     conn: sqlite3.Connection,
     meeting_code: str,
