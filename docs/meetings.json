@@ -333,7 +333,7 @@
     "track_name": "Forbes",
     "meeting_date": "3 May 2026",
     "races": 8,
-    "winners": 3
+    "winners": 2
   },
   {
     "meeting_code": "CB040526",
@@ -1115,14 +1115,6 @@
     "meeting_date": "19 Jun 2026",
     "races": 9,
     "winners": 1,
-    "state": "NSW"
-  },
-  {
-    "meeting_code": "PK190626",
-    "track_name": "Parkes",
-    "meeting_date": "19 Jun 2026",
-    "races": 10,
-    "winners": 0,
     "state": "NSW"
   },
   {
