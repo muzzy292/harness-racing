@@ -135,17 +135,12 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
     for runs in _trainer_runs_grouped.values():
         runs.sort(key=lambda r: _sort_run_date(r.get("run_date")), reverse=True)
 
-    # Rolling person stats — computed from pre-fetched runs (no per-person DB query).
-    _driver_cache: dict[str, dict] = {}
-    _trainer_cache: dict[str, dict] = {}
-    for runner in runners:
-        for name, cache, grouped in [
-            (runner["nominated_driver"], _driver_cache, _driver_runs_grouped),
-            (runner["nominated_trainer"], _trainer_cache, _trainer_runs_grouped),
-        ]:
-            key = str(name or "").strip().upper()
-            if key and key not in cache:
-                cache[key] = _rolling_person_stats_from_runs(grouped.get(key, []))
+    # Rolling person stats — anchored to each race's meeting_date so that scoring
+    # a past race only sees that driver/trainer's runs BEFORE the race (no
+    # look-ahead leakage into hot/cold form signals). Memoised per
+    # (person, meeting_date) because all runners in a meeting share the cutoff.
+    _driver_cache: dict[tuple[str, int], dict] = {}
+    _trainer_cache: dict[tuple[str, int], dict] = {}
 
     # Pre-fetch driver and trainer page win rates — avoids 8k+ simple indexed lookups
     # inside _build_feature_row (one per runner each).
@@ -203,6 +198,10 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
         race_field_avg_nr = field_avg_nrs.get((runner["meeting_code"], runner["race_number"]))
         driver_key = str(runner["nominated_driver"] or "").strip().upper()
         trainer_key = str(runner["nominated_trainer"] or "").strip().upper()
+        driver_stats = _rolling_person_stats_anchored(
+            _driver_cache, driver_key, _meeting_date_key, _driver_runs_grouped)
+        trainer_stats = _rolling_person_stats_anchored(
+            _trainer_cache, trainer_key, _meeting_date_key, _trainer_runs_grouped)
         rows.append(
             _build_feature_row(
                 conn,
@@ -211,8 +210,8 @@ def build_runner_feature_rows(conn: sqlite3.Connection, track_pars: dict | None 
                 track_pars,
                 race_field_size=race_field_size,
                 race_field_avg_nr=race_field_avg_nr,
-                driver_stats=_driver_cache.get(driver_key),
-                trainer_stats=_trainer_cache.get(trainer_key),
+                driver_stats=driver_stats,
+                trainer_stats=trainer_stats,
                 horse_runs=_horse_runs_by_horse.get(hid, []),
                 driver_page_wr=_driver_page_wr,
                 trainer_page_wr=_trainer_page_wr,
@@ -869,6 +868,34 @@ def _sp_features(lines: list[dict], race_nr_ceiling: float | None) -> dict[str, 
         "sp_short_count_last10":     short_count,
         "sp_reliability_rate":       reliability,
     }
+
+
+def _rolling_person_stats_anchored(
+    cache: dict[tuple[str, int], dict],
+    person_key: str,
+    meeting_date_key: int,
+    grouped_runs: dict[str, list[dict]],
+) -> dict[str, object]:
+    """Rolling driver/trainer stats using only runs strictly before meeting_date_key.
+
+    grouped_runs[person_key] is pre-sorted newest-first, so filtering to runs
+    before the race and slicing the most recent 30/90 reproduces the form a
+    punter would have seen at race time. Memoised per (person, meeting_date)
+    since every runner in a meeting shares the same cutoff. Empty key (no
+    nominated driver/trainer) returns all-None stats without caching.
+    """
+    if not person_key:
+        return _rolling_person_stats_from_runs([])
+    memo_key = (person_key, meeting_date_key)
+    cached = cache.get(memo_key)
+    if cached is not None:
+        return cached
+    runs = grouped_runs.get(person_key, [])
+    if meeting_date_key:
+        runs = [r for r in runs if _sort_run_date(r.get("run_date")) < meeting_date_key]
+    stats = _rolling_person_stats_from_runs(runs)
+    cache[memo_key] = stats
+    return stats
 
 
 def _rolling_person_stats_from_runs(runs: list[dict]) -> dict[str, object]:
