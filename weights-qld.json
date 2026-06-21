@@ -1,0 +1,68 @@
+{
+  "stage1": {
+    "consistency": 0.2867,
+    "ceiling": 0.2314,
+    "late_speed": 0.215,
+    "tempo_adj": -0.058,
+    "tempo_flags": 0.0323,
+    "null_flags": -0.0319,
+    "market_min": 0.0445,
+    "market_max": 0.0445,
+    "win_rate": -0.1384,
+    "career_win_rate": 0.0556,
+    "top3_rate": 0.2593,
+    "competitive_rate": 0.2551,
+    "nr": 0.1072,
+    "class_pos": 0.1267,
+    "stake_class": 0.095,
+    "class_delta": 0.2893,
+    "sp_market_ceiling": -0.0159,
+    "sp_class_ceiling": 0.0235,
+    "sp_avg_market": 0.2588,
+    "sp_reliability": -0.1613,
+    "sp_class": -0.4086,
+    "sp_trend": -0.0177,
+    "sp_similar_grade": 0.0235,
+    "form_staleness": -0.1665,
+    "debut_adj": -0.6704
+  },
+  "stage2": {
+    "map_lead": 0.8292,
+    "map_soft": 0.168,
+    "map_soft_context": 0.2263,
+    "pace_backmarker": 0.5081,
+    "pace_backmarker_threshold": 0.4,
+    "map_wide": 0.1716,
+    "map_death": -0.7802,
+    "dist_strike_rate": 0.1583,
+    "nr_grade_delta": 0.176,
+    "driver_form": 0.6,
+    "trainer_form_manual": 0.6,
+    "hot_driver": 0.7038,
+    "hot_trainer": 0.4404,
+    "cold_driver": 0.7479,
+    "cold_trainer": 0.8374,
+    "second_up": 0.0619,
+    "barrier_relief": 1.1736,
+    "barrier": 0.1904
+  },
+  "fitness": {
+    "tier_15_28": -0.0717,
+    "tier_29_42": -0.1229,
+    "tier_43_84": -0.1742,
+    "tier_85_99": -0.2254,
+    "tier_100_119": -0.2971,
+    "tier_120_149": -0.3483,
+    "tier_150_plus": -0.4098
+  },
+  "softmax": {
+    "temperature": 1.0,
+    "model_weight": 0.45,
+    "market_weight": 0.55
+  },
+  "blend": {
+    "b1": 0.895,
+    "b2": 0.573,
+    "threshold": 1.1
+  }
+}

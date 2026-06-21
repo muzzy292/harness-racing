@@ -2306,20 +2306,19 @@ def republish_all_meetings(
     _write_index(docs)
 
     # Rebuild betting and diagnose pages (all + per-state).
-    # NSW/headline ledger starts 11 Jun 2026 — adoption of the fitted weights
-    # and the pre-registered blend strategy (fit_holdout.py). Forward bets only;
-    # earlier bets were placed under different weights/rules and would mix
-    # strategies. QLD keeps the legacy window (1 May) for monitoring.
+    # All ledgers start 11 Jun 2026 — adoption of the fitted weights and the
+    # pre-registered blend strategy (fit_holdout.py). Forward bets only; earlier
+    # bets were placed under different weights/rules and would mix strategies.
+    # QLD now runs the same blend strategy as NSW (weights-qld.json mirrors NSW),
+    # but as an EXPLORATORY page only: the weights/blend were fitted on NSW data,
+    # not validated on QLD, which still has the NR-ceiling parsing gap.
     _bet_from = datetime(2026, 6, 11)
-    _bet_from_qld = datetime(2026, 5, 1)
     try:
-        # Headline page excludes QLD: 44% of QLD races lack a parseable NR
-        # ceiling, producing unreliable prices (-44.8% ROI). The QLD-only page
-        # is still built below for monitoring, but QLD bets stay out of the
-        # main ledger until NR gating / state-specific weights are in place.
+        # Headline page still excludes QLD until QLD has its own validated
+        # weights — the QLD-only page below is for monitoring the blend rule.
         build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, from_date=_bet_from, exclude_states=("QLD",))
         build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="NSW", from_date=_bet_from)
-        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="QLD", from_date=_bet_from_qld)
+        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="QLD", from_date=_bet_from)
     except Exception as exc:  # noqa: BLE001
         print(f"  Warning: betting page rebuild failed — {exc}")
     try:
