@@ -136,6 +136,31 @@ CREATE TABLE IF NOT EXISTS trainer_stats (
     career_win_rate REAL,
     fetched_date TEXT
 );
+
+-- Frozen, append-only betting ledger. Each bet is recorded ONCE, the first
+-- time its race is scored with a result, and never recomputed afterwards.
+-- This keeps the published betting history stable across daily republishes
+-- (without it the backtest re-scores past races every run as the DB grows).
+CREATE TABLE IF NOT EXISTS bet_ledger (
+    meeting_code  TEXT NOT NULL,
+    race_number   INTEGER NOT NULL,
+    horse_name    TEXT NOT NULL,
+    meeting_date  TEXT,
+    track_name    TEXT,
+    state         TEXT,
+    strategy      TEXT,
+    model_prob    REAL,
+    fair_odds     REAL,
+    market_odds   REAL,
+    edge_pct      REAL,
+    tier          TEXT,
+    stake         REAL,
+    won           INTEGER,
+    finish_pos    INTEGER,
+    profit        REAL,
+    frozen_at     TEXT,
+    PRIMARY KEY (meeting_code, race_number, horse_name)
+);
 """
 
 
@@ -905,7 +930,7 @@ def remove_meeting(conn: sqlite3.Connection, meeting_code: str) -> dict[str, int
     horse and shared across meetings, so they are intentionally left alone.
     Returns a per-table count of deleted rows.
     """
-    targets = ("race_results", "runner_recent_lines", "race_runners", "meetings")
+    targets = ("bet_ledger", "race_results", "runner_recent_lines", "race_runners", "meetings")
     existing = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     deleted: dict[str, int] = {}
     for table in targets:
@@ -918,6 +943,38 @@ def remove_meeting(conn: sqlite3.Connection, meeting_code: str) -> dict[str, int
         deleted[table] = cur.rowcount
     conn.commit()
     return deleted
+
+
+_BET_LEDGER_FIELDS = (
+    "meeting_code", "race_number", "horse_name", "meeting_date", "track_name",
+    "state", "strategy", "model_prob", "fair_odds", "market_odds", "edge_pct",
+    "tier", "stake", "won", "finish_pos", "profit", "frozen_at",
+)
+
+
+def load_bet_ledger(conn: sqlite3.Connection) -> list[dict]:
+    """Return all frozen bets, newest meeting first not guaranteed (caller sorts)."""
+    return [dict(r) for r in conn.execute("SELECT * FROM bet_ledger").fetchall()]
+
+
+def append_bets_to_ledger(conn: sqlite3.Connection, bets: list[dict]) -> int:
+    """Insert bets that are not already frozen (by meeting/race/horse). Append-only.
+
+    Existing rows are never modified — INSERT OR IGNORE keeps the first frozen
+    value for a bet permanently. Returns the number of newly frozen bets.
+    """
+    if not bets:
+        return 0
+    rows = [tuple(b.get(f) for f in _BET_LEDGER_FIELDS) for b in bets]
+    placeholders = ", ".join("?" for _ in _BET_LEDGER_FIELDS)
+    cols = ", ".join(_BET_LEDGER_FIELDS)
+    before = conn.execute("SELECT COUNT(*) FROM bet_ledger").fetchone()[0]
+    conn.executemany(
+        f"INSERT OR IGNORE INTO bet_ledger({cols}) VALUES ({placeholders})", rows
+    )
+    conn.commit()
+    after = conn.execute("SELECT COUNT(*) FROM bet_ledger").fetchone()[0]
+    return after - before
 
 
 def set_trainer_change_manual(

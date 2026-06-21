@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .odds import load_feature_rows, load_market_rows, load_weights, score_meeting_rows
-from .storage import connect, init_db
+from .storage import append_bets_to_ledger, connect, init_db, load_bet_ledger
 
 _QLD_PREFIXES: frozenset[str] = frozenset({"AP", "RE", "UG"})
 
@@ -1763,6 +1763,24 @@ def _compute_bet_records(
                     "bankroll": bankroll,
                 })
 
+    summary = _summarise_bet_records(
+        records, starting_bankroll, bankroll, state, from_date, exclude_states,
+        unit_halved=unit_halved, used_blend=used_blend,
+    )
+    return records, summary
+
+
+def _summarise_bet_records(
+    records: list[dict],
+    starting_bankroll: float,
+    current_bankroll: float,
+    state: str | None,
+    from_date: datetime | None,
+    exclude_states: tuple[str, ...],
+    unit_halved: bool,
+    used_blend: bool,
+) -> dict:
+    """Build the betting-page summary from a record list (live or frozen)."""
     total_staked = sum(r["stake"] for r in records)
     total_profit = sum(r["profit"] for r in records)
     winners = sum(1 for r in records if r["won"])
@@ -1771,9 +1789,9 @@ def _compute_bet_records(
     # order bets land in (a hot streak early inflates later stakes), so this is
     # the cleaner read on whether the bet selection itself has an edge.
     flat_units = sum((r["market_odds"] - 1.0) if r["won"] else -1.0 for r in records)
-    summary = {
+    return {
         "starting_bankroll": starting_bankroll,
-        "current_bankroll": bankroll,
+        "current_bankroll": current_bankroll,
         "total_bets": n,
         "winners": winners,
         "win_rate": round(winners / n * 100, 1) if n else 0.0,
@@ -1787,6 +1805,106 @@ def _compute_bet_records(
         "state": state or ("All excl. " + ", ".join(exclude_states) if exclude_states else "All"),
         "from_date": from_date.strftime("%d %b %Y").lstrip("0") if from_date else None,
     }
+
+
+def update_bet_ledger(
+    conn: sqlite3.Connection,
+    csv_path: str | Path,
+    weights: dict | None,
+    from_date: datetime | None = None,
+) -> int:
+    """Freeze any newly-resulted bets into the append-only bet_ledger.
+
+    Recomputes the candidate bet list from current scoring (all states) and
+    appends only bets not already frozen. Existing ledger rows are never
+    modified, so the published history is stable across republishes.
+    from_date limits freezing to the live forward period (the configured
+    weights went live 11 Jun 2026); earlier races aren't part of the live test.
+    Returns the number of bets newly frozen.
+    """
+    records, _ = _compute_bet_records(
+        conn, csv_path, weights, from_date=from_date, per_state_weights=True,
+    )
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ledger_rows = []
+    for r in records:
+        ledger_rows.append({
+            "meeting_code": r["meeting_code"],
+            "race_number": r["race_number"],
+            "horse_name": r["horse_name"],
+            "meeting_date": r.get("meeting_date", ""),
+            "track_name": r.get("track_name", ""),
+            "state": _meeting_state(r["meeting_code"]),
+            "strategy": "blend" if r.get("tier") == "Blend" else "kelly",
+            "model_prob": r.get("model_prob"),
+            "fair_odds": r.get("fair_odds"),
+            "market_odds": r.get("market_odds"),
+            "edge_pct": r.get("edge_pct"),
+            "tier": r.get("tier"),
+            "stake": r.get("stake"),
+            "won": 1 if r.get("won") else 0,
+            "finish_pos": r.get("finish_pos"),
+            "profit": r.get("profit"),
+            "frozen_at": now,
+        })
+    return append_bets_to_ledger(conn, ledger_rows)
+
+
+def _records_from_ledger(
+    conn: sqlite3.Connection,
+    starting_bankroll: float = 1000.0,
+    state: str | None = None,
+    from_date: datetime | None = None,
+    exclude_states: tuple[str, ...] = (),
+) -> tuple[list[dict], dict]:
+    """Build (records, summary) from the frozen ledger instead of re-scoring.
+
+    Bets are read as frozen, filtered by state/from_date, sorted chronologically,
+    and the bank curve is recomputed deterministically from the frozen profits.
+    Mirrors the shape returned by _compute_bet_records so the renderer is shared.
+    """
+    def _date_key(d: str) -> datetime:
+        try:
+            return datetime.strptime(d or "", "%d %b %Y")
+        except ValueError:
+            return datetime.min
+
+    rows = load_bet_ledger(conn)
+    rows = [r for r in rows if r.get("state") not in exclude_states]
+    if state:
+        rows = [r for r in rows if r.get("state") == state]
+    if from_date:
+        rows = [r for r in rows if _date_key(r.get("meeting_date")) >= from_date]
+    rows.sort(key=lambda r: (_date_key(r.get("meeting_date")), r["meeting_code"], r["race_number"]))
+
+    bankroll = starting_bankroll
+    records: list[dict] = []
+    used_blend = False
+    for r in rows:
+        if r.get("strategy") == "blend":
+            used_blend = True
+        bankroll = round(bankroll + (r.get("profit") or 0.0), 2)
+        records.append({
+            "meeting_code": r["meeting_code"],
+            "meeting_date": r.get("meeting_date", ""),
+            "track_name": r.get("track_name", ""),
+            "race_number": r["race_number"],
+            "horse_name": r["horse_name"],
+            "model_prob": r.get("model_prob"),
+            "fair_odds": r.get("fair_odds"),
+            "market_odds": r.get("market_odds"),
+            "edge_pct": r.get("edge_pct"),
+            "tier": r.get("tier"),
+            "stake": r.get("stake"),
+            "won": bool(r.get("won")),
+            "finish_pos": r.get("finish_pos"),
+            "profit": r.get("profit"),
+            "bankroll": bankroll,
+        })
+    summary = _summarise_bet_records(
+        records, starting_bankroll, bankroll, state, from_date, exclude_states,
+        unit_halved=False, used_blend=used_blend,
+    )
     return records, summary
 
 
@@ -1830,6 +1948,7 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
             "<span><strong>Strategy:</strong> Blend rule &mdash; bet when "
             "P(blend) &times; SP &gt; 1.10 (P = 0.895&middot;ln market + 0.573&middot;model, fitted 11 Jun 2026)</span>"
             "<span><strong>Stake:</strong> flat 1% of starting bank</span>"
+            "<span><strong>Ledger:</strong> frozen &mdash; each bet recorded once, never recomputed</span>"
         )
     else:
         _staking_label = "Quarter-Kelly staking"
@@ -2158,20 +2277,33 @@ def build_betting_site(
     state: str | None = None,
     from_date: datetime | None = None,
     exclude_states: tuple[str, ...] = (),
+    live: bool = False,
 ) -> Path:
-    """Build fractional-Kelly backtest page and write to out_dir/betting[-state].html."""
+    """Build the betting backtest page to out_dir/betting[-state].html.
+
+    Reads bets from the frozen append-only ledger so the published history is
+    stable across republishes. Pass live=True to bypass the ledger and re-score
+    from current weights/features (used for ad-hoc weight experiments, not the
+    daily site).
+    """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     conn = connect(db_path)
     init_db(conn)
-    weights_path = Path("weights.json")
-    weights = load_weights(weights_path) if weights_path.exists() else None
-    records, summary = _compute_bet_records(
-        conn, csv_path, weights, starting_bankroll,
-        state=state, from_date=from_date, exclude_states=exclude_states,
-        per_state_weights=True,
-    )
+    if live:
+        weights_path = Path("weights.json")
+        weights = load_weights(weights_path) if weights_path.exists() else None
+        records, summary = _compute_bet_records(
+            conn, csv_path, weights, starting_bankroll,
+            state=state, from_date=from_date, exclude_states=exclude_states,
+            per_state_weights=True,
+        )
+    else:
+        records, summary = _records_from_ledger(
+            conn, starting_bankroll,
+            state=state, from_date=from_date, exclude_states=exclude_states,
+        )
     conn.close()
 
     betting_html = _render_betting_html(
@@ -2299,13 +2431,19 @@ def republish_all_meetings(
         except Exception as exc:  # noqa: BLE001
             print(f"  {code}: ERROR — {exc}")
 
+    # Freeze any newly-resulted bets into the append-only ledger BEFORE the DB
+    # is closed. Once frozen, a bet's probability/edge/profit never change on
+    # later republishes — the betting pages then render from the frozen ledger.
+    newly_frozen = update_bet_ledger(conn, csv_path, weights, from_date=datetime(2026, 6, 11))
+    print(f"  Bet ledger: {newly_frozen} new bets frozen.")
+
     conn.close()
 
     # Write updated manifest and rebuild index
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     _write_index(docs)
 
-    # Rebuild betting and diagnose pages (all + per-state).
+    # Rebuild betting and diagnose pages (all + per-state) from the frozen ledger.
     # All ledgers start 11 Jun 2026 — adoption of the fitted weights and the
     # pre-registered blend strategy (fit_holdout.py). Forward bets only; earlier
     # bets were placed under different weights/rules and would mix strategies.
