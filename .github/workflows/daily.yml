@@ -1,0 +1,75 @@
+name: Daily harness run
+
+# Runs the full pipeline once a day and on demand.
+#
+# Schedule is in UTC. '0 19 * * *' = 06:00 AEDT (daylight saving) / 05:00 AEST
+# (standard time) — it drifts one hour across the DST changeover, which is fine
+# for a morning run. NOTE: GitHub Actions cron is best-effort and can be delayed
+# (sometimes 10-30+ min) under load; it is not a guaranteed exact-time trigger.
+#
+# Secrets are NEVER exposed to pull-request workflows, and this workflow has no
+# pull_request trigger, so DB_REPO_TOKEN is only ever available to the trusted
+# schedule / manual runs below.
+on:
+  schedule:
+    - cron: "0 19 * * *"
+  workflow_dispatch: {}
+
+# Allow the pipeline's republish step to push the rendered docs/ to this repo
+# (GitHub Pages) using the built-in GITHUB_TOKEN.
+permissions:
+  contents: write
+
+# Never let two daily runs overlap (they share the one database).
+concurrency:
+  group: daily-run
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Configure git identity (for the docs push)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Restore database from private repo
+        env:
+          GH_TOKEN: ${{ secrets.DB_REPO_TOKEN }}
+        run: bash scripts/db_restore.sh
+
+      - name: Run daily pipeline
+        run: python -m harness_model.cli daily-run
+
+      # Persist even if the pipeline step failed partway, so a partial DB
+      # update (e.g. results synced but scoring failed) is not lost.
+      - name: Back up database to private repo
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.DB_REPO_TOKEN }}
+        run: bash scripts/db_backup.sh

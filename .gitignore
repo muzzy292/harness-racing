@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 data/
 .tmp.driveupload/
+# DB bundles are never committed to this public repo — they live in the
+# private data repo as release assets (see scripts/SEEDING.md).
+harness-data.tar.gz
+harness-data-*.tar.gz
