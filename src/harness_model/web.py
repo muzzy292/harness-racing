@@ -1816,6 +1816,10 @@ def update_bet_ledger(
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ledger_rows = []
     for r in records:
+        # Don't freeze new bets for excluded states (QLD) — existing QLD ledger
+        # rows are kept as data, but the strategy isn't tracked forward off-site.
+        if not _is_site_meeting(r["meeting_code"]):
+            continue
         ledger_rows.append({
             "meeting_code": r["meeting_code"],
             "race_number": r["race_number"],
