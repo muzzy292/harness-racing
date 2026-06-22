@@ -21,6 +21,8 @@ from .pipeline import (
     ingest_meeting_html,
     ingest_results_html,
     ingest_results_dir,
+    refresh_today_meetings,
+    run_daily,
     snapshot_meeting,
     sync_upcoming_meetings,
     sync_recent_results,
@@ -546,6 +548,19 @@ def main() -> None:
     sync_results_parser.add_argument("--out", default="data/raw")
     sync_results_parser.add_argument("--delay", type=float, default=2.0, help="Seconds between fetches (default 2)")
 
+    refresh_today_parser = subparsers.add_parser("refresh-today", help="Re-ingest today's meetings to pick up late scratchings / field changes")
+    refresh_today_parser.add_argument("--db", default="data/harness.db")
+    refresh_today_parser.add_argument("--out", default="data/raw")
+    refresh_today_parser.add_argument("--delay", type=float, default=2.0, help="Seconds between fetches (default 2)")
+
+    daily_run_parser = subparsers.add_parser("daily-run", help="Full unattended daily pipeline: sync-results, sync-upcoming, refresh-today, build-features, republish-all")
+    daily_run_parser.add_argument("--db", default="data/harness.db")
+    daily_run_parser.add_argument("--csv", default="data/features/runner_features.csv")
+    daily_run_parser.add_argument("--track-pars", default="data/track_pars.json")
+    daily_run_parser.add_argument("--docs", default="docs")
+    daily_run_parser.add_argument("--weights", default="weights.json")
+    daily_run_parser.add_argument("--delay", type=float, default=2.0, help="Seconds between fetches (default 2)")
+
     build_site_parser = subparsers.add_parser("build-meeting-site", help="Build a light static website page for one scored meeting")
     build_site_parser.add_argument("--meeting-code", required=True)
     build_site_parser.add_argument("--csv", default="data/features/runner_features.csv")
@@ -801,6 +816,27 @@ def main() -> None:
     elif args.command == "sync-results":
         fetched, skipped = sync_recent_results(args.db, args.out, delay_s=args.delay)
         print(f"Done: {fetched} fetched, {skipped} skipped")
+    elif args.command == "refresh-today":
+        refreshed, failed = refresh_today_meetings(args.db, args.out, delay_s=args.delay)
+        print(f"Done: {refreshed} refreshed, {failed} failed")
+    elif args.command == "daily-run":
+        import logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+        )
+        summary = run_daily(
+            db_path=args.db,
+            csv_path=args.csv,
+            track_pars_path=args.track_pars,
+            docs_dir=args.docs,
+            weights_path=args.weights,
+            delay_s=args.delay,
+        )
+        if summary.get("errors"):
+            print(f"Daily run finished with {len(summary['errors'])} step error(s).")
+            raise SystemExit(1)
+        print("Daily run finished cleanly.")
     elif args.command == "build-meeting-site":
         weights = _resolve_weights(getattr(args, "weights", None))
         page_path = build_meeting_site(

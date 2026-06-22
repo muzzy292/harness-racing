@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 
@@ -10,7 +11,15 @@ USER_AGENT = (
 )
 
 
-def fetch_rendered_html(url: str, wait_ms: int = 5000) -> str:
+def fetch_rendered_html(
+    url: str, wait_ms: int = 5000, retries: int = 3, backoff_s: float = 3.0
+) -> str:
+    """Fetch a JS-rendered page via headless Chromium.
+
+    Retries transient failures (navigation timeouts, browser launch hiccups)
+    with linear backoff so unattended cloud runs survive a flaky network or a
+    momentary block. Raises after the final attempt.
+    """
     try:
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
@@ -19,15 +28,25 @@ def fetch_rendered_html(url: str, wait_ms: int = 5000) -> str:
             "and 'python -m playwright install chromium'."
         ) from exc
 
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        context = browser.new_context(user_agent=USER_AGENT)
-        page = context.new_page()
-        page.goto(url, timeout=45000, wait_until="domcontentloaded")
-        page.wait_for_timeout(wait_ms)
-        html = page.content()
-        browser.close()
-        return html
+    last_exc: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                context = browser.new_context(user_agent=USER_AGENT)
+                page = context.new_page()
+                page.goto(url, timeout=45000, wait_until="domcontentloaded")
+                page.wait_for_timeout(wait_ms)
+                html = page.content()
+                browser.close()
+                return html
+        except Exception as exc:  # noqa: BLE001 — transient nav/launch errors
+            last_exc = exc
+            if attempt < retries:
+                time.sleep(backoff_s * attempt)
+    raise RuntimeError(
+        f"fetch_rendered_html failed for {url} after {retries} attempts: {last_exc}"
+    ) from last_exc
 
 
 def fetch_hrnsw_results_search_html(track_value: str, wait_ms: int = 5000) -> str:

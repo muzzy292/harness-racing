@@ -1,8 +1,19 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 import time
-from datetime import datetime
+from datetime import date, datetime
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover — zoneinfo is stdlib on 3.9+
+    ZoneInfo = None  # type: ignore[assignment]
+
+# NSW racing date used to match meetings.meeting_date; Melbourne shares this
+# offset, so the calendar date is identical either way.
+_LOCAL_TZ = "Australia/Sydney"
+log = logging.getLogger("harness_model.pipeline")
 
 from .features import build_runner_feature_rows, generate_track_pars_from_db, install_sqlite_helpers, write_feature_csv, write_track_pars
 from .parsers import (
@@ -210,6 +221,122 @@ def sync_upcoming_meetings(
         flush=True,
     )
     return fetched, skipped
+
+
+def _local_today() -> date:
+    """Today's date in the Australian racing timezone (matches meeting_date).
+
+    Cron fires at ~6am AEDT, which is still the previous calendar day in UTC —
+    so the date must be computed in local time, not UTC, to pick today's
+    meetings. Falls back to the system local date if zoneinfo is unavailable
+    (e.g. Windows without tzdata), which on an Australian machine is correct.
+    """
+    if ZoneInfo is not None:
+        try:
+            return datetime.now(ZoneInfo(_LOCAL_TZ)).date()
+        except Exception:  # noqa: BLE001 — missing tz database
+            pass
+    return datetime.now().date()
+
+
+def refresh_today_meetings(
+    db_path: str | Path,
+    output_dir: str | Path = "data/raw",
+    delay_s: float = 2.0,
+    today: date | None = None,
+) -> tuple[int, int]:
+    """Re-fetch and re-ingest the form pages for meetings running today.
+
+    sync-upcoming imports each meeting once (often days early) and skips it
+    thereafter, so late scratchings and field changes are never picked up.
+    This re-ingests today's meetings so scoring sees the current fields. The
+    runner_recent_lines upsert (ON CONFLICT) makes re-ingest idempotent — no
+    duplicate rows. Returns (refreshed, failed).
+    """
+    target = today or _local_today()
+    conn = connect(db_path)
+    init_db(conn)
+    rows = conn.execute("SELECT meeting_code, meeting_date FROM meetings").fetchall()
+    conn.close()
+
+    todays = []
+    for row in rows:
+        code, meeting_date = row[0], row[1]
+        try:
+            if datetime.strptime(meeting_date, "%d %b %Y").date() == target:
+                todays.append(code)
+        except (TypeError, ValueError):
+            continue
+
+    if not todays:
+        print(f"No meetings dated {target:%d %b %Y} to refresh.", flush=True)
+        return 0, 0
+
+    refreshed = 0
+    failed = 0
+    for code in todays:
+        print(f"  Refreshing {code} (today's fields)...", flush=True)
+        try:
+            path = fetch_meeting(code, output_dir)
+            ingest_meeting_html(db_path, path)
+            refreshed += 1
+        except Exception as exc:  # noqa: BLE001 — keep refreshing other meetings
+            print(f"  Warning: refresh {code} failed — {exc}", flush=True)
+            failed += 1
+        time.sleep(delay_s)
+
+    print(f"\nRefresh-today summary: {refreshed} refreshed, {failed} failed.", flush=True)
+    return refreshed, failed
+
+
+def run_daily(
+    db_path: str | Path = "data/harness.db",
+    csv_path: str | Path = "data/features/runner_features.csv",
+    track_pars_path: str | Path = "data/track_pars.json",
+    docs_dir: str | Path = "docs",
+    weights_path: str | Path = "weights.json",
+    delay_s: float = 2.0,
+) -> dict:
+    """Full unattended daily pipeline for cloud (GitHub Actions) runs.
+
+    sync-results → sync-upcoming → refresh-today → build-features → republish-all.
+    Scrape steps are wrapped so a transient failure is logged but still lets the
+    site rebuild and publish from whatever is already in the DB. republish-all
+    handles its own git commit/push (GitHub Pages). Returns a summary dict.
+    """
+    from .web import republish_all_meetings
+    from .odds import load_weights
+
+    summary: dict = {"errors": []}
+
+    def _step(name: str, fn):
+        log.info("START %s", name)
+        try:
+            result = fn()
+            log.info("DONE  %s -> %s", name, result)
+            return result
+        except Exception as exc:  # noqa: BLE001 — publish even if a step fails
+            log.exception("FAILED %s", name)
+            summary["errors"].append(f"{name}: {exc}")
+            return None
+
+    summary["sync_results"] = _step("sync-results", lambda: sync_recent_results(db_path, delay_s=delay_s))
+    summary["sync_upcoming"] = _step("sync-upcoming", lambda: sync_upcoming_meetings(db_path, delay_s=delay_s))
+    summary["refresh_today"] = _step("refresh-today", lambda: refresh_today_meetings(db_path, delay_s=delay_s))
+
+    _tp = track_pars_path if Path(track_pars_path).exists() else None
+    if track_pars_path and _tp is None:
+        log.warning("track-pars file not found (%s) — sectional deltas will be empty.", track_pars_path)
+    summary["build_features"] = _step("build-features", lambda: build_feature_dataset(db_path, csv_path, _tp))
+
+    _weights = load_weights(weights_path) if Path(weights_path).exists() else None
+    summary["republish"] = _step("republish-all", lambda: republish_all_meetings(csv_path, db_path, docs_dir, weights=_weights))
+
+    if summary["errors"]:
+        log.warning("Daily run completed with %d step error(s): %s", len(summary["errors"]), summary["errors"])
+    else:
+        log.info("Daily run completed cleanly.")
+    return summary
 
 
 def sync_recent_results(
