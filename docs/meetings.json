@@ -414,14 +414,6 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "AP110526",
-    "track_name": "Albpark",
-    "meeting_date": "11 May 2026",
-    "races": 8,
-    "winners": 5,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "ME120526",
     "track_name": "Menangle",
     "meeting_date": "12 May 2026",
@@ -438,36 +430,12 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "AP120526",
-    "track_name": "Albpark",
-    "meeting_date": "12 May 2026",
-    "races": 6,
-    "winners": 0,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "BH130526",
     "track_name": "Bathurst",
     "meeting_date": "13 May 2026",
     "races": 8,
     "winners": 2,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "RE130526",
-    "track_name": "Redclif",
-    "meeting_date": "13 May 2026",
-    "races": 10,
-    "winners": 4,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "AP140526",
-    "track_name": "Albpark",
-    "meeting_date": "14 May 2026",
-    "races": 8,
-    "winners": 3,
-    "state": "QLD"
   },
   {
     "meeting_code": "ME140526",
@@ -492,14 +460,6 @@
     "races": 9,
     "winners": 5,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "RE150526",
-    "track_name": "Redclif",
-    "meeting_date": "15 May 2026",
-    "races": 7,
-    "winners": 0,
-    "state": "QLD"
   },
   {
     "meeting_code": "PK150526",
@@ -542,38 +502,6 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "AP190526",
-    "track_name": "Albpark",
-    "meeting_date": "19 May 2026",
-    "races": 3,
-    "winners": 0,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "AP160526",
-    "track_name": "Albpark",
-    "meeting_date": "16 May 2026",
-    "races": 8,
-    "winners": 3,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "RE170526",
-    "track_name": "Redclif",
-    "meeting_date": "17 May 2026",
-    "races": 8,
-    "winners": 2,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "RE200526",
-    "track_name": "Redclif",
-    "meeting_date": "20 May 2026",
-    "races": 10,
-    "winners": 3,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "BH200526",
     "track_name": "Bathurst",
     "meeting_date": "20 May 2026",
@@ -588,14 +516,6 @@
     "races": 10,
     "winners": 4,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "RE210526",
-    "track_name": "Redclif",
-    "meeting_date": "21 May 2026",
-    "races": 10,
-    "winners": 3,
-    "state": "QLD"
   },
   {
     "meeting_code": "PE210526",
@@ -622,14 +542,6 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "AP220526",
-    "track_name": "Albpark",
-    "meeting_date": "22 May 2026",
-    "races": 11,
-    "winners": 6,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "NR220526",
     "track_name": "Newcastle",
     "meeting_date": "22 May 2026",
@@ -644,22 +556,6 @@
     "races": 9,
     "winners": 1,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "AP230526",
-    "track_name": "Albpark",
-    "meeting_date": "23 May 2026",
-    "races": 9,
-    "winners": 4,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "UG240526",
-    "track_name": "Marburg",
-    "meeting_date": "24 May 2026",
-    "races": 8,
-    "winners": 0,
-    "state": "QLD"
   },
   {
     "meeting_code": "PE250526",
@@ -678,14 +574,6 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "AP260526",
-    "track_name": "Albpark",
-    "meeting_date": "26 May 2026",
-    "races": 6,
-    "winners": 0,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "YU260526",
     "track_name": "Young",
     "meeting_date": "26 May 2026",
@@ -700,22 +588,6 @@
     "races": 7,
     "winners": 2,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "RE270526",
-    "track_name": "Redclif",
-    "meeting_date": "27 May 2026",
-    "races": 9,
-    "winners": 4,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "AP280526",
-    "track_name": "Albpark",
-    "meeting_date": "28 May 2026",
-    "races": 9,
-    "winners": 1,
-    "state": "QLD"
   },
   {
     "meeting_code": "TA280526",
@@ -758,36 +630,12 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "RE290526",
-    "track_name": "Redclif",
-    "meeting_date": "29 May 2026",
-    "races": 9,
-    "winners": 4,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "EY300526",
     "track_name": "Wagga",
     "meeting_date": "30 May 2026",
     "races": 2,
     "winners": 1,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "AP300526",
-    "track_name": "Albpark",
-    "meeting_date": "30 May 2026",
-    "races": 6,
-    "winners": 4,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "RE310526",
-    "track_name": "Redclif",
-    "meeting_date": "31 May 2026",
-    "races": 8,
-    "winners": 0,
-    "state": "QLD"
   },
   {
     "meeting_code": "NR010626",
@@ -814,14 +662,6 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "AP020626T",
-    "track_name": "Albpark",
-    "meeting_date": "2 Jun 2026",
-    "races": 6,
-    "winners": 0,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "EY020626",
     "track_name": "Wagga",
     "meeting_date": "2 Jun 2026",
@@ -836,22 +676,6 @@
     "races": 8,
     "winners": 2,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "RE030626",
-    "track_name": "Redclif",
-    "meeting_date": "3 Jun 2026",
-    "races": 8,
-    "winners": 1,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "AP040626",
-    "track_name": "Albpark",
-    "meeting_date": "4 Jun 2026",
-    "races": 7,
-    "winners": 2,
-    "state": "QLD"
   },
   {
     "meeting_code": "PE040626",
@@ -878,36 +702,12 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "RE050626",
-    "track_name": "Redclif",
-    "meeting_date": "5 Jun 2026",
-    "races": 8,
-    "winners": 0,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "PC060626",
     "track_name": "Menangle",
     "meeting_date": "6 Jun 2026",
     "races": 8,
     "winners": 2,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "AP060626",
-    "track_name": "Albpark",
-    "meeting_date": "6 Jun 2026",
-    "races": 9,
-    "winners": 6,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "UG070626",
-    "track_name": "Marburg",
-    "meeting_date": "7 Jun 2026",
-    "races": 8,
-    "winners": 0,
-    "state": "QLD"
   },
   {
     "meeting_code": "PE080626",
@@ -924,14 +724,6 @@
     "races": 7,
     "winners": 0,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "AP090626",
-    "track_name": "Albpark",
-    "meeting_date": "9 Jun 2026",
-    "races": 6,
-    "winners": 1,
-    "state": "QLD"
   },
   {
     "meeting_code": "ME090626",
@@ -956,22 +748,6 @@
     "races": 8,
     "winners": 3,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "RE100626",
-    "track_name": "Redclif",
-    "meeting_date": "10 Jun 2026",
-    "races": 10,
-    "winners": 4,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "AP110626",
-    "track_name": "Albpark",
-    "meeting_date": "11 Jun 2026",
-    "races": 8,
-    "winners": 2,
-    "state": "QLD"
   },
   {
     "meeting_code": "TA110626",
@@ -1014,22 +790,6 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "RE120626",
-    "track_name": "Redclif",
-    "meeting_date": "12 Jun 2026",
-    "races": 11,
-    "winners": 1,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "AP130626",
-    "track_name": "Albpark",
-    "meeting_date": "13 Jun 2026",
-    "races": 10,
-    "winners": 4,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "PC130626",
     "track_name": "Menangle",
     "meeting_date": "13 Jun 2026",
@@ -1044,14 +804,6 @@
     "races": 7,
     "winners": 3,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "AP160626",
-    "track_name": "Albpark",
-    "meeting_date": "16 Jun 2026",
-    "races": 7,
-    "winners": 1,
-    "state": "QLD"
   },
   {
     "meeting_code": "ME160626",
@@ -1078,22 +830,6 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "RE170626",
-    "track_name": "Redclif",
-    "meeting_date": "17 Jun 2026",
-    "races": 7,
-    "winners": 2,
-    "state": "QLD"
-  },
-  {
-    "meeting_code": "RE180626",
-    "track_name": "Redclif",
-    "meeting_date": "18 Jun 2026",
-    "races": 9,
-    "winners": 5,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "PE180626",
     "track_name": "Penrith",
     "meeting_date": "18 Jun 2026",
@@ -1118,28 +854,12 @@
     "state": "NSW"
   },
   {
-    "meeting_code": "RE200626",
-    "track_name": "Redclif",
-    "meeting_date": "20 Jun 2026",
-    "races": 9,
-    "winners": 3,
-    "state": "QLD"
-  },
-  {
     "meeting_code": "PC200626",
     "track_name": "Menangle",
     "meeting_date": "20 Jun 2026",
     "races": 7,
     "winners": 1,
     "state": "NSW"
-  },
-  {
-    "meeting_code": "UG210626",
-    "track_name": "Marburg",
-    "meeting_date": "21 Jun 2026",
-    "races": 8,
-    "winners": 1,
-    "state": "QLD"
   },
   {
     "meeting_code": "PK210626",
