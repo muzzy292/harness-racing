@@ -868,5 +868,61 @@
     "races": 10,
     "winners": 1,
     "state": "NSW"
+  },
+  {
+    "meeting_code": "BH010426",
+    "state": "NSW",
+    "races": 8,
+    "winners": 2,
+    "track_name": "Bathurst",
+    "meeting_date": "1 Apr 2026"
+  },
+  {
+    "meeting_code": "BH240626",
+    "state": "NSW",
+    "races": 9,
+    "winners": 0,
+    "track_name": "Bathurst",
+    "meeting_date": "24 Jun 2026"
+  },
+  {
+    "meeting_code": "EY230626",
+    "state": "NSW",
+    "races": 9,
+    "winners": 0,
+    "track_name": "Wagga",
+    "meeting_date": "23 Jun 2026"
+  },
+  {
+    "meeting_code": "ME230626",
+    "state": "NSW",
+    "races": 6,
+    "winners": 0,
+    "track_name": "Menangle",
+    "meeting_date": "23 Jun 2026"
+  },
+  {
+    "meeting_code": "PC270626",
+    "state": "NSW",
+    "races": 8,
+    "winners": 0,
+    "track_name": "Menangle",
+    "meeting_date": "27 Jun 2026"
+  },
+  {
+    "meeting_code": "PE250626",
+    "state": "NSW",
+    "races": 9,
+    "winners": 0,
+    "track_name": "Penrith",
+    "meeting_date": "25 Jun 2026"
+  },
+  {
+    "meeting_code": "TA250626",
+    "state": "NSW",
+    "races": 8,
+    "winners": 0,
+    "track_name": "Tamworth",
+    "meeting_date": "25 Jun 2026"
   }
 ]
