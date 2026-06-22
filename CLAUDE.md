@@ -191,43 +191,60 @@ Race 4 should show 8 runners with BAM BAM BROOK at Fr4 and TONYS DREAM scratched
 
 ---
 
-## Cloud Migration Plan
+## Cloud Automation (live since 22 Jun 2026)
 
-Move the model off the desktop to a hosted server with daily automated pipeline.
+The pipeline runs automatically in **GitHub Actions** — no VPS, no Supabase, no
+Vercel. SQLite is kept; the static `docs/` site keeps deploying to GitHub Pages.
+(The earlier VPS/Oracle + Supabase plan was rejected: the frontend is
+pre-rendered static HTML, not a DB-reading app, so a Postgres/Vercel migration
+would have rewritten the data layer and frontend for no gain.)
 
 ### Architecture
-- **VPS** (Oracle Cloud Always Free — Sydney region, ARM, 4 vCPU / 24 GB RAM) runs all compute and holds the SQLite DB
-- **GitHub Pages** (existing) serves the frontend — VPS pushes rendered HTML after each run
-- Do NOT use GitHub Actions — SQLite DB needs persistent storage, not suitable for git commits
+- **Compute:** GitHub Actions cron, `.github/workflows/daily.yml`.
+- **Database:** SQLite, kept as-is. NOT in this repo. Lives as a release asset
+  in a **separate private repo** `muzzy292/harness-racing-data` so it is never
+  publicly downloadable.
+- **Frontend:** unchanged — `republish-all` renders static HTML to `docs/` and
+  pushes to GitHub Pages (branch `main`, `/docs`).
+- **Why a second repo:** the account is on **GitHub Free**, where Pages from a
+  *private* repo is unavailable. So the main repo stays **public** (code is just
+  model logic; Pages stays free) and only the DB is private.
 
-### Automation: daily_run.sh (7:00am AEST via cron)
+### Daily flow — `daily-run` command (cron `0 19 * * *` UTC = 6am AEDT / 5am AEST)
 ```
-sync-results   → fetch final SPs/positions for recently run meetings
-sync-upcoming  → discover and ingest today's meetings
-build-features → rebuild features CSV
-republish-all  → rebuild HTML + push to GitHub Pages
+restore DB (private repo)  ← scripts/db_restore.sh
+  sync-results    → fetch final SPs/positions for recently run meetings
+  sync-upcoming   → discover + ingest upcoming meetings not yet in DB
+  refresh-today   → re-ingest TODAY'S meetings for late scratchings/field changes
+  build-features  → rebuild features CSV
+  republish-all   → render HTML for every loaded meeting + push to Pages
+back up DB (private repo)   ← scripts/db_backup.sh (runs always)
 ```
-Cron: `0 21 * * *` (UTC) = 7:00am AEST
+Cron is UTC and best-effort (can be delayed); drifts 1h across DST. Also
+runnable on demand via `workflow_dispatch`.
 
-### CLI commands that already exist — no new model code needed
-| Command | Purpose |
-|---|---|
-| `sync-upcoming` | Discovers + ingests upcoming meetings not yet in DB |
-| `sync-results`  | Fetches + ingests results for recent meetings without stored results |
-| `build-features` | Rebuilds features CSV |
-| `republish-all` | Rebuilds HTML + pushes to GitHub Pages |
+### DB persistence (scripts/)
+- `db_restore.sh` downloads `harness-data.tar.gz` (data/harness.db +
+  data/track_pars.json) from the `db-latest` release of the private repo.
+- `db_backup.sh` overwrites `db-latest` (rolling working copy) and uploads a
+  dated snapshot to the `db-backups` release, pruned to the last 14.
+- One-time seed: `scripts/SEEDING.md` (upload the current bundle to `db-latest`).
 
-### Migration steps (ordered)
-1. Provision Oracle Cloud Ubuntu 22.04 ARM (Sydney)
-2. Install: Python 3.11, pip, git, Playwright + Chromium
-3. Clone repo; transfer `data/harness.db`, `data/track_pars.json`, `weights.json` via scp
-4. Generate SSH deploy key on VPS → add to GitHub repo (write access)
-5. Run one manual `daily_run.sh` end-to-end, verify Pages updates
-6. Set cron job; run desktop in parallel for one week to confirm parity
-7. Stop running on desktop
+### Secrets / config
+- One secret: **`DB_REPO_TOKEN`** — a fine-grained PAT (Contents: read+write,
+  scoped to ONLY the data repo), stored as a **Repository secret** in the
+  **public** repo's Actions settings. The workflow has no `pull_request`
+  trigger, so the secret is never exposed to fork PRs.
+- The `docs/` push uses the built-in `GITHUB_TOKEN` (`permissions: contents:
+  write`). GitHub auto-emails on scheduled-run failure — no notification secret.
 
-### Open questions to resolve before building
-1. Does `sync-upcoming` cover QLD meetings (AP/RE) or NSW only? — description says "NSW meetings", may need extending
-2. Does re-ingesting a post-race HTML correctly capture final SPs into `race_results.starting_price`?
-3. Is Playwright Chromium stable on ARM Linux? (test early)
-4. DB backup strategy — daily `scp` to desktop or object storage (DB is the single source of truth)
+### Operating rules (IMPORTANT)
+- **The cloud `db-latest` is the source of truth.** After a run it is ahead of
+  the local `data/harness.db`.
+- **Do NOT run the pipeline locally and push** — it split-brains the DB and the
+  docs git history. The desktop is for *developing/testing*; the cloud *runs* it.
+- To change behaviour: edit code → push → re-run the workflow (or wait for the
+  schedule). The cloud pushes `docs/` to `main` daily, so `git pull --rebase`
+  before pushing local code commits.
+- Dependencies pinned in `requirements.txt` / `pyproject.toml` (Playwright is the
+  only runtime dep; everything else is stdlib).
