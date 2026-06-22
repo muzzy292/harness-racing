@@ -25,7 +25,7 @@ _STARTING_BANK = 100.0
 # ---------------------------------------------------------------------------
 
 def _score_all_races(csv_path: str, weights_path: str | None, weights: dict | None = None) -> list[dict]:
-    from .web import _load_state_weights, _meeting_state
+    from .web import _is_site_meeting, _load_state_weights, _meeting_state
 
     rows = load_feature_rows(csv_path)
     if weights is not None:
@@ -50,6 +50,8 @@ def _score_all_races(csv_path: str, weights_path: str | None, weights: dict | No
 
     races: list[dict] = []
     for mc, rn in sorted(combos, reverse=True):   # most recent first
+        if not _is_site_meeting(mc):
+            continue  # QLD excluded from the site
         scored = score_race_rows(rows, mc, rn, weights=state_weights[_meeting_state(mc)])
         if not scored:
             continue

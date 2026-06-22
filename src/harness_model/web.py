@@ -17,10 +17,21 @@ from .storage import append_bets_to_ledger, connect, init_db, load_bet_ledger
 
 _QLD_PREFIXES: frozenset[str] = frozenset({"AP", "RE", "UG"})
 
+# States hidden from the published site. QLD data is still ingested and kept in
+# the DB (and its bets stay frozen in bet_ledger) — it just isn't rendered:
+# 44% of QLD races lack a parseable NR ceiling, so its prices are unreliable and
+# it has no validated edge. Flip this back to () to re-publish QLD.
+_SITE_EXCLUDE_STATES: tuple[str, ...] = ("QLD",)
+
 
 def _meeting_state(meeting_code: str) -> str:
     """Return 'QLD' for QLD meetings, 'NSW' for all others."""
     return "QLD" if str(meeting_code)[:2].upper() in _QLD_PREFIXES else "NSW"
+
+
+def _is_site_meeting(meeting_code: str) -> bool:
+    """True if this meeting should appear on the published site."""
+    return _meeting_state(meeting_code) not in _SITE_EXCLUDE_STATES
 
 
 def _load_state_weights(base: dict | None) -> dict[str, dict | None]:
@@ -215,7 +226,11 @@ def _write_index(
         except ValueError:
             return datetime.min
 
-    manifest_sorted = sorted(manifest, key=_date_sort_key, reverse=True)
+    # Hide excluded-state meetings (e.g. QLD) from the index listing.
+    manifest_sorted = sorted(
+        (m for m in manifest if _is_site_meeting(m["meeting_code"])),
+        key=_date_sort_key, reverse=True,
+    )
     cards: list[str] = []
     for m in manifest_sorted:
         code = m["meeting_code"]
@@ -342,8 +357,6 @@ def _write_index(
     .meeting-meta {{ color: var(--secondary); font-size: 12px; }}
     .meeting-stats {{ color: var(--primary-text); font-size: 12px; font-weight: 600; }}
     .meeting-link {{ margin-top: 4px; color: var(--accent); font-size: 13px; font-weight: 600; }}
-    .filter-btn{{background:var(--surface);color:var(--secondary);border:1px solid var(--border);border-radius:5px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}}
-    .filter-btn.active{{background:rgba(0,212,255,0.12);color:var(--accent);border-color:var(--accent)}}
   </style>
 </head>
 <body>
@@ -351,11 +364,7 @@ def _write_index(
     <a href="index.html" class="active">Meetings</a>
     <a href="stats.html">Stats</a>
     <a href="betting.html">Betting</a>
-    <a href="betting-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
-    <a href="betting-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
     <a href="diagnose.html">Diagnose</a>
-    <a href="diagnose-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
-    <a href="diagnose-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
     <a href="live.html">Live</a>
   </nav>
   <div class="hero">
@@ -363,23 +372,10 @@ def _write_index(
     <p>Fair odds and probabilities — select a meeting below</p>
   </div>
   <div class="wrap">
-    <div class="filter-bar" style="display:flex;gap:8px;margin-bottom:20px">
-      <button class="filter-btn active" onclick="filterState('all')">All</button>
-      <button class="filter-btn" onclick="filterState('NSW')">NSW</button>
-      <button class="filter-btn" onclick="filterState('QLD')">QLD</button>
-    </div>
     <div class="grid">
       {''.join(cards) if cards else '<p>No meeting pages built yet.</p>'}
     </div>
   </div>
-<script>
-function filterState(s) {{
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.textContent===s||(s==='all'&&b.textContent==='All')));
-  document.querySelectorAll('.meeting-card').forEach(c => {{
-    c.style.display = (s==='all' || c.dataset.state===s) ? '' : 'none';
-  }});
-}}
-</script>
 </body>
 </html>
 """
@@ -760,11 +756,7 @@ def _render_meeting_html(
       <a href="index.html">Meetings</a>
       <a href="stats.html">Stats</a>
       <a href="betting.html">Betting</a>
-      <a href="betting-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
-      <a href="betting-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
       <a href="diagnose.html">Diagnose</a>
-      <a href="diagnose-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
-      <a href="diagnose-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
       <a href="live.html">Live</a>
       {race_nav}
     </nav>
@@ -1400,11 +1392,7 @@ def _render_stats_html(driver_rows: list[dict], trainer_rows: list[dict], meta: 
     <a href="index.html">Meetings</a>
     <a href="stats.html" class="active">Stats</a>
     <a href="betting.html">Betting</a>
-    <a href="betting-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
-    <a href="betting-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
     <a href="diagnose.html">Diagnose</a>
-    <a href="diagnose-nsw.html" style="font-size:11px;padding:3px 8px">NSW</a>
-    <a href="diagnose-qld.html" style="font-size:11px;padding:3px 8px">QLD</a>
     <a href="live.html">Live</a>
   </nav>
   <div class="hero">
@@ -1992,18 +1980,8 @@ def _render_betting_html(records: list[dict], summary: dict, generated_at: str) 
         })
     records_json = _json.dumps(serialisable)
 
-    _bet_state = summary.get("state", "All")
-    _sub = "style=\"font-size:11px;padding:3px 8px\""
-    _bet_nav = (
-        f'<a href="betting.html"{" class=\"active\"" if _bet_state=="All" else ""}>Betting</a>'
-        f'<a href="betting-nsw.html" {_sub}{" class=\"active\"" if _bet_state=="NSW" else ""}>NSW</a>'
-        f'<a href="betting-qld.html" {_sub}{" class=\"active\"" if _bet_state=="QLD" else ""}>QLD</a>'
-    )
-    _diag_nav = (
-        '<a href="diagnose.html">Diagnose</a>'
-        f'<a href="diagnose-nsw.html" {_sub}>NSW</a>'
-        f'<a href="diagnose-qld.html" {_sub}>QLD</a>'
-    )
+    _bet_nav = '<a href="betting.html" class="active">Betting</a>'
+    _diag_nav = '<a href="diagnose.html">Diagnose</a>'
 
     return f"""<!doctype html>
 <html lang="en">
@@ -2403,6 +2381,14 @@ def republish_all_meetings(
     published = 0
     state_weights = _load_state_weights(weights)
     for code in meeting_codes:
+        # Excluded-state meetings (QLD) stay in the DB but are removed from the
+        # site: delete any existing page and drop the manifest entry.
+        if not _is_site_meeting(code):
+            stale_page = docs / f"{code}.html"
+            if stale_page.exists():
+                stale_page.unlink()
+            manifest[:] = [m for m in manifest if m.get("meeting_code") != code]
+            continue
         try:
             meeting_scores = score_meeting_rows(feature_rows, code, weights=state_weights[_meeting_state(code)])
             meeting_meta = _load_meeting_metadata(conn, code)
@@ -2443,26 +2429,19 @@ def republish_all_meetings(
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     _write_index(docs)
 
-    # Rebuild betting and diagnose pages (all + per-state) from the frozen ledger.
-    # All ledgers start 11 Jun 2026 — adoption of the fitted weights and the
-    # pre-registered blend strategy (fit_holdout.py). Forward bets only; earlier
-    # bets were placed under different weights/rules and would mix strategies.
-    # QLD now runs the same blend strategy as NSW (weights-qld.json mirrors NSW),
-    # but as an EXPLORATORY page only: the weights/blend were fitted on NSW data,
-    # not validated on QLD, which still has the NR-ceiling parsing gap.
+    # Rebuild betting and diagnose pages from the frozen ledger. QLD is excluded
+    # from the site (_SITE_EXCLUDE_STATES) so only NSW pages are built; the
+    # headline and NSW pages are the same NSW-only view. Ledger starts 11 Jun
+    # 2026 (adoption of the fitted weights + pre-registered blend strategy).
     _bet_from = datetime(2026, 6, 11)
     try:
-        # Headline page still excludes QLD until QLD has its own validated
-        # weights — the QLD-only page below is for monitoring the blend rule.
-        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, from_date=_bet_from, exclude_states=("QLD",))
+        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, from_date=_bet_from, exclude_states=_SITE_EXCLUDE_STATES)
         build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="NSW", from_date=_bet_from)
-        build_betting_site(db_path, csv_path, docs, starting_bankroll=1000.0, state="QLD", from_date=_bet_from)
     except Exception as exc:  # noqa: BLE001
         print(f"  Warning: betting page rebuild failed — {exc}")
     try:
         build_diagnose_site(csv_path, db_path, docs, weights=weights)
         build_diagnose_site(csv_path, db_path, docs, weights=weights, state="NSW")
-        build_diagnose_site(csv_path, db_path, docs, weights=weights, state="QLD")
     except Exception as exc:  # noqa: BLE001
         print(f"  Warning: diagnose page rebuild failed — {exc}")
 
@@ -2560,6 +2539,8 @@ def build_diagnose_site(
     for meeting_code in meetings:
         if state and _meeting_state(meeting_code) != state:
             continue
+        if not _is_site_meeting(meeting_code):
+            continue  # QLD excluded from the site
         try:
             scored = score_meeting_rows(rows, meeting_code, weights=state_weights[_meeting_state(meeting_code)])
         except Exception:
@@ -2732,17 +2713,8 @@ def _render_diagnose_html(race_groups: dict, generated_at: str, meeting_track: d
 
     n_races = global_stats.get("total_races", 0)
 
-    _sub = "style=\"font-size:11px;padding:3px 8px\""
-    _bet_nav = (
-        '<a href="betting.html">Betting</a>'
-        f'<a href="betting-nsw.html" {_sub}>NSW</a>'
-        f'<a href="betting-qld.html" {_sub}>QLD</a>'
-    )
-    _diag_nav = (
-        f'<a href="diagnose.html"{" class=\"active\"" if not state else ""}>Diagnose</a>'
-        f'<a href="diagnose-nsw.html" {_sub}{" class=\"active\"" if state=="NSW" else ""}>NSW</a>'
-        f'<a href="diagnose-qld.html" {_sub}{" class=\"active\"" if state=="QLD" else ""}>QLD</a>'
-    )
+    _bet_nav = '<a href="betting.html">Betting</a>'
+    _diag_nav = '<a href="diagnose.html" class="active">Diagnose</a>'
 
     return f"""<!doctype html>
 <html lang="en">
