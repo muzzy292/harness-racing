@@ -2356,28 +2356,36 @@ def republish_all_meetings(
     docs_dir: str | Path = "docs",
     weights: dict | None = None,
 ) -> int:
-    """Re-score and re-render every meeting in docs/meetings.json in one batch.
+    """Re-score and re-render every meeting loaded in the DB in one batch.
 
-    Loads feature rows and opens the DB once, writes all HTMLs, then does a
-    single git add/commit/push. Returns the number of meetings republished.
+    Sources meetings from the feature CSV (every meeting with runners, including
+    newly imported upcoming ones) unioned with the existing manifest, so new
+    meetings are published — not just those already listed. Loads feature rows
+    and opens the DB once, writes all HTMLs, then does a single git
+    add/commit/push. Returns the number of meetings republished.
     """
     repo_root = Path(__file__).parents[2]
     docs = Path(docs_dir) if Path(docs_dir).is_absolute() else (repo_root / docs_dir)
     docs.mkdir(parents=True, exist_ok=True)
 
     manifest_path = docs / "meetings.json"
-    if not manifest_path.exists():
-        print("No meetings.json found — nothing to republish.")
-        return 0
-
-    manifest: list[dict[str, Any]] = json.loads(manifest_path.read_text(encoding="utf-8"))
-    meeting_codes = [m["meeting_code"] for m in manifest if m.get("meeting_code")]
-    if not meeting_codes:
-        print("meetings.json is empty — nothing to republish.")
-        return 0
+    manifest: list[dict[str, Any]] = (
+        json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest_path.exists() else []
+    )
+    manifest_codes = [m["meeting_code"] for m in manifest if m.get("meeting_code")]
 
     print(f"Loading features from {csv_path} ...")
     feature_rows = load_feature_rows(csv_path)
+    # Publish every meeting loaded in the DB (via the feature CSV), not only those
+    # already in the manifest — so newly imported upcoming meetings appear on the
+    # site. Union with manifest codes so older results-only meetings (no current
+    # runners in the CSV) still get refreshed.
+    csv_codes = [r.get("meeting_code", "") for r in feature_rows if r.get("meeting_code")]
+    meeting_codes = [c for c in dict.fromkeys(manifest_codes + csv_codes) if c]
+    if not meeting_codes:
+        print("No meetings to publish (manifest and feature CSV are both empty).")
+        return 0
 
     conn = connect(db_path)
     init_db(conn)
@@ -2401,20 +2409,27 @@ def republish_all_meetings(
             races_scored = sum(1 for rows in meeting_scores.values() if rows)
             winners_count = _count_top_pick_winners(meeting_scores, result_rows)
 
+            # Create a manifest entry for newly loaded meetings so they show on the
+            # index; skip a brand-new meeting with nothing scoreable yet (no empty
+            # placeholder page).
+            entry = next((m for m in manifest if m.get("meeting_code") == code), None)
+            if entry is None and races_scored == 0:
+                continue
+
             page_path = docs / f"{code}.html"
             page_path.write_text(
                 _render_meeting_html(code, meeting_scores, meeting_meta, result_rows),
                 encoding="utf-8",
             )
-            # Update the manifest entry in-place (races/winners counts may have changed)
-            entry = next((m for m in manifest if m.get("meeting_code") == code), None)
-            if entry:
-                entry["races"] = races_scored
-                entry["winners"] = winners_count
-                if meeting_meta:
-                    for k in ("track_name", "meeting_date"):
-                        if meeting_meta.get(k):
-                            entry[k] = meeting_meta[k]
+            if entry is None:
+                entry = {"meeting_code": code, "state": _meeting_state(code)}
+                manifest.append(entry)
+            entry["races"] = races_scored
+            entry["winners"] = winners_count
+            if meeting_meta:
+                for k in ("track_name", "meeting_date"):
+                    if meeting_meta.get(k):
+                        entry[k] = meeting_meta[k]
 
             print(f"  {code}: {races_scored} races, {winners_count} winners")
             published += 1
