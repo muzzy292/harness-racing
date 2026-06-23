@@ -389,7 +389,7 @@
     "track_name": "Wagga",
     "meeting_date": "8 May 2026",
     "races": 7,
-    "winners": 2
+    "winners": 3
   },
   {
     "meeting_code": "DU080526",
@@ -546,7 +546,7 @@
     "track_name": "Newcastle",
     "meeting_date": "22 May 2026",
     "races": 9,
-    "winners": 1,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -738,7 +738,7 @@
     "track_name": "Wagga",
     "meeting_date": "9 Jun 2026",
     "races": 8,
-    "winners": 1,
+    "winners": 0,
     "state": "NSW"
   },
   {
@@ -897,7 +897,7 @@
     "meeting_code": "ME230626",
     "state": "NSW",
     "races": 6,
-    "winners": 0,
+    "winners": 2,
     "track_name": "Menangle",
     "meeting_date": "23 Jun 2026"
   },
@@ -924,5 +924,21 @@
     "winners": 0,
     "track_name": "Tamworth",
     "meeting_date": "25 Jun 2026"
+  },
+  {
+    "meeting_code": "EY260626",
+    "state": "NSW",
+    "races": 9,
+    "winners": 0,
+    "track_name": "Wagga",
+    "meeting_date": "26 Jun 2026"
+  },
+  {
+    "meeting_code": "NR260626",
+    "state": "NSW",
+    "races": 7,
+    "winners": 0,
+    "track_name": "Newcastle",
+    "meeting_date": "26 Jun 2026"
   }
 ]
