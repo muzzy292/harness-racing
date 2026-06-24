@@ -344,10 +344,12 @@ def sync_recent_results(
     output_dir: str | Path = "data/raw",
     delay_s: float = 2.0,
 ) -> tuple[int, int]:
-    """Fetch and ingest results for recently run NSW meetings with no stored results.
+    """Fetch and ingest results for recent NSW meetings with incomplete results.
 
-    For meetings not yet in the meetings table the form page is ingested first.
-    Returns (fetched, skipped).
+    Re-fetches any meeting on the HRNSW recent-results index whose stored
+    results don't yet cover all of its scoreable races (so meetings scraped
+    mid-card get completed later). For meetings not yet in the meetings table
+    the form page is ingested first. Returns (fetched, skipped).
     """
     print("Fetching HRNSW recent results index...", flush=True)
     html = fetch_rendered_html(_HRNSW_RESULTS_URL, wait_ms=4000)
@@ -359,19 +361,36 @@ def sync_recent_results(
     conn = connect(db_path)
     init_db(conn)
     existing_meetings = {row[0] for row in conn.execute("SELECT meeting_code FROM meetings").fetchall()}
-    with_results = {
-        row[0]
-        for row in conn.execute("SELECT DISTINCT meeting_code FROM race_results").fetchall()
-    }
+    # A meeting is re-fetched unless EVERY scoreable race already has a result.
+    # Skipping on "has any result" stranded meetings scraped mid-card (one race
+    # official, the rest not) — the partial result marked them done forever.
+    # Comparing the set of runner race_numbers to result race_numbers means a
+    # partially-resulted meeting gets completed on a later run. The HRNSW index
+    # only lists recent meetings, so re-fetching self-bounds.
+    runner_races: dict[str, set] = {}
+    for row in conn.execute(
+        "SELECT DISTINCT meeting_code, race_number FROM race_runners WHERE COALESCE(scratched, 0) = 0"
+    ).fetchall():
+        runner_races.setdefault(row[0], set()).add(row[1])
+    result_races: dict[str, set] = {}
+    for row in conn.execute(
+        "SELECT DISTINCT meeting_code, race_number FROM race_results WHERE finish_position IS NOT NULL"
+    ).fetchall():
+        result_races.setdefault(row[0], set()).add(row[1])
     conn.close()
+
+    def _results_complete(code: str) -> bool:
+        needed = runner_races.get(code, set())
+        # Unknown meetings (no runners yet) are treated as incomplete so they fetch.
+        return bool(needed) and needed.issubset(result_races.get(code, set()))
 
     fetched = 0
     skipped = 0
     for entry in entries:
         code = entry["meeting_code"]
         label = f"{entry['track_name']} {entry['meeting_date']} ({code})"
-        if code in with_results:
-            print(f"  Skip {label} — results already in DB", flush=True)
+        if _results_complete(code):
+            print(f"  Skip {label} — all races have results", flush=True)
             skipped += 1
             continue
         print(f"  Fetching results for {label}...", flush=True)
@@ -384,7 +403,6 @@ def sync_recent_results(
             results_path = fetch_results(code, output_dir)
             ingest_results_html(db_path, results_path)
             fetched += 1
-            with_results.add(code)
         except Exception as exc:
             print(f"  Warning: {code} failed — {exc}", flush=True)
         time.sleep(delay_s)
