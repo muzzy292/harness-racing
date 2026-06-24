@@ -179,7 +179,7 @@
     "track_name": "Parkes",
     "meeting_date": "17 Apr 2026",
     "races": 9,
-    "winners": 3
+    "winners": 4
   },
   {
     "meeting_code": "PC180426",
@@ -881,7 +881,7 @@
     "meeting_code": "BH240626",
     "state": "NSW",
     "races": 9,
-    "winners": 0,
+    "winners": 2,
     "track_name": "Bathurst",
     "meeting_date": "24 Jun 2026"
   },
@@ -939,6 +939,14 @@
     "races": 7,
     "winners": 0,
     "track_name": "Newcastle",
+    "meeting_date": "26 Jun 2026"
+  },
+  {
+    "meeting_code": "DU260626",
+    "state": "NSW",
+    "races": 8,
+    "winners": 0,
+    "track_name": "Dubbo",
     "meeting_date": "26 Jun 2026"
   }
 ]
