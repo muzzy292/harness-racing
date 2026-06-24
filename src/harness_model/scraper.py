@@ -131,6 +131,20 @@ def is_valid_meeting_html(html: str) -> bool:
     return 'class="racefieldtable"' in lowered or "horse-search/?horseid=" in lowered
 
 
+def is_valid_results_html(html: str) -> bool:
+    """True if the page actually contains a results table.
+
+    The results table (class "raceFieldTable resultTable") only appears once a
+    race is official and rendered. A fields-only or not-yet-rendered page has no
+    resultTable, so parsing it would silently yield zero results — this lets the
+    fetcher reject/retry such pages instead of ingesting nothing.
+    """
+    lowered = html.lower()
+    if is_rate_limited_html(html):
+        return False
+    return "resulttable" in lowered
+
+
 def is_valid_horse_html(html: str) -> bool:
     lowered = html.lower()
     if is_rate_limited_html(html):

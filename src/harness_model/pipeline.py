@@ -43,6 +43,7 @@ from .scraper import (
     is_valid_driver_html,
     is_valid_horse_html,
     is_valid_meeting_html,
+    is_valid_results_html,
     is_valid_trainer_html,
     save_html,
     trainer_name_to_slug,
@@ -76,9 +77,24 @@ def fetch_meeting(meeting_code: str, output_dir: str | Path) -> Path:
     return save_html(html, Path(output_dir) / f"meeting_{meeting_code}.html")
 
 
-def fetch_results(meeting_code: str, output_dir: str | Path) -> Path:
-    html = fetch_rendered_html(build_results_url(meeting_code))
-    return save_html(html, Path(output_dir) / f"results_{meeting_code}.html")
+def fetch_results(meeting_code: str, output_dir: str | Path, wait_ms: int = 6000, retries: int = 3) -> Path:
+    """Fetch a meeting's results page, validating that results actually rendered.
+
+    The results table loads after the fields table, so a too-early capture sees a
+    fields-only page and parses to zero results. Earlier this was saved silently;
+    now we validate (is_valid_results_html) and retry with escalating wait, and
+    raise a clear error if no results table appears — so the meeting is retried on
+    a later run instead of being stranded with zero results.
+    """
+    html = ""
+    for attempt in range(1, retries + 1):
+        html = fetch_rendered_html(build_results_url(meeting_code), wait_ms=wait_ms + (attempt - 1) * 4000)
+        if is_valid_results_html(html):
+            return save_html(html, Path(output_dir) / f"results_{meeting_code}.html")
+    raise RuntimeError(
+        f"Results page for {meeting_code} showed no results table after {retries} attempts "
+        "(race may not be official yet, or the page was slow/blocked) — will retry next run."
+    )
 
 
 def fetch_results_history(
@@ -401,7 +417,8 @@ def sync_recent_results(
                 existing_meetings.add(code)
                 time.sleep(delay_s)
             results_path = fetch_results(code, output_dir)
-            ingest_results_html(db_path, results_path)
+            n_results = ingest_results_html(db_path, results_path)
+            print(f"    {code}: ingested {n_results} result rows", flush=True)
             fetched += 1
         except Exception as exc:
             print(f"  Warning: {code} failed — {exc}", flush=True)
