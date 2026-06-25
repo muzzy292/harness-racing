@@ -11,7 +11,7 @@
     "track_name": "Newcastle",
     "meeting_date": "6 Apr 2026",
     "races": 6,
-    "winners": 1
+    "winners": 0
   },
   {
     "meeting_code": "EY040426",
@@ -130,7 +130,7 @@
     "track_name": "Menangle",
     "meeting_date": "14 Apr 2026",
     "races": 6,
-    "winners": 1
+    "winners": 2
   },
   {
     "meeting_code": "LE140426",
@@ -382,7 +382,7 @@
     "track_name": "Newcastle",
     "meeting_date": "8 May 2026",
     "races": 8,
-    "winners": 3
+    "winners": 2
   },
   {
     "meeting_code": "EY080526",
@@ -410,7 +410,7 @@
     "track_name": "Newcastle",
     "meeting_date": "11 May 2026",
     "races": 9,
-    "winners": 1,
+    "winners": 0,
     "state": "NSW"
   },
   {
@@ -562,7 +562,7 @@
     "track_name": "Penrith",
     "meeting_date": "25 May 2026",
     "races": 7,
-    "winners": 3,
+    "winners": 2,
     "state": "NSW"
   },
   {
@@ -642,7 +642,7 @@
     "track_name": "Newcastle",
     "meeting_date": "1 Jun 2026",
     "races": 7,
-    "winners": 4,
+    "winners": 3,
     "state": "NSW"
   },
   {
@@ -913,7 +913,7 @@
     "meeting_code": "PE250626",
     "state": "NSW",
     "races": 9,
-    "winners": 0,
+    "winners": 3,
     "track_name": "Penrith",
     "meeting_date": "25 Jun 2026"
   },
@@ -948,5 +948,29 @@
     "winners": 0,
     "track_name": "Dubbo",
     "meeting_date": "26 Jun 2026"
+  },
+  {
+    "meeting_code": "EY300626",
+    "state": "NSW",
+    "races": 8,
+    "winners": 0,
+    "track_name": "Wagga",
+    "meeting_date": "30 Jun 2026"
+  },
+  {
+    "meeting_code": "ME300626",
+    "state": "NSW",
+    "races": 5,
+    "winners": 0,
+    "track_name": "Menangle",
+    "meeting_date": "30 Jun 2026"
+  },
+  {
+    "meeting_code": "NR290626",
+    "state": "NSW",
+    "races": 8,
+    "winners": 0,
+    "track_name": "Newcastle",
+    "meeting_date": "29 Jun 2026"
   }
 ]
