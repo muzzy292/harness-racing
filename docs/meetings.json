@@ -881,7 +881,7 @@
     "meeting_code": "BH240626",
     "state": "NSW",
     "races": 9,
-    "winners": 2,
+    "winners": 4,
     "track_name": "Bathurst",
     "meeting_date": "24 Jun 2026"
   },
@@ -937,7 +937,7 @@
     "meeting_code": "NR260626",
     "state": "NSW",
     "races": 7,
-    "winners": 0,
+    "winners": 1,
     "track_name": "Newcastle",
     "meeting_date": "26 Jun 2026"
   },
@@ -972,5 +972,13 @@
     "winners": 0,
     "track_name": "Newcastle",
     "meeting_date": "29 Jun 2026"
+  },
+  {
+    "meeting_code": "BH010726",
+    "state": "NSW",
+    "races": 9,
+    "winners": 0,
+    "track_name": "Bathurst",
+    "meeting_date": "1 Jul 2026"
   }
 ]
