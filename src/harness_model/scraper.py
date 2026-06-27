@@ -18,6 +18,7 @@ def fetch_rendered_html(
     backoff_s: float = 3.0,
     wait_selector: str | None = None,
     selector_timeout_ms: int = 20000,
+    wait_until: str = "domcontentloaded",
 ) -> str:
     """Fetch a JS-rendered page via headless Chromium.
 
@@ -46,7 +47,7 @@ def fetch_rendered_html(
                 browser = playwright.chromium.launch(headless=True)
                 context = browser.new_context(user_agent=USER_AGENT)
                 page = context.new_page()
-                page.goto(url, timeout=45000, wait_until="domcontentloaded")
+                page.goto(url, timeout=45000, wait_until=wait_until)
                 if wait_selector:
                     try:
                         page.wait_for_selector(wait_selector, timeout=selector_timeout_ms)

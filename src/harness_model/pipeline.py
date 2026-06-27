@@ -114,6 +114,34 @@ def fetch_results(meeting_code: str, output_dir: str | Path, wait_ms: int = 6000
         f"rate_limited={is_rate_limited_html(html)} error={'an error has occurred' in low}",
         flush=True,
     )
+    # The old site is migrating results to harness.au and now redirects some
+    # meetings there. If we can spot the redirect target, probe it (real browser
+    # from the runner) so we can see the new site's structure and confirm the
+    # runner can even reach it. Diagnostic only — safe to remove once the new
+    # source is built.
+    import re as _re
+    tgt = _re.search(r"https?://[^\s\"'<>]+harness\.au[^\s\"'<>]*", html)
+    if tgt:
+        target_url = tgt.group(0).replace("&amp;", "&")
+        print(f"    {meeting_code} redirect target: {target_url}", flush=True)
+        try:
+            nhtml = fetch_rendered_html(target_url, wait_ms=8000, wait_until="networkidle", retries=1)
+            nlow = nhtml.lower()
+            nt0 = nlow.find("<title")
+            ntitle = ""
+            if nt0 != -1:
+                nts, nte = nhtml.find(">", nt0), nlow.find("</title>", nt0)
+                if nts != -1 and nte != -1:
+                    ntitle = nhtml[nts + 1:nte].strip()[:80]
+            print(
+                f"    {meeting_code} harness.au probe: len={len(nhtml)} title={ntitle!r} "
+                f"finish={'finish' in nlow} position={'position' in nlow} "
+                f"price={'price' in nlow or 'odds' in nlow} margin={'margin' in nlow} "
+                f"json_blob={'application/json' in nlow or '__next_data__' in nlow}",
+                flush=True,
+            )
+        except Exception as exc:  # noqa: BLE001 — probe must never break the run
+            print(f"    {meeting_code} harness.au probe failed: {exc}", flush=True)
     raise RuntimeError(
         f"Results page for {meeting_code} showed no results table after {retries} attempts "
         "(race may not be official yet, or the page was slow/blocked) — will retry next run."
