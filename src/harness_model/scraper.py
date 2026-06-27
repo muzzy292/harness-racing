@@ -12,13 +12,24 @@ USER_AGENT = (
 
 
 def fetch_rendered_html(
-    url: str, wait_ms: int = 5000, retries: int = 3, backoff_s: float = 3.0
+    url: str,
+    wait_ms: int = 5000,
+    retries: int = 3,
+    backoff_s: float = 3.0,
+    wait_selector: str | None = None,
+    selector_timeout_ms: int = 20000,
 ) -> str:
     """Fetch a JS-rendered page via headless Chromium.
 
     Retries transient failures (navigation timeouts, browser launch hiccups)
     with linear backoff so unattended cloud runs survive a flaky network or a
     momentary block. Raises after the final attempt.
+
+    wait_selector: if set, wait for this CSS selector to appear (up to
+    selector_timeout_ms) before capturing — more reliable than a fixed delay for
+    content that loads late (e.g. a results table that renders slowly). Missing
+    selector is non-fatal: it falls through to capture whatever rendered so the
+    caller can validate/retry.
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -36,6 +47,11 @@ def fetch_rendered_html(
                 context = browser.new_context(user_agent=USER_AGENT)
                 page = context.new_page()
                 page.goto(url, timeout=45000, wait_until="domcontentloaded")
+                if wait_selector:
+                    try:
+                        page.wait_for_selector(wait_selector, timeout=selector_timeout_ms)
+                    except Exception:  # noqa: BLE001 — selector never appeared; capture anyway
+                        pass
                 page.wait_for_timeout(wait_ms)
                 html = page.content()
                 browser.close()

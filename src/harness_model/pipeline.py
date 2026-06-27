@@ -88,7 +88,13 @@ def fetch_results(meeting_code: str, output_dir: str | Path, wait_ms: int = 6000
     """
     html = ""
     for attempt in range(1, retries + 1):
-        html = fetch_rendered_html(build_results_url(meeting_code), wait_ms=wait_ms + (attempt - 1) * 4000)
+        # Wait for the results table itself to render, rather than guessing a fixed
+        # delay — some meetings (e.g. Wagga) render results notably slower.
+        html = fetch_rendered_html(
+            build_results_url(meeting_code),
+            wait_ms=wait_ms,
+            wait_selector="table.resultTable",
+        )
         if is_valid_results_html(html):
             return save_html(html, Path(output_dir) / f"results_{meeting_code}.html")
     raise RuntimeError(
