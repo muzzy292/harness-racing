@@ -81,15 +81,17 @@ def fetch_results(meeting_code: str, output_dir: str | Path, wait_ms: int = 6000
     """Fetch a meeting's results page, validating that results actually rendered.
 
     The results table loads after the fields table, so a too-early capture sees a
-    fields-only page and parses to zero results. Earlier this was saved silently;
-    now we validate (is_valid_results_html) and retry with escalating wait, and
-    raise a clear error if no results table appears — so the meeting is retried on
-    a later run instead of being stranded with zero results.
+    fields-only page and parses to zero results. We validate (is_valid_results_html)
+    and retry, and raise a clear error if no results table appears.
+
+    Migration note: harness.org.au is moving results to harness.au and now
+    redirects migrated meetings to a generic "Redirecting" landing (no results).
+    We detect that and fail fast with a distinct error instead of retrying.
     """
     html = ""
     for attempt in range(1, retries + 1):
         # Wait for the results table itself to render, rather than guessing a fixed
-        # delay — some meetings (e.g. Wagga) render results notably slower.
+        # delay — some meetings render results notably slower.
         html = fetch_rendered_html(
             build_results_url(meeting_code),
             wait_ms=wait_ms,
@@ -97,51 +99,11 @@ def fetch_results(meeting_code: str, output_dir: str | Path, wait_ms: int = 6000
         )
         if is_valid_results_html(html):
             return save_html(html, Path(output_dir) / f"results_{meeting_code}.html")
-    # Diagnostic: describe what our headless fetch actually received, so a
-    # persistent failure (e.g. Wagga) can be characterised from the run log
-    # without reproducing locally — is it a fields-only page, a challenge/error
-    # page, or a genuinely different structure?
-    low = html.lower()
-    title = ""
-    t0 = low.find("<title")
-    if t0 != -1:
-        ts, te = html.find(">", t0), low.find("</title>", t0)
-        if ts != -1 and te != -1:
-            title = html[ts + 1:te].strip()[:80]
-    print(
-        f"    {meeting_code} diagnostic: len={len(html)} title={title!r} "
-        f"racefieldtable={'racefieldtable' in low} resulttable={'resulttable' in low} "
-        f"rate_limited={is_rate_limited_html(html)} error={'an error has occurred' in low}",
-        flush=True,
-    )
-    # The old site is migrating results to harness.au and now redirects some
-    # meetings there. If we can spot the redirect target, probe it (real browser
-    # from the runner) so we can see the new site's structure and confirm the
-    # runner can even reach it. Diagnostic only — safe to remove once the new
-    # source is built.
-    import re as _re
-    tgt = _re.search(r"https?://[^\s\"'<>]+harness\.au[^\s\"'<>]*", html)
-    if tgt:
-        target_url = tgt.group(0).replace("&amp;", "&")
-        print(f"    {meeting_code} redirect target: {target_url}", flush=True)
-        try:
-            nhtml = fetch_rendered_html(target_url, wait_ms=8000, wait_until="networkidle", retries=1)
-            nlow = nhtml.lower()
-            nt0 = nlow.find("<title")
-            ntitle = ""
-            if nt0 != -1:
-                nts, nte = nhtml.find(">", nt0), nlow.find("</title>", nt0)
-                if nts != -1 and nte != -1:
-                    ntitle = nhtml[nts + 1:nte].strip()[:80]
-            print(
-                f"    {meeting_code} harness.au probe: len={len(nhtml)} title={ntitle!r} "
-                f"finish={'finish' in nlow} position={'position' in nlow} "
-                f"price={'price' in nlow or 'odds' in nlow} margin={'margin' in nlow} "
-                f"json_blob={'application/json' in nlow or '__next_data__' in nlow}",
-                flush=True,
+        if "redirecting" in html[:4000].lower() or "redirected=old" in html.lower():
+            raise RuntimeError(
+                f"Results for {meeting_code} have migrated to harness.au "
+                "(old site redirects to a generic landing) — old-site fetch can't serve them."
             )
-        except Exception as exc:  # noqa: BLE001 — probe must never break the run
-            print(f"    {meeting_code} harness.au probe failed: {exc}", flush=True)
     raise RuntimeError(
         f"Results page for {meeting_code} showed no results table after {retries} attempts "
         "(race may not be official yet, or the page was slow/blocked) — will retry next run."
