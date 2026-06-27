@@ -416,12 +416,32 @@ def sync_recent_results(
         "SELECT DISTINCT meeting_code, race_number FROM race_results WHERE finish_position IS NOT NULL"
     ).fetchall():
         result_races.setdefault(row[0], set()).add(row[1])
+    meeting_dates: dict[str, str] = {
+        row[0]: row[1]
+        for row in conn.execute("SELECT meeting_code, meeting_date FROM meetings").fetchall()
+    }
     conn.close()
+
+    _today = _local_today()
+
+    def _meeting_age_days(code: str) -> int | None:
+        try:
+            return (_today - datetime.strptime(meeting_dates.get(code, ""), "%d %b %Y").date()).days
+        except (TypeError, ValueError):
+            return None
 
     def _results_complete(code: str) -> bool:
         needed = runner_races.get(code, set())
+        have = result_races.get(code, set())
         # Unknown meetings (no runners yet) are treated as incomplete so they fetch.
-        return bool(needed) and needed.issubset(result_races.get(code, set()))
+        if needed and needed.issubset(have):
+            return True
+        # Grace: a meeting that has SOME results and is >2 days old is treated as
+        # final — remaining races are abandoned/never-posted (e.g. Penrith R9/R10
+        # abandoned), not pending, so stop re-fetching it. A meeting with ZERO
+        # results keeps retrying (that's a fetch failure, not abandonment).
+        age = _meeting_age_days(code)
+        return bool(have) and age is not None and age > 2
 
     fetched = 0
     skipped = 0
