@@ -100,6 +100,17 @@ def fetch_results(meeting_code: str, output_dir: str | Path, wait_ms: int = 6000
         if is_valid_results_html(html):
             return save_html(html, Path(output_dir) / f"results_{meeting_code}.html")
         if "redirecting" in html[:4000].lower() or "redirected=old" in html.lower():
+            # Migrated to harness.au. Probe the new API from the runner to confirm
+            # we can reach it past Cloudflare (feasibility test before we build the
+            # full harness.au results client).
+            try:
+                from .scraper import fetch_harness_au_json
+                _data = fetch_harness_au_json(meeting_code)
+                _nr = len(_data.get("races", []))
+                _status = (_data.get("meta") or {}).get("status")
+                print(f"    {meeting_code} harness.au API probe: OK — {_nr} races (meta status {_status})", flush=True)
+            except Exception as _exc:  # noqa: BLE001
+                print(f"    {meeting_code} harness.au API probe: FAILED — {_exc}", flush=True)
             raise RuntimeError(
                 f"Results for {meeting_code} have migrated to harness.au "
                 "(old site redirects to a generic landing) — old-site fetch can't serve them."

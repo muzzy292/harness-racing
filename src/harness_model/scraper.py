@@ -89,6 +89,58 @@ def fetch_hrnsw_results_search_html(track_value: str, wait_ms: int = 5000) -> st
         return html
 
 
+def fetch_harness_au_json(meeting_code: str, wait_ms: int = 8000, retries: int = 2) -> dict:
+    """Fetch a meeting's results JSON from the new harness.au API.
+
+    api.harness.au sits behind Cloudflare and only answers requests that carry a
+    real browser origin + cf_clearance cookie. So we load harness.au with
+    Playwright (clearing the Cloudflare challenge), then issue the API fetch from
+    inside the page so the browser supplies cookies/origin/referer automatically
+    — exactly how the site's own JS does it. Returns the parsed JSON; raises on
+    failure (e.g. Cloudflare blocked the runner).
+    """
+    import json as _json
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:
+        raise RuntimeError(
+            "Playwright is required. Install with 'pip install playwright' "
+            "and 'python -m playwright install chromium'."
+        ) from exc
+
+    api_url = f"https://api.harness.au/racing/{meeting_code}/"
+    last_exc: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                context = browser.new_context(user_agent=USER_AGENT)
+                page = context.new_page()
+                page.goto("https://www.harness.au/", timeout=45000, wait_until="domcontentloaded")
+                page.wait_for_timeout(wait_ms)  # let the Cloudflare challenge clear
+                result = page.evaluate(
+                    """async (url) => {
+                        try {
+                            const r = await fetch(url, {
+                                headers: {accept: 'application/json', 'x-requested-with': 'harness-web/1.0.0'},
+                                credentials: 'include',
+                            });
+                            return {status: r.status, body: await r.text()};
+                        } catch (e) { return {status: -1, body: String(e)}; }
+                    }""",
+                    api_url,
+                )
+                browser.close()
+            if result and result.get("status") == 200 and result.get("body"):
+                return _json.loads(result["body"])
+            last_exc = RuntimeError(f"API returned status {result.get('status') if result else 'none'}")
+        except Exception as exc:  # noqa: BLE001 — transient/Cloudflare errors
+            last_exc = exc
+        time.sleep(3 * attempt)
+    raise RuntimeError(f"harness.au API fetch failed for {meeting_code}: {last_exc}")
+
+
 def save_html(html: str, output_path: str | Path) -> Path:
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
