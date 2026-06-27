@@ -89,7 +89,7 @@ def fetch_hrnsw_results_search_html(track_value: str, wait_ms: int = 5000) -> st
         return html
 
 
-def fetch_harness_au_json(meeting_code: str, wait_ms: int = 8000, retries: int = 2) -> dict:
+def fetch_harness_au_json(meeting_code: str, wait_ms: int = 12000, retries: int = 2) -> dict:
     """Fetch a meeting's results JSON from the new harness.au API.
 
     api.harness.au sits behind Cloudflare and only answers requests that carry a
@@ -112,6 +112,7 @@ def fetch_harness_au_json(meeting_code: str, wait_ms: int = 8000, retries: int =
     api_url = f"https://api.harness.au/racing/{meeting_code}/"
     last_exc: Exception | None = None
     for attempt in range(1, retries + 1):
+        page_title = "?"
         try:
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch(headless=True)
@@ -119,6 +120,7 @@ def fetch_harness_au_json(meeting_code: str, wait_ms: int = 8000, retries: int =
                 page = context.new_page()
                 page.goto("https://www.harness.au/", timeout=45000, wait_until="domcontentloaded")
                 page.wait_for_timeout(wait_ms)  # let the Cloudflare challenge clear
+                page_title = page.title()
                 result = page.evaluate(
                     """async (url) => {
                         try {
@@ -134,9 +136,16 @@ def fetch_harness_au_json(meeting_code: str, wait_ms: int = 8000, retries: int =
                 browser.close()
             if result and result.get("status") == 200 and result.get("body"):
                 return _json.loads(result["body"])
-            last_exc = RuntimeError(f"API returned status {result.get('status') if result else 'none'}")
+            # Surface the page title (Cloudflare state) and the JS-side error so a
+            # failure can be diagnosed from the log: a "Just a moment" title means
+            # Cloudflare didn't clear; a "Failed to fetch" body means CORS/network.
+            last_exc = RuntimeError(
+                f"status={result.get('status') if result else 'none'} "
+                f"page_title={page_title!r} "
+                f"detail={(str(result.get('body'))[:160]) if result else ''}"
+            )
         except Exception as exc:  # noqa: BLE001 — transient/Cloudflare errors
-            last_exc = exc
+            last_exc = RuntimeError(f"{exc} (page_title={page_title!r})")
         time.sleep(3 * attempt)
     raise RuntimeError(f"harness.au API fetch failed for {meeting_code}: {last_exc}")
 
