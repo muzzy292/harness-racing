@@ -97,6 +97,23 @@ def fetch_results(meeting_code: str, output_dir: str | Path, wait_ms: int = 6000
         )
         if is_valid_results_html(html):
             return save_html(html, Path(output_dir) / f"results_{meeting_code}.html")
+    # Diagnostic: describe what our headless fetch actually received, so a
+    # persistent failure (e.g. Wagga) can be characterised from the run log
+    # without reproducing locally — is it a fields-only page, a challenge/error
+    # page, or a genuinely different structure?
+    low = html.lower()
+    title = ""
+    t0 = low.find("<title")
+    if t0 != -1:
+        ts, te = html.find(">", t0), low.find("</title>", t0)
+        if ts != -1 and te != -1:
+            title = html[ts + 1:te].strip()[:80]
+    print(
+        f"    {meeting_code} diagnostic: len={len(html)} title={title!r} "
+        f"racefieldtable={'racefieldtable' in low} resulttable={'resulttable' in low} "
+        f"rate_limited={is_rate_limited_html(html)} error={'an error has occurred' in low}",
+        flush=True,
+    )
     raise RuntimeError(
         f"Results page for {meeting_code} showed no results table after {retries} attempts "
         "(race may not be official yet, or the page was slow/blocked) — will retry next run."
