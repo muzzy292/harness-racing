@@ -179,7 +179,7 @@
     "track_name": "Parkes",
     "meeting_date": "17 Apr 2026",
     "races": 9,
-    "winners": 4
+    "winners": 3
   },
   {
     "meeting_code": "PC180426",
@@ -945,7 +945,7 @@
     "meeting_code": "DU260626",
     "state": "NSW",
     "races": 8,
-    "winners": 0,
+    "winners": 1,
     "track_name": "Dubbo",
     "meeting_date": "26 Jun 2026"
   },
